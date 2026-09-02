@@ -1,0 +1,33 @@
+{
+ "id": "curated-dw-langsam",
+ "slug": "dw-langsam-gesprochene-nachrichten",
+ "title": "Langsam gesprochene Nachrichten",
+ "publisher": "Deutsche Welle",
+ "description": "Die Tagesnachrichten, absichtlich langsam gesprochen. Der klassische Brückenkurs zwischen A2 und B1.",
+ "source": {
+  "kind": "pending",
+  "pageUrl": "https://learngerman.dw.com/",
+  "ingestHint": "npm run ingest -- --url <episode audio URL> --level A2"
+ },
+ "cefr": "A2",
+ "cefrNote": "Editorial label. Run the ingest worker to replace it with a measured one.",
+ "topics": [
+  "Nachrichten",
+  "Politik"
+ ],
+ "durationSec": 600,
+ "license": "Link out to the publisher. Ingest for personal study only.",
+ "metrics": {
+  "syllablesPerSecond": 0,
+  "lexicalDiversity": 0,
+  "phoneticComplexity": 0,
+  "sdm": 22,
+  "goetheCoverage": {},
+  "outOfListRatio": 0
+ },
+ "transcriptStatus": "pending",
+ "glossary": {},
+ "transcript": [],
+ "quiz": [],
+ "drillSegmentIds": []
+}

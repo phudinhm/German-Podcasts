@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": ".scripts-out",
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "files": [
+    "scripts/build-catalog.ts",
+    "scripts/classify-level.ts",
+    "lib/types.ts",
+    "lib/cefr.ts",
+    "lib/sdm.ts",
+    "lib/german/orthography.ts",
+    "lib/german/phonetics.ts",
+    "lib/german/compound.ts",
+    "lib/german/stems.ts",
+    "lib/german/lemma.ts",
+    "data/lexicon/core.ts",
+    "data/lexicon/goethe.ts",
+    "data/lexicon/irregular-verbs.ts",
+    "data/lexicon/stems.extra.ts"
+  ]
+}

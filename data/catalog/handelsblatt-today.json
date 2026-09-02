@@ -1,0 +1,34 @@
+{
+ "id": "curated-handelsblatt-today",
+ "slug": "handelsblatt-today",
+ "title": "Handelsblatt Today",
+ "publisher": "Handelsblatt",
+ "description": "Wirtschaft und Finanzmärkte im Tagesformat. Fachvokabular, Zahlen, schnelle Übergaben zwischen Moderation und Korrespondenten.",
+ "source": {
+  "kind": "pending",
+  "pageUrl": "https://www.handelsblatt.com/",
+  "ingestHint": "npm run ingest -- --feed <RSS URL> --level C1"
+ },
+ "cefr": "C1",
+ "cefrNote": "Editorial label. Run the ingest worker to replace it with a measured one.",
+ "topics": [
+  "Wirtschaft",
+  "Finanzen",
+  "Märkte"
+ ],
+ "durationSec": 1500,
+ "license": "Link out to the publisher. Ingest for personal study only.",
+ "metrics": {
+  "syllablesPerSecond": 0,
+  "lexicalDiversity": 0,
+  "phoneticComplexity": 0,
+  "sdm": 76,
+  "goetheCoverage": {},
+  "outOfListRatio": 0
+ },
+ "transcriptStatus": "pending",
+ "glossary": {},
+ "transcript": [],
+ "quiz": [],
+ "drillSegmentIds": []
+}

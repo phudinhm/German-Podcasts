@@ -1,0 +1,33 @@
+{
+ "id": "curated-slow-german",
+ "slug": "slow-german",
+ "title": "Slow German mit Annik Rubens",
+ "publisher": "Annik Rubens",
+ "description": "Monologe über deutsche Alltagskultur, deutlich langsamer als normales Sprechtempo. Gute Brücke zu freiem Sprechen.",
+ "source": {
+  "kind": "pending",
+  "pageUrl": "https://slowgerman.com/",
+  "ingestHint": "npm run ingest -- --feed <RSS URL> --level A2"
+ },
+ "cefr": "A2",
+ "cefrNote": "Editorial label. Run the ingest worker to replace it with a measured one.",
+ "topics": [
+  "Kultur",
+  "Alltag"
+ ],
+ "durationSec": 480,
+ "license": "Link out to the publisher. Ingest for personal study only.",
+ "metrics": {
+  "syllablesPerSecond": 0,
+  "lexicalDiversity": 0,
+  "phoneticComplexity": 0,
+  "sdm": 24,
+  "goetheCoverage": {},
+  "outOfListRatio": 0
+ },
+ "transcriptStatus": "pending",
+ "glossary": {},
+ "transcript": [],
+ "quiz": [],
+ "drillSegmentIds": []
+}

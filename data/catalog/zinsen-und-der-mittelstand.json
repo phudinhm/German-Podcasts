@@ -1,0 +1,2492 @@
+{
+ "id": "demo-c1-mittelstand",
+ "slug": "zinsen-und-der-mittelstand",
+ "title": "Zinsen, Investitionen und der deutsche Mittelstand",
+ "publisher": "Hörbar Demo",
+ "description": "Wirtschaftsanalyse im Tempo eines Business-Podcasts: Geldpolitik, Finanzierungskosten und die Investitionszurückhaltung im Mittelstand.",
+ "source": {
+  "kind": "timeline"
+ },
+ "cefr": "C1",
+ "cefrNote": "61% of tokens sit inside the Goethe A1-B1 lists, 39% fall outside them, 10% are compounds, delivery runs at 5.7 syllables per second",
+ "topics": [
+  "Wirtschaft",
+  "Finanzen",
+  "Geldpolitik"
+ ],
+ "durationSec": 71.46,
+ "license": "Original demo script written for Hörbar, CC BY 4.0.",
+ "metrics": {
+  "syllablesPerSecond": 5.7,
+  "lexicalDiversity": 0.907,
+  "phoneticComplexity": 0.129,
+  "sdm": 58,
+  "goetheCoverage": {
+   "A1": 0.428,
+   "A2": 0.506,
+   "B1": 0.608
+  },
+  "outOfListRatio": 0.392
+ },
+ "transcriptStatus": "demo",
+ "glossary": {
+  "Zinswende": {
+   "en": [
+    "interest-rate turnaround"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Zinswenden",
+   "vi": [
+    "bước ngoặt lãi suất"
+   ]
+  },
+  "haben": {
+   "en": [
+    "to have"
+   ],
+   "p": "v",
+   "vi": [
+    "có"
+   ]
+  },
+  "hat": {
+   "en": [
+    "to have"
+   ],
+   "p": "v",
+   "vi": [
+    "có"
+   ]
+  },
+  "Mittelstand": {
+   "en": [
+    "the Mittelstand, small and mid-sized firms"
+   ],
+   "g": "der",
+   "n": "Culturally specific: family-owned, often export-strong.",
+   "p": "n",
+   "vi": [
+    "khối doanh nghiệp vừa và nhỏ"
+   ]
+  },
+  "treffen": {
+   "en": [
+    "to meet",
+    "to hit"
+   ],
+   "n": "Vowel change: er trifft.",
+   "p": "v",
+   "vi": [
+    "gặp",
+    "tác động"
+   ]
+  },
+  "getroffen": {
+   "en": [
+    "to meet",
+    "to hit"
+   ],
+   "n": "Vowel change: er trifft.",
+   "p": "v",
+   "vi": [
+    "gặp",
+    "tác động"
+   ]
+  },
+  "als": {
+   "en": [
+    "when",
+    "than",
+    "as"
+   ],
+   "p": "conj",
+   "vi": [
+    "khi",
+    "hơn"
+   ]
+  },
+  "Konzern": {
+   "en": [
+    "corporate group"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Konzerne",
+   "vi": [
+    "tập đoàn"
+   ]
+  },
+  "Konzerne": {
+   "en": [
+    "corporate group"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Konzerne",
+   "vi": [
+    "tập đoàn"
+   ]
+  },
+  "Unternehmen": {
+   "en": [
+    "company"
+   ],
+   "g": "das",
+   "p": "n",
+   "pl": "Unternehmen",
+   "vi": [
+    "doanh nghiệp"
+   ]
+  },
+  "finanzieren": {
+   "en": [
+    "to finance"
+   ],
+   "p": "v",
+   "vi": [
+    "tài trợ"
+   ]
+  },
+  "sich": {
+   "en": [
+    "himself",
+    "herself",
+    "themselves"
+   ],
+   "n": "Reflexive pronoun.",
+   "p": "pron",
+   "vi": [
+    "chính mình"
+   ]
+  },
+  "über": {
+   "en": [
+    "over",
+    "about"
+   ],
+   "n": "Two-way preposition.",
+   "p": "prep",
+   "vi": [
+    "trên",
+    "về"
+   ]
+  },
+  "Kapitalmarkt": {
+   "en": [
+    "capital market"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Kapitalmärkte",
+   "vi": [
+    "thị trường vốn"
+   ]
+  },
+  "und": {
+   "en": [
+    "and"
+   ],
+   "p": "conj",
+   "vi": [
+    "và"
+   ]
+  },
+  "begeben": {
+   "en": [
+    "to issue (securities)",
+    "to proceed"
+   ],
+   "n": "sich begeben = to make one's way.",
+   "p": "v",
+   "vi": [
+    "phát hành"
+   ]
+  },
+  "hängen": {
+   "en": [
+    "to hang",
+    "to depend"
+   ],
+   "n": "hängen an + dative.",
+   "p": "v",
+   "vi": [
+    "treo",
+    "phụ thuộc"
+   ]
+  },
+  "hängt": {
+   "en": [
+    "to hang",
+    "to depend"
+   ],
+   "n": "hängen an + dative.",
+   "p": "v",
+   "vi": [
+    "treo",
+    "phụ thuộc"
+   ]
+  },
+  "dagegen": {
+   "en": [
+    "by contrast",
+    "against it"
+   ],
+   "p": "adv",
+   "vi": [
+    "ngược lại"
+   ]
+  },
+  "fast": {
+   "en": [
+    "almost"
+   ],
+   "p": "adv",
+   "vi": [
+    "gần như"
+   ]
+  },
+  "vollständig": {
+   "en": [
+    "complete"
+   ],
+   "p": "adj",
+   "vi": [
+    "hoàn toàn"
+   ]
+  },
+  "klassisch": {
+   "en": [
+    "classic",
+    "traditional"
+   ],
+   "p": "adj",
+   "vi": [
+    "truyền thống"
+   ]
+  },
+  "klassischen": {
+   "en": [
+    "classic",
+    "traditional"
+   ],
+   "p": "adj",
+   "vi": [
+    "truyền thống"
+   ]
+  },
+  "Bankkredit": {
+   "en": [
+    "bank loan"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Bankkredite",
+   "vi": [
+    "tín dụng ngân hàng"
+   ]
+  },
+  "steigen": {
+   "en": [
+    "to rise",
+    "to climb"
+   ],
+   "n": "Perfect with sein.",
+   "p": "v",
+   "vi": [
+    "tăng"
+   ]
+  },
+  "Steigen": {
+   "en": [
+    "to rise",
+    "to climb"
+   ],
+   "n": "Perfect with sein.",
+   "p": "v",
+   "vi": [
+    "tăng"
+   ]
+  },
+  "Leitzins": {
+   "en": [
+    "key interest rate"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Leitzinsen",
+   "vi": [
+    "lãi suất điều hành"
+   ]
+  },
+  "Leitzinsen": {
+   "en": [
+    "key interest rate"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Leitzinsen",
+   "vi": [
+    "lãi suất điều hành"
+   ]
+  },
+  "dort": {
+   "en": [
+    "there"
+   ],
+   "p": "adv",
+   "vi": [
+    "ở đó"
+   ]
+  },
+  "unmittelbar": {
+   "en": [
+    "immediately",
+    "directly"
+   ],
+   "p": "adv",
+   "vi": [
+    "lập tức"
+   ]
+  },
+  "Geschäftsführer": {
+   "en": [
+    "managing director"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Geschäftsführer",
+   "vi": [
+    "giám đốc điều hành"
+   ]
+  },
+  "Investition": {
+   "en": [
+    "investment"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Investitionen",
+   "vi": [
+    "khoản đầu tư"
+   ]
+  },
+  "Investitionen": {
+   "en": [
+    "investment"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Investitionen",
+   "vi": [
+    "khoản đầu tư"
+   ]
+  },
+  "deshalb": {
+   "en": [
+    "therefore"
+   ],
+   "p": "adv",
+   "vi": [
+    "vì vậy"
+   ]
+  },
+  "schlicht": {
+   "en": [
+    "simply"
+   ],
+   "p": "adv",
+   "vi": [
+    "đơn giản là"
+   ]
+  },
+  "sein": {
+   "en": [
+    "to be"
+   ],
+   "n": "Irregular: bin, bist, ist, sind, seid.",
+   "p": "v",
+   "vi": [
+    "thì",
+    "là"
+   ]
+  },
+  "ist": {
+   "en": [
+    "to be"
+   ],
+   "n": "Irregular: bin, bist, ist, sind, seid.",
+   "p": "v",
+   "vi": [
+    "thì",
+    "là"
+   ]
+  },
+  "betriebswirtschaftlich": {
+   "en": [
+    "in business-management terms"
+   ],
+   "p": "adj",
+   "vi": [
+    "về mặt quản trị doanh nghiệp"
+   ]
+  },
+  "vernünftig": {
+   "en": [
+    "sensible"
+   ],
+   "p": "adj",
+   "vi": [
+    "hợp lý"
+   ]
+  },
+  "volkswirtschaftlich": {
+   "en": [
+    "in macroeconomic terms"
+   ],
+   "p": "adj",
+   "vi": [
+    "về mặt kinh tế vĩ mô"
+   ]
+  },
+  "aber": {
+   "en": [
+    "but"
+   ],
+   "p": "conj",
+   "vi": [
+    "nhưng"
+   ]
+  },
+  "gefährlich": {
+   "en": [
+    "dangerous"
+   ],
+   "p": "adj",
+   "vi": [
+    "nguy hiểm"
+   ]
+  },
+  "denn": {
+   "en": [
+    "because"
+   ],
+   "n": "Keeps normal word order, unlike weil.",
+   "p": "conj",
+   "vi": [
+    "bởi vì"
+   ]
+  },
+  "Denn": {
+   "en": [
+    "because"
+   ],
+   "n": "Keeps normal word order, unlike weil.",
+   "p": "conj",
+   "vi": [
+    "bởi vì"
+   ]
+  },
+  "von": {
+   "en": [
+    "from",
+    "of",
+    "by"
+   ],
+   "n": "Dative.",
+   "p": "prep",
+   "vi": [
+    "từ",
+    "của"
+   ]
+  },
+  "heute": {
+   "en": [
+    "today"
+   ],
+   "p": "adv",
+   "vi": [
+    "hôm nay"
+   ]
+  },
+  "sind": {
+   "en": [
+    "to be"
+   ],
+   "n": "Irregular: bin, bist, ist, sind, seid.",
+   "p": "v",
+   "vi": [
+    "thì",
+    "là"
+   ]
+  },
+  "Produktivitätslücke": {
+   "en": [
+    "productivity gap"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Produktivitätslücken",
+   "vi": [
+    "khoảng trống năng suất"
+   ]
+  },
+  "morgen": {
+   "en": [
+    "tomorrow"
+   ],
+   "p": "adv",
+   "vi": [
+    "ngày mai"
+   ]
+  },
+  "hinzu": {
+   "en": [
+    "in addition"
+   ],
+   "n": "hinzu kommt, dass ...",
+   "p": "adv",
+   "vi": [
+    "thêm vào đó"
+   ]
+  },
+  "Hinzu": {
+   "en": [
+    "in addition"
+   ],
+   "n": "hinzu kommt, dass ...",
+   "p": "adv",
+   "vi": [
+    "thêm vào đó"
+   ]
+  },
+  "kommen": {
+   "en": [
+    "to come"
+   ],
+   "p": "v",
+   "vi": [
+    "đến"
+   ]
+  },
+  "kommt": {
+   "en": [
+    "to come"
+   ],
+   "p": "v",
+   "vi": [
+    "đến"
+   ]
+  },
+  "dass": {
+   "en": [
+    "that"
+   ],
+   "n": "Always sends the verb to the end.",
+   "p": "conj",
+   "vi": [
+    "rằng"
+   ]
+  },
+  "Energiepreis": {
+   "en": [
+    "energy price"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Energiepreise",
+   "vi": [
+    "giá năng lượng"
+   ]
+  },
+  "Energiepreise": {
+   "en": [
+    "energy price"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Energiepreise",
+   "vi": [
+    "giá năng lượng"
+   ]
+  },
+  "weiterhin": {
+   "en": [
+    "still",
+    "continuing"
+   ],
+   "p": "adv",
+   "vi": [
+    "vẫn còn"
+   ]
+  },
+  "Vorkrisenniveau": {
+   "en": [
+    "pre-crisis level"
+   ],
+   "g": "das",
+   "p": "n",
+   "vi": [
+    "mức trước khủng hoảng"
+   ]
+  },
+  "liegen": {
+   "en": [
+    "to lie",
+    "to be located"
+   ],
+   "p": "v",
+   "vi": [
+    "nằm"
+   ]
+  },
+  "wer": {
+   "en": [
+    "who"
+   ],
+   "n": "Also means whoever at the start of a clause.",
+   "p": "pron",
+   "vi": [
+    "ai"
+   ]
+  },
+  "Wer": {
+   "en": [
+    "who"
+   ],
+   "n": "Also means whoever at the start of a clause.",
+   "p": "pron",
+   "vi": [
+    "ai"
+   ]
+  },
+  "energieintensiv": {
+   "en": [
+    "energy-intensive"
+   ],
+   "p": "adj",
+   "vi": [
+    "tiêu tốn nhiều năng lượng"
+   ]
+  },
+  "produzieren": {
+   "en": [
+    "to produce"
+   ],
+   "p": "v",
+   "vi": [
+    "sản xuất"
+   ]
+  },
+  "produziert": {
+   "en": [
+    "to produce"
+   ],
+   "p": "v",
+   "vi": [
+    "sản xuất"
+   ]
+  },
+  "rechnen": {
+   "en": [
+    "to calculate",
+    "to reckon"
+   ],
+   "n": "rechnen mit = to count on.",
+   "p": "v",
+   "vi": [
+    "tính toán"
+   ]
+  },
+  "rechnet": {
+   "en": [
+    "to calculate",
+    "to reckon"
+   ],
+   "n": "rechnen mit = to count on.",
+   "p": "v",
+   "vi": [
+    "tính toán"
+   ]
+  },
+  "inzwischen": {
+   "en": [
+    "by now",
+    "meanwhile"
+   ],
+   "p": "adv",
+   "vi": [
+    "hiện nay"
+   ]
+  },
+  "sehr": {
+   "en": [
+    "very"
+   ],
+   "p": "adv",
+   "vi": [
+    "rất"
+   ]
+  },
+  "genau": {
+   "en": [
+    "exact",
+    "precise"
+   ],
+   "p": "adj",
+   "vi": [
+    "chính xác"
+   ]
+  },
+  "nach": {
+   "en": [
+    "after",
+    "to"
+   ],
+   "n": "Dative.",
+   "p": "prep",
+   "vi": [
+    "sau",
+    "đến"
+   ]
+  },
+  "Familienunternehmen": {
+   "en": [
+    "family business"
+   ],
+   "g": "das",
+   "p": "n",
+   "pl": "Familienunternehmen",
+   "vi": [
+    "doanh nghiệp gia đình"
+   ]
+  },
+  "verlagern": {
+   "en": [
+    "to relocate",
+    "to shift"
+   ],
+   "p": "v",
+   "vi": [
+    "chuyển dịch"
+   ]
+  },
+  "Teil": {
+   "en": [
+    "part"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Teile",
+   "vi": [
+    "phần"
+   ]
+  },
+  "Teile": {
+   "en": [
+    "part"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Teile",
+   "vi": [
+    "phần"
+   ]
+  },
+  "Fertigung": {
+   "en": [
+    "production",
+    "manufacturing"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Fertigungen",
+   "vi": [
+    "sản xuất"
+   ]
+  },
+  "Ausland": {
+   "en": [
+    "abroad"
+   ],
+   "g": "das",
+   "n": "Always with a preposition: ins Ausland, im Ausland.",
+   "p": "n",
+   "vi": [
+    "nước ngoài"
+   ]
+  },
+  "setzen": {
+   "en": [
+    "to set",
+    "to place"
+   ],
+   "n": "setzen auf = to bet on.",
+   "p": "v",
+   "vi": [
+    "đặt"
+   ]
+  },
+  "auf": {
+   "en": [
+    "on",
+    "onto"
+   ],
+   "n": "Two-way: dative for location, accusative for direction.",
+   "p": "prep",
+   "vi": [
+    "trên"
+   ]
+  },
+  "Automatisierung": {
+   "en": [
+    "automation"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Automatisierungen",
+   "vi": [
+    "tự động hóa"
+   ]
+  },
+  "um": {
+   "en": [
+    "at",
+    "around"
+   ],
+   "n": "Accusative. um ... zu = in order to.",
+   "p": "prep",
+   "vi": [
+    "vào lúc"
+   ]
+  },
+  "Lohnkosten": {
+   "en": [
+    "labour costs"
+   ],
+   "g": "die",
+   "n": "Plural only.",
+   "p": "n",
+   "vi": [
+    "chi phí nhân công"
+   ]
+  },
+  "zu": {
+   "en": [
+    "to",
+    "too"
+   ],
+   "n": "Dative.",
+   "p": "prep",
+   "vi": [
+    "đến",
+    "quá"
+   ]
+  },
+  "senken": {
+   "en": [
+    "to lower",
+    "to cut"
+   ],
+   "p": "v",
+   "vi": [
+    "giảm"
+   ]
+  },
+  "Fachkräftemangel": {
+   "en": [
+    "shortage of skilled workers"
+   ],
+   "g": "der",
+   "p": "n",
+   "vi": [
+    "thiếu lao động lành nghề"
+   ]
+  },
+  "verstärken": {
+   "en": [
+    "to reinforce",
+    "to intensify"
+   ],
+   "p": "v",
+   "vi": [
+    "làm gia tăng"
+   ]
+  },
+  "verstärkt": {
+   "en": [
+    "to reinforce",
+    "to intensify"
+   ],
+   "p": "v",
+   "vi": [
+    "làm gia tăng"
+   ]
+  },
+  "Druck": {
+   "en": [
+    "pressure"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Drücke",
+   "vi": [
+    "áp lực"
+   ]
+  },
+  "zusätzlich": {
+   "en": [
+    "additionally"
+   ],
+   "p": "adv",
+   "vi": [
+    "thêm nữa"
+   ]
+  },
+  "Bundesregierung": {
+   "en": [
+    "federal government"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Bundesregierungen",
+   "vi": [
+    "chính phủ liên bang"
+   ]
+  },
+  "Genehmigung": {
+   "en": [
+    "permit",
+    "approval"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Genehmigungen",
+   "vi": [
+    "giấy phép"
+   ]
+  },
+  "Genehmigungen": {
+   "en": [
+    "permit",
+    "approval"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Genehmigungen",
+   "vi": [
+    "giấy phép"
+   ]
+  },
+  "weniger": {
+   "en": [
+    "less",
+    "fewer"
+   ],
+   "p": "adv",
+   "vi": [
+    "ít hơn"
+   ]
+  },
+  "Bürokratie": {
+   "en": [
+    "bureaucracy",
+    "red tape"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Bürokratien",
+   "vi": [
+    "bộ máy hành chính"
+   ]
+  },
+  "in": {
+   "en": [
+    "in",
+    "into"
+   ],
+   "n": "Two-way preposition.",
+   "p": "prep",
+   "vi": [
+    "trong"
+   ]
+  },
+  "In": {
+   "en": [
+    "in",
+    "into"
+   ],
+   "n": "Two-way preposition.",
+   "p": "prep",
+   "vi": [
+    "trong"
+   ]
+  },
+  "Praxis": {
+   "en": [
+    "practice"
+   ],
+   "g": "die",
+   "n": "in der Praxis = in practice.",
+   "p": "n",
+   "pl": "Praxen",
+   "vi": [
+    "thực tế"
+   ]
+  },
+  "Genehmigungsverfahren": {
+   "en": [
+    "approval procedure"
+   ],
+   "g": "das",
+   "p": "n",
+   "pl": "Genehmigungsverfahren",
+   "vi": [
+    "quy trình cấp phép"
+   ]
+  },
+  "jedoch": {
+   "en": [
+    "however"
+   ],
+   "p": "adv",
+   "vi": [
+    "tuy nhiên"
+   ]
+  },
+  "oft": {
+   "en": [
+    "often"
+   ],
+   "p": "adv",
+   "vi": [
+    "thường xuyên"
+   ]
+  },
+  "Jahr": {
+   "en": [
+    "year"
+   ],
+   "g": "das",
+   "p": "n",
+   "pl": "Jahre",
+   "vi": [
+    "năm"
+   ]
+  },
+  "Jahre": {
+   "en": [
+    "year"
+   ],
+   "g": "das",
+   "p": "n",
+   "pl": "Jahre",
+   "vi": [
+    "năm"
+   ]
+  },
+  "Ökonom": {
+   "en": [
+    "economist"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Ökonomen",
+   "vi": [
+    "nhà kinh tế"
+   ]
+  },
+  "Ökonomen": {
+   "en": [
+    "economist"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Ökonomen",
+   "vi": [
+    "nhà kinh tế"
+   ]
+  },
+  "fordern": {
+   "en": [
+    "to demand"
+   ],
+   "n": "Do not confuse with fördern, to promote.",
+   "p": "v",
+   "vi": [
+    "yêu cầu"
+   ]
+  },
+  "Anreiz": {
+   "en": [
+    "incentive"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Anreize",
+   "vi": [
+    "ưu đãi",
+    "động lực"
+   ]
+  },
+  "Anreize": {
+   "en": [
+    "incentive"
+   ],
+   "g": "der",
+   "p": "n",
+   "pl": "Anreize",
+   "vi": [
+    "ưu đãi",
+    "động lực"
+   ]
+  },
+  "statt": {
+   "en": [
+    "instead of"
+   ],
+   "n": "Takes the genitive.",
+   "p": "prep",
+   "vi": [
+    "thay vì"
+   ]
+  },
+  "Förderprogramm": {
+   "en": [
+    "subsidy programme"
+   ],
+   "g": "das",
+   "p": "n",
+   "pl": "Förderprogramme",
+   "vi": [
+    "chương trình trợ cấp"
+   ]
+  },
+  "Förderprogramme": {
+   "en": [
+    "subsidy programme"
+   ],
+   "g": "das",
+   "p": "n",
+   "pl": "Förderprogramme",
+   "vi": [
+    "chương trình trợ cấp"
+   ]
+  },
+  "Abschreibung": {
+   "en": [
+    "depreciation",
+    "write-off"
+   ],
+   "g": "die",
+   "n": "Accounting term: degressiv = declining balance.",
+   "p": "n",
+   "pl": "Abschreibungen",
+   "vi": [
+    "khấu hao"
+   ]
+  },
+  "werden": {
+   "en": [
+    "to become",
+    "will"
+   ],
+   "n": "Also forms the future and the passive.",
+   "p": "v",
+   "vi": [
+    "trở thành"
+   ]
+  },
+  "würde": {
+   "en": [
+    "to become",
+    "will"
+   ],
+   "n": "Also forms the future and the passive.",
+   "p": "v",
+   "vi": [
+    "trở thành"
+   ]
+  },
+  "sofort": {
+   "en": [
+    "immediately"
+   ],
+   "p": "adv",
+   "vi": [
+    "ngay lập tức"
+   ]
+  },
+  "wirken": {
+   "en": [
+    "to have an effect",
+    "to seem"
+   ],
+   "p": "v",
+   "vi": [
+    "có tác dụng",
+    "trông có vẻ"
+   ]
+  },
+  "wäre": {
+   "en": [
+    "to be"
+   ],
+   "n": "Irregular: bin, bist, ist, sind, seid.",
+   "p": "v",
+   "vi": [
+    "thì",
+    "là"
+   ]
+  },
+  "einfach": {
+   "en": [
+    "simple",
+    "easy"
+   ],
+   "n": "Also a particle: just.",
+   "p": "adj",
+   "vi": [
+    "đơn giản"
+   ]
+  },
+  "ob": {
+   "en": [
+    "whether"
+   ],
+   "n": "Sends the verb to the end.",
+   "p": "conj",
+   "vi": [
+    "liệu có"
+   ]
+  },
+  "Ob": {
+   "en": [
+    "whether"
+   ],
+   "n": "Sends the verb to the end.",
+   "p": "conj",
+   "vi": [
+    "liệu có"
+   ]
+  },
+  "Koalition": {
+   "en": [
+    "coalition"
+   ],
+   "g": "die",
+   "p": "n",
+   "pl": "Koalitionen",
+   "vi": [
+    "liên minh cầm quyền"
+   ]
+  },
+  "einigen": {
+   "en": [
+    "to agree"
+   ],
+   "n": "sich einigen auf + accusative.",
+   "p": "v",
+   "vi": [
+    "thống nhất"
+   ]
+  },
+  "einigt": {
+   "en": [
+    "to agree"
+   ],
+   "n": "sich einigen auf + accusative.",
+   "p": "v",
+   "vi": [
+    "thống nhất"
+   ]
+  },
+  "derzeit": {
+   "en": [
+    "at the moment"
+   ],
+   "p": "adv",
+   "vi": [
+    "hiện tại"
+   ]
+  },
+  "völlig": {
+   "en": [
+    "completely"
+   ],
+   "p": "adv",
+   "vi": [
+    "hoàn toàn"
+   ]
+  },
+  "offen": {
+   "en": [
+    "open",
+    "undecided"
+   ],
+   "p": "adj",
+   "vi": [
+    "bỏ ngỏ"
+   ]
+  },
+  "dahin": {
+   "en": [
+    "until then",
+    "there"
+   ],
+   "n": "bis dahin = until then.",
+   "p": "adv",
+   "vi": [
+    "đến lúc đó"
+   ]
+  },
+  "bleiben": {
+   "en": [
+    "to stay",
+    "to remain"
+   ],
+   "n": "Perfect with sein.",
+   "p": "v",
+   "vi": [
+    "ở lại"
+   ]
+  },
+  "bleibt": {
+   "en": [
+    "to stay",
+    "to remain"
+   ],
+   "n": "Perfect with sein.",
+   "p": "v",
+   "vi": [
+    "ở lại"
+   ]
+  },
+  "was": {
+   "en": [
+    "what"
+   ],
+   "p": "pron",
+   "vi": [
+    "cái gì"
+   ]
+  },
+  "immer": {
+   "en": [
+    "always"
+   ],
+   "p": "adv",
+   "vi": [
+    "luôn luôn"
+   ]
+  },
+  "war": {
+   "en": [
+    "to be"
+   ],
+   "n": "Irregular: bin, bist, ist, sind, seid.",
+   "p": "v",
+   "vi": [
+    "thì",
+    "là"
+   ]
+  },
+  "vorsichtig": {
+   "en": [
+    "cautious"
+   ],
+   "p": "adj",
+   "vi": [
+    "thận trọng"
+   ]
+  },
+  "geduldig": {
+   "en": [
+    "patient"
+   ],
+   "p": "adj",
+   "vi": [
+    "kiên nhẫn"
+   ]
+  },
+  "erstaunlich": {
+   "en": [
+    "astonishing"
+   ],
+   "p": "adj",
+   "vi": [
+    "đáng kinh ngạc"
+   ]
+  },
+  "zäh": {
+   "en": [
+    "tough",
+    "resilient"
+   ],
+   "p": "adj",
+   "vi": [
+    "bền bỉ"
+   ]
+  }
+ },
+ "transcript": [
+  {
+   "id": "s0",
+   "start": 0,
+   "end": 3.684,
+   "de": "Die Zinswende hat den deutschen Mittelstand härter getroffen als die Konzerne.",
+   "en": "The interest-rate turnaround has hit the German Mittelstand harder than the large corporations.",
+   "vi": "Bước ngoặt lãi suất đã tác động đến khối doanh nghiệp vừa và nhỏ của Đức mạnh hơn so với các tập đoàn lớn.",
+   "words": [
+    {
+     "w": "Die",
+     "s": 0,
+     "e": 0.175
+    },
+    {
+     "w": "Zinswende",
+     "s": 0.175,
+     "e": 0.702
+    },
+    {
+     "w": "hat",
+     "s": 0.702,
+     "e": 0.877
+    },
+    {
+     "w": "den",
+     "s": 0.877,
+     "e": 1.053
+    },
+    {
+     "w": "deutschen",
+     "s": 1.053,
+     "e": 1.404
+    },
+    {
+     "w": "Mittelstand",
+     "s": 1.404,
+     "e": 1.93
+    },
+    {
+     "w": "härter",
+     "s": 1.93,
+     "e": 2.281
+    },
+    {
+     "w": "getroffen",
+     "s": 2.281,
+     "e": 2.807
+    },
+    {
+     "w": "als",
+     "s": 2.807,
+     "e": 2.982
+    },
+    {
+     "w": "die",
+     "s": 2.982,
+     "e": 3.158
+    },
+    {
+     "w": "Konzerne",
+     "s": 3.158,
+     "e": 3.684
+    }
+   ]
+  },
+  {
+   "id": "s1",
+   "start": 3.904,
+   "end": 8.29,
+   "de": "Große Unternehmen finanzieren sich über den Kapitalmarkt und begeben Anleihen.",
+   "en": "Large companies finance themselves on the capital market and issue bonds.",
+   "vi": "Các doanh nghiệp lớn huy động vốn trên thị trường vốn và phát hành trái phiếu.",
+   "words": [
+    {
+     "w": "Große",
+     "s": 3.904,
+     "e": 4.255
+    },
+    {
+     "w": "Unternehmen",
+     "s": 4.255,
+     "e": 4.957
+    },
+    {
+     "w": "finanzieren",
+     "s": 4.957,
+     "e": 5.659
+    },
+    {
+     "w": "sich",
+     "s": 5.659,
+     "e": 5.834
+    },
+    {
+     "w": "über",
+     "s": 5.834,
+     "e": 6.185
+    },
+    {
+     "w": "den",
+     "s": 6.185,
+     "e": 6.36
+    },
+    {
+     "w": "Kapitalmarkt",
+     "s": 6.36,
+     "e": 7.062
+    },
+    {
+     "w": "und",
+     "s": 7.062,
+     "e": 7.238
+    },
+    {
+     "w": "begeben",
+     "s": 7.238,
+     "e": 7.764
+    },
+    {
+     "w": "Anleihen",
+     "s": 7.764,
+     "e": 8.29
+    }
+   ]
+  },
+  {
+   "id": "s2",
+   "start": 8.51,
+   "end": 11.844,
+   "de": "Der Mittelstand hängt dagegen fast vollständig am klassischen Bankkredit.",
+   "en": "The Mittelstand, by contrast, depends almost entirely on the classic bank loan.",
+   "vi": "Ngược lại, khối doanh nghiệp vừa và nhỏ gần như phụ thuộc hoàn toàn vào tín dụng ngân hàng truyền thống.",
+   "words": [
+    {
+     "w": "Der",
+     "s": 8.51,
+     "e": 8.686
+    },
+    {
+     "w": "Mittelstand",
+     "s": 8.686,
+     "e": 9.212
+    },
+    {
+     "w": "hängt",
+     "s": 9.212,
+     "e": 9.387
+    },
+    {
+     "w": "dagegen",
+     "s": 9.387,
+     "e": 9.914
+    },
+    {
+     "w": "fast",
+     "s": 9.914,
+     "e": 10.089
+    },
+    {
+     "w": "vollständig",
+     "s": 10.089,
+     "e": 10.615
+    },
+    {
+     "w": "am",
+     "s": 10.615,
+     "e": 10.791
+    },
+    {
+     "w": "klassischen",
+     "s": 10.791,
+     "e": 11.317
+    },
+    {
+     "w": "Bankkredit",
+     "s": 11.317,
+     "e": 11.844
+    }
+   ]
+  },
+  {
+   "id": "s3",
+   "start": 12.064,
+   "end": 15.572,
+   "de": "Steigen die Leitzinsen, verteuert sich die Finanzierung dort unmittelbar.",
+   "en": "When key interest rates rise, financing there becomes more expensive immediately.",
+   "vi": "Khi lãi suất điều hành tăng, chi phí tài chính ở đó lập tức đắt lên.",
+   "words": [
+    {
+     "w": "Steigen",
+     "s": 12.064,
+     "e": 12.414
+    },
+    {
+     "w": "die",
+     "s": 12.414,
+     "e": 12.59
+    },
+    {
+     "w": "Leitzinsen",
+     "s": 12.59,
+     "e": 13.116
+    },
+    {
+     "w": "verteuert",
+     "s": 13.116,
+     "e": 13.642
+    },
+    {
+     "w": "sich",
+     "s": 13.642,
+     "e": 13.818
+    },
+    {
+     "w": "die",
+     "s": 13.818,
+     "e": 13.993
+    },
+    {
+     "w": "Finanzierung",
+     "s": 13.993,
+     "e": 14.695
+    },
+    {
+     "w": "dort",
+     "s": 14.695,
+     "e": 14.871
+    },
+    {
+     "w": "unmittelbar",
+     "s": 14.871,
+     "e": 15.572
+    }
+   ]
+  },
+  {
+   "id": "s4",
+   "start": 15.792,
+   "end": 19.652,
+   "de": "Viele Geschäftsführer haben ihre Investitionen deshalb schlicht verschoben.",
+   "en": "Many managing directors have therefore simply postponed their investments.",
+   "vi": "Vì vậy nhiều giám đốc điều hành đơn giản là hoãn các khoản đầu tư.",
+   "words": [
+    {
+     "w": "Viele",
+     "s": 15.792,
+     "e": 16.143
+    },
+    {
+     "w": "Geschäftsführer",
+     "s": 16.143,
+     "e": 16.845
+    },
+    {
+     "w": "haben",
+     "s": 16.845,
+     "e": 17.196
+    },
+    {
+     "w": "ihre",
+     "s": 17.196,
+     "e": 17.547
+    },
+    {
+     "w": "Investitionen",
+     "s": 17.547,
+     "e": 18.599
+    },
+    {
+     "w": "deshalb",
+     "s": 18.599,
+     "e": 18.95
+    },
+    {
+     "w": "schlicht",
+     "s": 18.95,
+     "e": 19.126
+    },
+    {
+     "w": "verschoben",
+     "s": 19.126,
+     "e": 19.652
+    }
+   ]
+  },
+  {
+   "id": "s5",
+   "start": 19.872,
+   "end": 23.205,
+   "de": "Das ist betriebswirtschaftlich vernünftig, volkswirtschaftlich aber gefährlich.",
+   "en": "That is sensible at the level of the individual firm, but dangerous for the economy as a whole.",
+   "vi": "Về mặt quản trị doanh nghiệp thì hợp lý, nhưng về mặt kinh tế vĩ mô lại nguy hiểm.",
+   "words": [
+    {
+     "w": "Das",
+     "s": 19.872,
+     "e": 20.047
+    },
+    {
+     "w": "ist",
+     "s": 20.047,
+     "e": 20.223
+    },
+    {
+     "w": "betriebswirtschaftlich",
+     "s": 20.223,
+     "e": 21.1
+    },
+    {
+     "w": "vernünftig",
+     "s": 21.1,
+     "e": 21.626
+    },
+    {
+     "w": "volkswirtschaftlich",
+     "s": 21.626,
+     "e": 22.328
+    },
+    {
+     "w": "aber",
+     "s": 22.328,
+     "e": 22.679
+    },
+    {
+     "w": "gefährlich",
+     "s": 22.679,
+     "e": 23.205
+    }
+   ]
+  },
+  {
+   "id": "s6",
+   "start": 23.425,
+   "end": 27.987,
+   "de": "Denn ausbleibende Investitionen von heute sind die Produktivitätslücke von morgen.",
+   "en": "Because the investments that fail to happen today are tomorrow's productivity gap.",
+   "vi": "Bởi những khoản đầu tư không diễn ra hôm nay chính là khoảng trống năng suất của ngày mai.",
+   "words": [
+    {
+     "w": "Denn",
+     "s": 23.425,
+     "e": 23.601
+    },
+    {
+     "w": "ausbleibende",
+     "s": 23.601,
+     "e": 24.302
+    },
+    {
+     "w": "Investitionen",
+     "s": 24.302,
+     "e": 25.355
+    },
+    {
+     "w": "von",
+     "s": 25.355,
+     "e": 25.531
+    },
+    {
+     "w": "heute",
+     "s": 25.531,
+     "e": 25.881
+    },
+    {
+     "w": "sind",
+     "s": 25.881,
+     "e": 26.057
+    },
+    {
+     "w": "die",
+     "s": 26.057,
+     "e": 26.232
+    },
+    {
+     "w": "Produktivitätslücke",
+     "s": 26.232,
+     "e": 27.46
+    },
+    {
+     "w": "von",
+     "s": 27.46,
+     "e": 27.636
+    },
+    {
+     "w": "morgen",
+     "s": 27.636,
+     "e": 27.987
+    }
+   ]
+  },
+  {
+   "id": "s7",
+   "start": 28.207,
+   "end": 32.242,
+   "de": "Hinzu kommt, dass die Energiepreise weiterhin über dem Vorkrisenniveau liegen.",
+   "en": "On top of that, energy prices remain above their pre-crisis level.",
+   "vi": "Thêm vào đó, giá năng lượng vẫn cao hơn mức trước khủng hoảng.",
+   "words": [
+    {
+     "w": "Hinzu",
+     "s": 28.207,
+     "e": 28.558
+    },
+    {
+     "w": "kommt",
+     "s": 28.558,
+     "e": 28.733
+    },
+    {
+     "w": "dass",
+     "s": 28.733,
+     "e": 28.908
+    },
+    {
+     "w": "die",
+     "s": 28.908,
+     "e": 29.084
+    },
+    {
+     "w": "Energiepreise",
+     "s": 29.084,
+     "e": 29.961
+    },
+    {
+     "w": "weiterhin",
+     "s": 29.961,
+     "e": 30.487
+    },
+    {
+     "w": "über",
+     "s": 30.487,
+     "e": 30.838
+    },
+    {
+     "w": "dem",
+     "s": 30.838,
+     "e": 31.014
+    },
+    {
+     "w": "Vorkrisenniveau",
+     "s": 31.014,
+     "e": 31.891
+    },
+    {
+     "w": "liegen",
+     "s": 31.891,
+     "e": 32.242
+    }
+   ]
+  },
+  {
+   "id": "s8",
+   "start": 32.462,
+   "end": 35.795,
+   "de": "Wer energieintensiv produziert, rechnet inzwischen sehr genau nach.",
+   "en": "Anyone producing energy-intensively now does the arithmetic very carefully.",
+   "vi": "Ai sản xuất tiêu tốn nhiều năng lượng thì giờ đây tính toán rất kỹ.",
+   "words": [
+    {
+     "w": "Wer",
+     "s": 32.462,
+     "e": 32.637
+    },
+    {
+     "w": "energieintensiv",
+     "s": 32.637,
+     "e": 33.69
+    },
+    {
+     "w": "produziert",
+     "s": 33.69,
+     "e": 34.216
+    },
+    {
+     "w": "rechnet",
+     "s": 34.216,
+     "e": 34.567
+    },
+    {
+     "w": "inzwischen",
+     "s": 34.567,
+     "e": 35.093
+    },
+    {
+     "w": "sehr",
+     "s": 35.093,
+     "e": 35.269
+    },
+    {
+     "w": "genau",
+     "s": 35.269,
+     "e": 35.62
+    },
+    {
+     "w": "nach",
+     "s": 35.62,
+     "e": 35.795
+    }
+   ]
+  },
+  {
+   "id": "s9",
+   "start": 36.015,
+   "end": 39.875,
+   "de": "Einige Familienunternehmen verlagern Teile der Fertigung ins Ausland.",
+   "en": "Some family businesses are relocating parts of their production abroad.",
+   "vi": "Một số doanh nghiệp gia đình đang chuyển một phần sản xuất ra nước ngoài.",
+   "words": [
+    {
+     "w": "Einige",
+     "s": 36.015,
+     "e": 36.541
+    },
+    {
+     "w": "Familienunternehmen",
+     "s": 36.541,
+     "e": 37.769
+    },
+    {
+     "w": "verlagern",
+     "s": 37.769,
+     "e": 38.296
+    },
+    {
+     "w": "Teile",
+     "s": 38.296,
+     "e": 38.647
+    },
+    {
+     "w": "der",
+     "s": 38.647,
+     "e": 38.822
+    },
+    {
+     "w": "Fertigung",
+     "s": 38.822,
+     "e": 39.348
+    },
+    {
+     "w": "ins",
+     "s": 39.348,
+     "e": 39.524
+    },
+    {
+     "w": "Ausland",
+     "s": 39.524,
+     "e": 39.875
+    }
+   ]
+  },
+  {
+   "id": "s10",
+   "start": 40.095,
+   "end": 43.604,
+   "de": "Andere setzen auf Automatisierung, um die Lohnkosten zu senken.",
+   "en": "Others are betting on automation in order to cut labour costs.",
+   "vi": "Số khác đặt cược vào tự động hóa để giảm chi phí nhân công.",
+   "words": [
+    {
+     "w": "Andere",
+     "s": 40.095,
+     "e": 40.621
+    },
+    {
+     "w": "setzen",
+     "s": 40.621,
+     "e": 40.972
+    },
+    {
+     "w": "auf",
+     "s": 40.972,
+     "e": 41.147
+    },
+    {
+     "w": "Automatisierung",
+     "s": 41.147,
+     "e": 42.2
+    },
+    {
+     "w": "um",
+     "s": 42.2,
+     "e": 42.375
+    },
+    {
+     "w": "die",
+     "s": 42.375,
+     "e": 42.551
+    },
+    {
+     "w": "Lohnkosten",
+     "s": 42.551,
+     "e": 43.077
+    },
+    {
+     "w": "zu",
+     "s": 43.077,
+     "e": 43.253
+    },
+    {
+     "w": "senken",
+     "s": 43.253,
+     "e": 43.604
+    }
+   ]
+  },
+  {
+   "id": "s11",
+   "start": 43.824,
+   "end": 46.28,
+   "de": "Der Fachkräftemangel verstärkt diesen Druck zusätzlich.",
+   "en": "The shortage of skilled workers adds to this pressure.",
+   "vi": "Tình trạng thiếu lao động lành nghề càng làm gia tăng áp lực này.",
+   "words": [
+    {
+     "w": "Der",
+     "s": 43.824,
+     "e": 43.999
+    },
+    {
+     "w": "Fachkräftemangel",
+     "s": 43.999,
+     "e": 44.876
+    },
+    {
+     "w": "verstärkt",
+     "s": 44.876,
+     "e": 45.227
+    },
+    {
+     "w": "diesen",
+     "s": 45.227,
+     "e": 45.578
+    },
+    {
+     "w": "Druck",
+     "s": 45.578,
+     "e": 45.753
+    },
+    {
+     "w": "zusätzlich",
+     "s": 45.753,
+     "e": 46.28
+    }
+   ]
+  },
+  {
+   "id": "s12",
+   "start": 46.5,
+   "end": 50.71,
+   "de": "Die Bundesregierung verspricht schnellere Genehmigungen und weniger Bürokratie.",
+   "en": "The federal government is promising faster permits and less bureaucracy.",
+   "vi": "Chính phủ liên bang hứa hẹn cấp phép nhanh hơn và ít thủ tục hành chính hơn.",
+   "words": [
+    {
+     "w": "Die",
+     "s": 46.5,
+     "e": 46.675
+    },
+    {
+     "w": "Bundesregierung",
+     "s": 46.675,
+     "e": 47.552
+    },
+    {
+     "w": "verspricht",
+     "s": 47.552,
+     "e": 47.903
+    },
+    {
+     "w": "schnellere",
+     "s": 47.903,
+     "e": 48.429
+    },
+    {
+     "w": "Genehmigungen",
+     "s": 48.429,
+     "e": 49.307
+    },
+    {
+     "w": "und",
+     "s": 49.307,
+     "e": 49.482
+    },
+    {
+     "w": "weniger",
+     "s": 49.482,
+     "e": 50.008
+    },
+    {
+     "w": "Bürokratie",
+     "s": 50.008,
+     "e": 50.71
+    }
+   ]
+  },
+  {
+   "id": "s13",
+   "start": 50.93,
+   "end": 54.79,
+   "de": "In der Praxis dauert ein Genehmigungsverfahren jedoch oft mehrere Jahre.",
+   "en": "In practice, however, an approval procedure often takes several years.",
+   "vi": "Tuy nhiên trên thực tế, một quy trình cấp phép thường kéo dài nhiều năm.",
+   "words": [
+    {
+     "w": "In",
+     "s": 50.93,
+     "e": 51.106
+    },
+    {
+     "w": "der",
+     "s": 51.106,
+     "e": 51.281
+    },
+    {
+     "w": "Praxis",
+     "s": 51.281,
+     "e": 51.632
+    },
+    {
+     "w": "dauert",
+     "s": 51.632,
+     "e": 51.983
+    },
+    {
+     "w": "ein",
+     "s": 51.983,
+     "e": 52.158
+    },
+    {
+     "w": "Genehmigungsverfahren",
+     "s": 52.158,
+     "e": 53.386
+    },
+    {
+     "w": "jedoch",
+     "s": 53.386,
+     "e": 53.737
+    },
+    {
+     "w": "oft",
+     "s": 53.737,
+     "e": 53.913
+    },
+    {
+     "w": "mehrere",
+     "s": 53.913,
+     "e": 54.439
+    },
+    {
+     "w": "Jahre",
+     "s": 54.439,
+     "e": 54.79
+    }
+   ]
+  },
+  {
+   "id": "s14",
+   "start": 55.01,
+   "end": 59.045,
+   "de": "Ökonomen fordern deshalb steuerliche Anreize statt neuer Förderprogramme.",
+   "en": "Economists are therefore calling for tax incentives instead of new subsidy programmes.",
+   "vi": "Vì vậy các nhà kinh tế kêu gọi ưu đãi thuế thay vì các chương trình trợ cấp mới.",
+   "words": [
+    {
+     "w": "Ökonomen",
+     "s": 55.01,
+     "e": 55.712
+    },
+    {
+     "w": "fordern",
+     "s": 55.712,
+     "e": 56.062
+    },
+    {
+     "w": "deshalb",
+     "s": 56.062,
+     "e": 56.413
+    },
+    {
+     "w": "steuerliche",
+     "s": 56.413,
+     "e": 57.115
+    },
+    {
+     "w": "Anreize",
+     "s": 57.115,
+     "e": 57.641
+    },
+    {
+     "w": "statt",
+     "s": 57.641,
+     "e": 57.817
+    },
+    {
+     "w": "neuer",
+     "s": 57.817,
+     "e": 58.168
+    },
+    {
+     "w": "Förderprogramme",
+     "s": 58.168,
+     "e": 59.045
+    }
+   ]
+  },
+  {
+   "id": "s15",
+   "start": 59.265,
+   "end": 63.475,
+   "de": "Eine degressive Abschreibung würde sofort wirken und wäre einfach umzusetzen.",
+   "en": "A declining-balance depreciation allowance would take effect immediately and would be simple to implement.",
+   "vi": "Khấu hao giảm dần sẽ có hiệu lực ngay và dễ triển khai.",
+   "words": [
+    {
+     "w": "Eine",
+     "s": 59.265,
+     "e": 59.616
+    },
+    {
+     "w": "degressive",
+     "s": 59.616,
+     "e": 60.318
+    },
+    {
+     "w": "Abschreibung",
+     "s": 60.318,
+     "e": 60.844
+    },
+    {
+     "w": "würde",
+     "s": 60.844,
+     "e": 61.195
+    },
+    {
+     "w": "sofort",
+     "s": 61.195,
+     "e": 61.546
+    },
+    {
+     "w": "wirken",
+     "s": 61.546,
+     "e": 61.896
+    },
+    {
+     "w": "und",
+     "s": 61.896,
+     "e": 62.072
+    },
+    {
+     "w": "wäre",
+     "s": 62.072,
+     "e": 62.423
+    },
+    {
+     "w": "einfach",
+     "s": 62.423,
+     "e": 62.774
+    },
+    {
+     "w": "umzusetzen",
+     "s": 62.774,
+     "e": 63.475
+    }
+   ]
+  },
+  {
+   "id": "s16",
+   "start": 63.695,
+   "end": 66.853,
+   "de": "Ob die Koalition sich darauf einigt, ist derzeit völlig offen.",
+   "en": "Whether the coalition can agree on that is completely open at the moment.",
+   "vi": "Liệu liên minh cầm quyền có thống nhất được điều đó hay không thì hiện vẫn hoàn toàn bỏ ngỏ.",
+   "words": [
+    {
+     "w": "Ob",
+     "s": 63.695,
+     "e": 63.871
+    },
+    {
+     "w": "die",
+     "s": 63.871,
+     "e": 64.046
+    },
+    {
+     "w": "Koalition",
+     "s": 64.046,
+     "e": 64.748
+    },
+    {
+     "w": "sich",
+     "s": 64.748,
+     "e": 64.924
+    },
+    {
+     "w": "darauf",
+     "s": 64.924,
+     "e": 65.274
+    },
+    {
+     "w": "einigt",
+     "s": 65.274,
+     "e": 65.625
+    },
+    {
+     "w": "ist",
+     "s": 65.625,
+     "e": 65.801
+    },
+    {
+     "w": "derzeit",
+     "s": 65.801,
+     "e": 66.152
+    },
+    {
+     "w": "völlig",
+     "s": 66.152,
+     "e": 66.502
+    },
+    {
+     "w": "offen",
+     "s": 66.502,
+     "e": 66.853
+    }
+   ]
+  },
+  {
+   "id": "s17",
+   "start": 67.073,
+   "end": 71.459,
+   "de": "Bis dahin bleibt der Mittelstand das, was er immer war: vorsichtig, geduldig und erstaunlich zäh.",
+   "en": "Until then the Mittelstand remains what it always was: cautious, patient and remarkably resilient.",
+   "vi": "Cho đến lúc đó, khối doanh nghiệp vừa và nhỏ vẫn là chính nó: thận trọng, kiên nhẫn và bền bỉ đến kinh ngạc.",
+   "words": [
+    {
+     "w": "Bis",
+     "s": 67.073,
+     "e": 67.249
+    },
+    {
+     "w": "dahin",
+     "s": 67.249,
+     "e": 67.6
+    },
+    {
+     "w": "bleibt",
+     "s": 67.6,
+     "e": 67.775
+    },
+    {
+     "w": "der",
+     "s": 67.775,
+     "e": 67.951
+    },
+    {
+     "w": "Mittelstand",
+     "s": 67.951,
+     "e": 68.477
+    },
+    {
+     "w": "das",
+     "s": 68.477,
+     "e": 68.652
+    },
+    {
+     "w": "was",
+     "s": 68.652,
+     "e": 68.828
+    },
+    {
+     "w": "er",
+     "s": 68.828,
+     "e": 69.003
+    },
+    {
+     "w": "immer",
+     "s": 69.003,
+     "e": 69.354
+    },
+    {
+     "w": "war",
+     "s": 69.354,
+     "e": 69.529
+    },
+    {
+     "w": "vorsichtig",
+     "s": 69.529,
+     "e": 70.056
+    },
+    {
+     "w": "geduldig",
+     "s": 70.056,
+     "e": 70.582
+    },
+    {
+     "w": "und",
+     "s": 70.582,
+     "e": 70.758
+    },
+    {
+     "w": "erstaunlich",
+     "s": 70.758,
+     "e": 71.284
+    },
+    {
+     "w": "zäh",
+     "s": 71.284,
+     "e": 71.459
+    }
+   ]
+  }
+ ],
+ "quiz": [
+  {
+   "id": "q0",
+   "anchor": 8.51,
+   "prompt": "Warum trifft die Zinswende den Mittelstand stärker als die Konzerne?",
+   "choices": [
+    "Weil er mehr exportiert",
+    "Weil er sich über Bankkredite finanziert",
+    "Weil er höhere Löhne zahlt",
+    "Weil er keine Rücklagen bilden darf"
+   ],
+   "answerIndex": 1,
+   "explanation": "Konzerne begeben Anleihen am Kapitalmarkt, der Mittelstand nicht."
+  },
+  {
+   "id": "q1",
+   "anchor": 23.425,
+   "prompt": "Was ist laut Text die langfristige Folge verschobener Investitionen?",
+   "choices": [
+    "Höhere Dividenden",
+    "Eine Produktivitätslücke",
+    "Sinkende Energiepreise",
+    "Mehr Bürokratie"
+   ],
+   "answerIndex": 1,
+   "explanation": "Ausbleibende Investitionen von heute sind die Produktivitätslücke von morgen."
+  },
+  {
+   "id": "q2",
+   "anchor": 55.01,
+   "prompt": "Welches Instrument empfehlen die zitierten Ökonomen?",
+   "choices": [
+    "Neue Förderprogramme",
+    "Steuerliche Anreize",
+    "Höhere Leitzinsen",
+    "Staatliche Beteiligungen"
+   ],
+   "answerIndex": 1,
+   "explanation": "Sie fordern steuerliche Anreize statt neuer Förderprogramme, konkret eine degressive Abschreibung."
+  }
+ ],
+ "drillSegmentIds": [
+  "s5",
+  "s17",
+  "s11",
+  "s2",
+  "s7"
+ ]
+}
