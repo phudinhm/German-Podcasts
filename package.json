@@ -12,7 +12,8 @@
     "test": "npm run build:scripts && node --test tests/*.test.mjs",
     "classify": "npm run build:scripts && node .scripts-out/scripts/classify-level.js",
     "build-catalog": "npm run build:scripts && node .scripts-out/scripts/build-catalog.js",
-    "build:scripts": "tsc -p tsconfig.scripts.json"
+    "build:scripts": "tsc -p tsconfig.scripts.json",
+    "ingest": "python3 worker/ingest.py"
   },
   "dependencies": {
     "next": "15.5.25",
