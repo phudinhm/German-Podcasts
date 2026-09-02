@@ -8,7 +8,7 @@
   "kind": "timeline"
  },
  "cefr": "B1",
- "cefrNote": "72% of tokens sit inside the Goethe A1-B1 lists, 28% fall outside them, 5% are compounds, delivery runs at 4.6 syllables per second",
+ "cefrNote": "72% of tokens sit inside the Goethe A1-B1 lists, 28% fall outside them, 4% are compounds, delivery runs at 4.6 syllables per second",
  "topics": [
   "Arbeitskultur",
   "Gesellschaft",
@@ -19,14 +19,14 @@
  "metrics": {
   "syllablesPerSecond": 4.6,
   "lexicalDiversity": 0.9,
-  "phoneticComplexity": 0.095,
+  "phoneticComplexity": 0.092,
   "sdm": 43,
   "goetheCoverage": {
-   "A1": 0.574,
-   "A2": 0.663,
-   "B1": 0.722
+   "A1": 0.568,
+   "A2": 0.657,
+   "B1": 0.716
   },
-  "outOfListRatio": 0.278
+  "outOfListRatio": 0.284
  },
  "transcriptStatus": "demo",
  "glossary": {
@@ -2380,8 +2380,8 @@
  ],
  "drillSegmentIds": [
   "s3",
-  "s8",
   "s7",
+  "s8",
   "s17",
   "s0"
  ]

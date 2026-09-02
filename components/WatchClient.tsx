@@ -23,9 +23,13 @@ interface Props {
   episode: Episode;
   /** Deep-link target from ?t= */
   initialTime?: number;
+  /** Segment to open in a practice loop, from ?seg= */
+  initialSegmentId?: string;
+  /** Practice mode to start in, from ?mode= */
+  initialMode?: ShadowMode;
 }
 
-export function WatchClient({ episode, initialTime = 0 }: Props) {
+export function WatchClient({ episode, initialTime = 0, initialSegmentId, initialMode }: Props) {
   const source = episode.source;
   const youtubeId = source.kind === "youtube" ? source.youtubeId : null;
   const audioUrl = source.kind === "audio" ? source.audioUrl : null;
@@ -42,7 +46,7 @@ export function WatchClient({ episode, initialTime = 0 }: Props) {
   }, [source.kind, youtube.handle, audio.handle, timeline.handle]);
 
   const [values, setValues] = useState<ControlValues>({
-    mode: "free",
+    mode: initialMode ?? "free",
     loopCount: 3,
     echoGapFactor: 1.2,
     tempoRamp: [0.75, 0.85, 1, 1.1],
@@ -67,9 +71,9 @@ export function WatchClient({ episode, initialTime = 0 }: Props) {
       tempoRamp: stored.tempoRamp,
       showHazards: stored.hazardsEnabled,
       karaoke: stored.karaoke,
-      mode: stored.echoEnabled ? "echo" : "free",
+      mode: initialMode ?? (stored.echoEnabled ? "echo" : "free"),
     }));
-  }, []);
+  }, [initialMode]);
 
   const engine = useShadowEngine(handle, episode.transcript, {
     mode: values.mode,
@@ -117,13 +121,25 @@ export function WatchClient({ episode, initialTime = 0 }: Props) {
     });
   }, [values]);
 
-  // Honour ?t= once the player reports ready.
+  // Honour ?seg= and ?t= once the player reports ready. ?seg= wins, because a
+  // drill link means "practise this sentence", not "jump near it".
   useEffect(() => {
-    if (seeded || initialTime <= 0) return;
+    if (seeded) return;
     if (!handle.isReady()) return;
-    handle.seekTo(initialTime, true);
-    setSeeded(true);
-  }, [handle, initialTime, seeded, engine.state.activeIndex]);
+    if (initialSegmentId) {
+      const index = episode.transcript.findIndex((segment) => segment.id === initialSegmentId);
+      if (index >= 0) {
+        engine.focusSegment(index, false);
+        setFocusIndex(index);
+        setSeeded(true);
+        return;
+      }
+    }
+    if (initialTime > 0) {
+      handle.seekTo(initialTime, true);
+      setSeeded(true);
+    }
+  }, [engine, episode.transcript, handle, initialSegmentId, initialTime, seeded]);
 
   useEffect(() => {
     if (values.mode === "free") handle.setRate(values.baseRate);

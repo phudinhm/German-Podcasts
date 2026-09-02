@@ -5,7 +5,7 @@ import { WatchClient } from "@/components/WatchClient";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ t?: string; seg?: string }>;
+  searchParams: Promise<{ t?: string; seg?: string; mode?: string }>;
 }
 
 export async function generateStaticParams() {
@@ -25,16 +25,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function WatchPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
-  const { t } = await searchParams;
+  const { t, seg, mode } = await searchParams;
   const episode = await getEpisode(slug);
   if (!episode) notFound();
 
   const initialTime = Number.parseFloat(t ?? "");
 
+  // The glossary stays on the server. /api/lookup reads it from the same
+  // payload, so shipping it to the browser would only double the page weight.
+  const { glossary: _glossary, ...clientEpisode } = episode;
+
   return (
     <WatchClient
-      episode={episode}
+      episode={{ ...clientEpisode, glossary: {} }}
       initialTime={Number.isFinite(initialTime) ? initialTime : 0}
+      initialSegmentId={seg}
+      initialMode={mode === "echo" || mode === "loop" ? mode : undefined}
     />
   );
 }

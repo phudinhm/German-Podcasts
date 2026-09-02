@@ -40,7 +40,7 @@ export function lemmatize(token: string, options: { capitalised?: boolean } = {}
   const looksLikeNoun = options.capitalised ?? /^[A-ZÄÖÜ]/.test(token.trim());
 
   // Past participles: ge-...-t / ge-...-en, including separable ones (aufgestanden).
-  const participle = surface.match(/^(?:(.*?)ge)?(\w+?)(t|en)$/);
+  const participle = surface.match(/^(?:(.*?)ge)?(\p{L}+?)(t|en)$/u);
   if (!looksLikeNoun && surface.startsWith("ge") && /(t|en)$/.test(surface)) {
     const stem = surface.replace(/^ge/, "").replace(/(t|en)$/, "");
     const candidate = IRREGULAR[`ge${stem}en`] ?? `${stem}en`;

@@ -84,16 +84,98 @@ const AUXILIARIES = new Set([
   "werde","wirst","wird","werden","werdet","wurde","wurden","würde","würden",
 ]);
 
+const INSEPARABLE = ["be", "emp", "ent", "er", "miss", "ver", "zer", "voll", "wider", "hinter", "über", "unter"];
+
+/**
+ * Strong participles that carry an inseparable prefix and therefore no ge-.
+ * Rule-derivable forms are handled by the regexes; these are the ones where a
+ * vowel change also hides the stem.
+ */
+const BARE_PARTICIPLES = new Set([
+  "verstanden","begonnen","empfohlen","verloren","entschieden","erhalten","bekommen","verschwunden",
+  "vergessen","verbunden","übernommen","versprochen","entstanden","erschienen","beschlossen","geschehen",
+  "betroffen","gebrochen","behalten","besessen","gewonnen","zerbrochen","unterschrieben","verglichen",
+  "erfunden","empfangen","entnommen","vertrieben","erwiesen","verschoben","unterlassen","verziehen",
+]);
+
 function isParticiple(word: string): boolean {
   const lower = word.toLowerCase();
-  if (/^ge\w{2,}(t|en)$/.test(lower)) return true;
-  // Separable participles: aufgestanden, mitgenommen.
-  return SEPARABLE_PREFIXES.some((prefix) => lower.startsWith(prefix) && /ge\w{2,}(t|en)$/.test(lower.slice(prefix.length)));
+  if (BARE_PARTICIPLES.has(lower)) return true;
+  if (/^ge\p{L}{2,}(t|en)$/u.test(lower)) return true;
+  // Separable participles keep the ge- inside: aufgestanden, mitgenommen.
+  if (SEPARABLE_PREFIXES.some((prefix) => lower.startsWith(prefix) && /^ge\p{L}{2,}(t|en)$/u.test(lower.slice(prefix.length)))) {
+    return true;
+  }
+  // Inseparable prefixes drop the ge-: erfasst, bezahlt, verkauft.
+  return INSEPARABLE.some((prefix) => lower.startsWith(prefix) && /^\p{L}{2,}t$/u.test(lower.slice(prefix.length)));
 }
 
+/** Adjectives and adverbs that turn "zu" into an intensifier, not a preposition. */
+const INTENSIFIED = new Set([
+  "viel","wenig","spät","früh","schnell","langsam","groß","klein","teuer","billig","hoch","niedrig",
+  "lang","kurz","stark","schwach","schwer","leicht","laut","leise","weit","nah","oft","selten","gut",
+]);
+
+/**
+ * Index just past the end of the clause starting at `from`: the next comma in
+ * the original sentence, or the end of the token list.
+ */
+function findClauseEnd(sentence: string, tokens: string[], from: number): number {
+  let cursor = 0;
+  for (let i = 0; i < tokens.length; i += 1) {
+    const at = sentence.indexOf(tokens[i], cursor);
+    if (at < 0) continue;
+    cursor = at + tokens[i].length;
+    if (i > from && /^\s*[,;:]/.test(sentence.slice(cursor))) return i + 1;
+  }
+  return tokens.length;
+}
+
+/** Lowercase words ending in -en that are not verbs. */
+const NOT_A_VERB = new Set([
+  "inzwischen","zwischen","oben","unten","hinten","vorn","vorne","innen","außen","eben","übrigens",
+  "wegen","gegen","neben","sieben","morgen","dagegen","daneben","deswegen","hingegen","indessen",
+  "seinen","ihren","meinen","deinen","keinen","einen","jeden","allen","denen","diesen","jenen","welchen",
+  "unseren","euren","großen","kleinen","langen","kurzen","guten","neuen","alten","letzten","ersten",
+  "gestern","modern","besondern","andern","anderen","weiteren","vielen","wenigen","beiden","meisten",
+]);
+
+/**
+ * German capitalises every noun, which is the cheapest disambiguation signal
+ * available: "Investitionen" ends in -en but is never an infinitive.
+ */
 function isInfinitive(word: string): boolean {
+  if (/^[A-ZÄÖÜ]/.test(word)) return false;
   const lower = word.toLowerCase();
-  return /\w{3,}(en|ern|eln)$/.test(lower) && !isParticiple(lower);
+  if (NOT_A_VERB.has(lower)) return false;
+  return /\p{L}{3,}(en|ern|eln)$/u.test(lower) && !isParticiple(lower);
+}
+
+/** Words that can never be the finite verb, so the scan does not stop on them. */
+const NEVER_FINITE = new Set([
+  "ich","du","er","sie","es","wir","ihr","man","mich","dich","sich","uns","euch","mir","dir","ihm","ihn",
+  "der","die","das","den","dem","des","ein","eine","einen","einem","einer","eines","kein","keine",
+  "mein","dein","sein","ihre","ihren","unser","euer","jeden","jede","jeder","jedes","alle","allen",
+  "und","aber","oder","denn","sondern","dass","weil","wenn","als","wie","wo","nicht","nur","auch",
+  "sehr","schon","noch","immer","halb","hier","dort","heute","morgen","gestern","dann","doch","mal",
+  "in","an","auf","aus","bei","mit","nach","seit","von","vor","zu","um","über","unter","für","gegen",
+  "ohne","durch","bis","zwischen","hinter","neben","während","trotz","wegen","statt",
+]);
+
+/**
+ * Finds the finite verb of a main clause by scanning from the left. In German
+ * it sits in second position, so the first token that inflects like a verb and
+ * is not a pronoun, article or preposition is almost always the right one.
+ */
+function findFiniteVerb(tokens: string[]): string | undefined {
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+    if (NEVER_FINITE.has(lower)) continue;
+    if (/^[A-ZÄÖÜ]/.test(token) && token !== tokens[0]) continue;
+    if (AUXILIARIES.has(lower) || MODALS.has(lower)) return token;
+    if (/^\p{Ll}\p{L}{2,}(e|st|t|te|ten|en)$/u.test(lower) && !isParticiple(lower) && !NOT_A_VERB.has(lower)) return token;
+  }
+  return undefined;
 }
 
 export function deconstruct(sentence: string): SyntaxNote[] {
@@ -109,12 +191,16 @@ export function deconstruct(sentence: string): SyntaxNote[] {
     if (["wer", "wo", "bis"].includes(lower[i]) && i !== 0 && !/[,;]/.test(sentence.charAt(sentence.indexOf(tokens[i]) - 2))) {
       continue;
     }
-    const tail = lower.slice(i + 1);
-    const finalVerb = [...tail].reverse().find((word) => isInfinitive(word) || isParticiple(word) || AUXILIARIES.has(word) || MODALS.has(word));
+    // The clause runs from the conjunction to the next comma or to the end.
+    const clauseEnd = findClauseEnd(sentence, tokens, i);
+    const clause = tokens.slice(i + 1, clauseEnd);
+    const finalVerb = clause.length > 0 ? clause[clause.length - 1] : undefined;
     notes.push({
       kind: "clause",
       title: `${tokens[i]} opens a subordinate clause`,
-      detail: `${tokens[i]} ${meaning}, and it sends the conjugated verb${finalVerb ? ` (${finalVerb})` : ""} to the very end of its clause.`,
+      detail: `${tokens[i]} (${meaning}) sends the conjugated verb${
+        finalVerb ? ` ${finalVerb}` : ""
+      } to the very end of its clause, so the meaning only resolves on the last word.`,
       focus: [tokens[i], ...(finalVerb ? [finalVerb] : [])],
     });
     break;
@@ -123,9 +209,15 @@ export function deconstruct(sentence: string): SyntaxNote[] {
   // 2. The verb bracket: modal or auxiliary in position two, second verb at the end.
   const firstVerbIndex = lower.findIndex((word) => MODALS.has(word) || AUXILIARIES.has(word));
   if (firstVerbIndex >= 0) {
-    const closerIndex = lower.findIndex(
-      (word, index) => index > firstVerbIndex && (isParticiple(word) || isInfinitive(word)),
-    );
+    // The bracket closes at the end of the clause, so search backwards: the
+    // last verbal element wins over any adverb that happens to end in -en.
+    let closerIndex = -1;
+    for (let index = tokens.length - 1; index > firstVerbIndex; index -= 1) {
+      if (isParticiple(tokens[index].toLowerCase()) || isInfinitive(tokens[index])) {
+        closerIndex = index;
+        break;
+      }
+    }
     if (closerIndex > firstVerbIndex + 1) {
       const opener = tokens[firstVerbIndex];
       const closer = tokens[closerIndex];
@@ -160,21 +252,32 @@ export function deconstruct(sentence: string): SyntaxNote[] {
   // 3. A separable prefix stranded at the end of the clause.
   const lastToken = lower[lower.length - 1];
   if (lastToken && SEPARABLE_PREFIXES.includes(lastToken) && lower.length > 3) {
-    const verb = lower.slice(0, -1).reverse().find((word) => /\w{3,}(e|st|t|en)$/.test(word));
+    const verb = findFiniteVerb(tokens.slice(0, -1));
     notes.push({
       kind: "separable",
-      title: `Separable verb split across the clause`,
-      detail: `${lastToken} at the end belongs to the verb${verb ? ` ${verb}` : ""}: look them up together as ${lastToken}${verb ?? ""}, not separately.`,
+      title: "Separable verb split across the clause",
+      detail: verb
+        ? `${lastToken} at the end belongs to ${verb}: look them up together as ${lastToken}${verb.toLowerCase()}, not as two words.`
+        : `${lastToken} at the end is a stranded verb prefix, not a preposition. It belongs to the conjugated verb earlier in the clause.`,
       focus: [lastToken, ...(verb ? [verb] : [])],
     });
   }
 
   // 4. Prepositions and the case they govern.
   const seen = new Set<string>();
-  for (const token of lower) {
+  for (let index = 0; index < lower.length; index += 1) {
+    const token = lower[index];
     if (seen.has(token)) continue;
     const rule = CASE_PREPOSITIONS.find((entry) => entry.words.includes(token));
     if (!rule) continue;
+    // "zu viel", "zu schnell" and "zu + infinitive" are not prepositional.
+    if (token === "zu" && (INTENSIFIED.has(lower[index + 1] ?? "") || isInfinitive(lower[index + 1] ?? ""))) {
+      continue;
+    }
+    // "bis" before a second preposition ("bis zum Ende") governs nothing itself.
+    if (token === "bis" && CASE_PREPOSITIONS.some((entry) => entry.words.includes(lower[index + 1] ?? ""))) {
+      continue;
+    }
     seen.add(token);
     notes.push({
       kind: "case",
@@ -188,7 +291,7 @@ export function deconstruct(sentence: string): SyntaxNote[] {
   // 5. Something other than the subject in first position.
   if (tokens.length > 3) {
     const firstIsVerb = MODALS.has(lower[0]) || AUXILIARIES.has(lower[0]);
-    const secondIsVerb = MODALS.has(lower[1]) || AUXILIARIES.has(lower[1]) || /\w{3,}(t|te|st)$/.test(lower[1]);
+    const secondIsVerb = MODALS.has(lower[1]) || AUXILIARIES.has(lower[1]) || /\p{L}{3,}(t|te|st)$/u.test(lower[1]);
     const startsWithAdverbial = !firstIsVerb && secondIsVerb && !/^(ich|du|er|sie|es|wir|ihr|man|der|die|das)$/.test(lower[0]);
     if (startsWithAdverbial) {
       notes.push({

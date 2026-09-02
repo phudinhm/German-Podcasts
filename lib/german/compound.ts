@@ -39,9 +39,11 @@ export function splitCompound(word: string): string[] {
 
 function search(word: string, depth: number): string[] | null {
   if (depth > 4) return null;
-  if (isStem(word) || word.length <= 6) {
-    return isStem(word) || depth > 0 ? [word] : null;
-  }
+  // A tail is only accepted when it is a real stem. Accepting any short
+  // remainder produced splits like "angsts + chweiß"; refusing to split is a
+  // much cheaper mistake than splitting in the wrong place.
+  if (isStem(word)) return [word];
+  if (word.length <= 6) return null;
 
   // Try the longest head first so "Wirtschaftskrise" prefers "wirtschaft".
   for (let cut = word.length - MIN_MEMBER; cut >= MIN_KNOWN; cut -= 1) {

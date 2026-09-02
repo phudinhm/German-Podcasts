@@ -8,7 +8,7 @@
   "kind": "timeline"
  },
  "cefr": "C1",
- "cefrNote": "61% of tokens sit inside the Goethe A1-B1 lists, 39% fall outside them, 10% are compounds, delivery runs at 5.7 syllables per second",
+ "cefrNote": "60% of tokens sit inside the Goethe A1-B1 lists, 40% fall outside them, 5% are compounds, delivery runs at 5.7 syllables per second",
  "topics": [
   "Wirtschaft",
   "Finanzen",
@@ -19,14 +19,14 @@
  "metrics": {
   "syllablesPerSecond": 5.7,
   "lexicalDiversity": 0.907,
-  "phoneticComplexity": 0.129,
+  "phoneticComplexity": 0.121,
   "sdm": 58,
   "goetheCoverage": {
-   "A1": 0.428,
-   "A2": 0.506,
-   "B1": 0.608
+   "A1": 0.416,
+   "A2": 0.494,
+   "B1": 0.596
   },
-  "outOfListRatio": 0.392
+  "outOfListRatio": 0.404
  },
  "transcriptStatus": "demo",
  "glossary": {

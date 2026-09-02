@@ -8,7 +8,7 @@
   "kind": "timeline"
  },
  "cefr": "A2",
- "cefrNote": "85% of tokens sit inside the Goethe A1-B1 lists, 15% fall outside them, 2% are compounds, delivery runs at 3.4 syllables per second",
+ "cefrNote": "86% of tokens sit inside the Goethe A1-B1 lists, 14% fall outside them, 2% are compounds, delivery runs at 3.4 syllables per second",
  "topics": [
   "Alltag",
   "Arbeit",
@@ -19,14 +19,14 @@
  "metrics": {
   "syllablesPerSecond": 3.4,
   "lexicalDiversity": 0.83,
-  "phoneticComplexity": 0.046,
+  "phoneticComplexity": 0.045,
   "sdm": 15,
   "goetheCoverage": {
-   "A1": 0.817,
-   "A2": 0.855,
-   "B1": 0.855
+   "A1": 0.824,
+   "A2": 0.863,
+   "B1": 0.863
   },
-  "outOfListRatio": 0.145
+  "outOfListRatio": 0.137
  },
  "transcriptStatus": "demo",
  "glossary": {
