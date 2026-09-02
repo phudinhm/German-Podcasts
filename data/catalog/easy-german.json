@@ -1,0 +1,34 @@
+{
+ "id": "curated-easy-german",
+ "slug": "easy-german",
+ "title": "Easy German",
+ "publisher": "Easy German",
+ "description": "Straßeninterviews mit deutschen und englischen Untertiteln. Echtes Umgangsdeutsch, aber in verdaulichen Portionen.",
+ "source": {
+  "kind": "pending",
+  "pageUrl": "https://www.easygerman.org/",
+  "ingestHint": "npm run ingest -- --url <YouTube URL> --level B1"
+ },
+ "cefr": "B1",
+ "cefrNote": "Editorial label. Run the ingest worker to replace it with a measured one.",
+ "topics": [
+  "Alltag",
+  "Interviews",
+  "Umgangssprache"
+ ],
+ "durationSec": 900,
+ "license": "Link out to the publisher. Ingest for personal study only.",
+ "metrics": {
+  "syllablesPerSecond": 0,
+  "lexicalDiversity": 0,
+  "phoneticComplexity": 0,
+  "sdm": 44,
+  "goetheCoverage": {},
+  "outOfListRatio": 0
+ },
+ "transcriptStatus": "pending",
+ "glossary": {},
+ "transcript": [],
+ "quiz": [],
+ "drillSegmentIds": []
+}

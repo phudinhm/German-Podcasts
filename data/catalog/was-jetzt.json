@@ -1,0 +1,34 @@
+{
+ "id": "curated-was-jetzt",
+ "slug": "was-jetzt",
+ "title": "Was jetzt?",
+ "publisher": "ZEIT ONLINE",
+ "description": "Täglicher Nachrichtenpodcast mit Interviews. Journalistisches Register, viele Nebensätze, normales Sprechtempo.",
+ "source": {
+  "kind": "pending",
+  "pageUrl": "https://www.zeit.de/",
+  "ingestHint": "npm run ingest -- --feed <RSS URL> --level B2"
+ },
+ "cefr": "B2",
+ "cefrNote": "Editorial label. Run the ingest worker to replace it with a measured one.",
+ "topics": [
+  "Nachrichten",
+  "Politik",
+  "Interviews"
+ ],
+ "durationSec": 660,
+ "license": "Link out to the publisher. Ingest for personal study only.",
+ "metrics": {
+  "syllablesPerSecond": 0,
+  "lexicalDiversity": 0,
+  "phoneticComplexity": 0,
+  "sdm": 62,
+  "goetheCoverage": {},
+  "outOfListRatio": 0
+ },
+ "transcriptStatus": "pending",
+ "glossary": {},
+ "transcript": [],
+ "quiz": [],
+ "drillSegmentIds": []
+}

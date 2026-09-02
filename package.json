@@ -1,0 +1,31 @@
+{
+  "name": "hoerbar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "H\u00f6rbar - CEFR-graded German podcast and video shadowing trainer",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build:scripts && node --test tests/*.test.mjs",
+    "classify": "npm run build:scripts && node .scripts-out/scripts/classify-level.js",
+    "build-catalog": "npm run build:scripts && node .scripts-out/scripts/build-catalog.js",
+    "build:scripts": "tsc -p tsconfig.scripts.json",
+    "ingest": "python3 worker/ingest.py"
+  },
+  "dependencies": {
+    "next": "15.5.25",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.20.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3"
+  }
+}

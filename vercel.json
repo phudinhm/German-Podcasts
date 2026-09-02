@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "npm run build-catalog && next build",
+  "functions": {
+    "app/api/lookup/route.ts": { "maxDuration": 15 },
+    "app/api/breakdown/route.ts": { "maxDuration": 20 },
+    "app/api/quiz/route.ts": { "maxDuration": 30 },
+    "app/api/translate/route.ts": { "maxDuration": 20 }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    }
+  ]
+}
