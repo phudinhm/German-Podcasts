@@ -98,7 +98,7 @@ export function VaultClient() {
             Vokabelheft
           </h1>
           <p className="mt-0.5 text-[13px] text-[var(--ink-soft)]">
-            {entries.length} Wörter · {due.length} heute fällig
+            {entries.length === 1 ? "1 Wort" : `${entries.length} Wörter`} · {due.length} heute fällig
           </p>
         </div>
 

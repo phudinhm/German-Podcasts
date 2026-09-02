@@ -87,16 +87,16 @@ export function isDue(state: SrsState, now: Date = new Date()): boolean {
   return new Date(state.due).getTime() <= now.getTime();
 }
 
-/** Human-readable "in 6 days" / "due now". */
+/** Human-readable due date, in the German the rest of the interface uses. */
 export function describeDue(state: SrsState, now: Date = new Date()): string {
   const deltaMs = new Date(state.due).getTime() - now.getTime();
-  if (deltaMs <= 0) return "due now";
+  if (deltaMs <= 0) return "jetzt fällig";
   const days = Math.round(deltaMs / DAY_MS);
-  if (days === 0) return "due today";
-  if (days === 1) return "due tomorrow";
-  if (days < 30) return `in ${days} days`;
+  if (days === 0) return "heute fällig";
+  if (days === 1) return "morgen fällig";
+  if (days < 30) return `in ${days} Tagen`;
   const months = Math.round(days / 30);
-  return months === 1 ? "in a month" : `in ${months} months`;
+  return months === 1 ? "in einem Monat" : `in ${months} Monaten`;
 }
 
 /** Orders a review queue: overdue first, then closest to due. */

@@ -97,7 +97,9 @@ export function ReviewSession({
   if (!card) {
     return (
       <div className="card p-6 text-center">
-        <p className="text-[15px] font-medium">{done} Karten geschafft.</p>
+        <p className="text-[15px] font-medium">
+          {done === 1 ? "1 Karte geschafft." : `${done} Karten geschafft.`}
+        </p>
         <button type="button" className="btn mt-3" onClick={onDone}>
           Zurück zur Liste
         </button>

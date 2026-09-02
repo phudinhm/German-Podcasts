@@ -30,8 +30,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="de">
       <body className="min-h-screen antialiased">
         <header className="sticky top-0 z-40 border-b border-[var(--rule)] bg-[color-mix(in_oklab,var(--paper)_88%,transparent)] backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center gap-6 px-5 py-3">
-            <Link href="/" className="flex items-baseline gap-2">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-1 px-5 py-2.5 sm:py-3">
+            <Link href="/" className="mr-auto flex items-baseline gap-2">
               <span
                 className="text-[19px] font-semibold tracking-tight"
                 style={{ fontFamily: "var(--font-display)" }}
@@ -42,12 +42,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Deutsch hören, nachsprechen, behalten
               </span>
             </Link>
-            <nav className="ml-auto flex items-center gap-1 text-[13px]">
+            <nav className="-mx-1 flex w-full items-center gap-1 overflow-x-auto px-1 text-[13px] [scrollbar-width:none] sm:w-auto">
               {NAV.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="rounded-lg px-3 py-1.5 text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]"
+                  className="shrink-0 rounded-lg px-2.5 py-1.5 text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--ink)] sm:px-3"
                 >
                   {item.label}
                 </Link>
