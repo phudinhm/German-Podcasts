@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CEFR_LEVELS, type Cefr, type EpisodeSummary } from "@/lib/types";
+import { useUi } from "@/lib/i18n";
 import { LevelBadge } from "./LevelBadge";
 import { ShadowingBadge } from "./ShadowingBadge";
 
@@ -17,6 +18,7 @@ function formatDuration(seconds: number): string {
 type SortKey = "level" | "sdm" | "duration";
 
 export function CatalogGrid({ episodes }: { episodes: EpisodeSummary[] }) {
+  const { t } = useUi();
   const [levels, setLevels] = useState<Set<Cefr>>(new Set());
   const [topic, setTopic] = useState<string>("");
   const [sort, setSort] = useState<SortKey>("level");
@@ -36,6 +38,12 @@ export function CatalogGrid({ episodes }: { episodes: EpisodeSummary[] }) {
     });
 
     return filtered.sort((a, b) => {
+      // Whatever the sort, an episode you can actually open comes first. A grid
+      // that opens with ten entries that cannot be played reads as a broken
+      // app rather than a catalog with room to grow.
+      const readiness =
+        Number(a.transcriptStatus === "pending") - Number(b.transcriptStatus === "pending");
+      if (readiness !== 0) return readiness;
       if (sort === "sdm") return a.metrics.sdm - b.metrics.sdm;
       if (sort === "duration") return a.durationSec - b.durationSec;
       return (
@@ -57,7 +65,7 @@ export function CatalogGrid({ episodes }: { episodes: EpisodeSummary[] }) {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-[var(--rule)] py-3">
-        <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">Niveau</span>
+        <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">{t("common.level")}</span>
         <div className="flex flex-wrap gap-1">
           {CEFR_LEVELS.map((level) => (
             <button
@@ -73,18 +81,18 @@ export function CatalogGrid({ episodes }: { episodes: EpisodeSummary[] }) {
           ))}
           {levels.size > 0 ? (
             <button type="button" className="btn px-2.5 py-1 text-[12px]" onClick={() => setLevels(new Set())}>
-              Alle
+              {t("common.all")}
             </button>
           ) : null}
         </div>
 
-        <span className="ml-2 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">Thema</span>
+        <span className="ml-2 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">{t("common.topic")}</span>
         <select
           value={topic}
           onChange={(event) => setTopic(event.target.value)}
           className="btn px-2 py-1 text-[12px]"
         >
-          <option value="">alle</option>
+          <option value="">{t("common.all")}</option>
           {topics.map((item) => (
             <option key={item} value={item}>
               {item}
@@ -92,15 +100,15 @@ export function CatalogGrid({ episodes }: { episodes: EpisodeSummary[] }) {
           ))}
         </select>
 
-        <span className="ml-2 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">Sortieren</span>
+        <span className="ml-2 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">{t("common.sort")}</span>
         <select
           value={sort}
           onChange={(event) => setSort(event.target.value as SortKey)}
           className="btn px-2 py-1 text-[12px]"
         >
-          <option value="level">nach Niveau</option>
-          <option value="sdm">nach Sprechtempo</option>
-          <option value="duration">nach Länge</option>
+          <option value="level">{t("catalog.byLevel")}</option>
+          <option value="sdm">{t("catalog.byPace")}</option>
+          <option value="duration">{t("catalog.byLength")}</option>
         </select>
 
         <label className="ml-auto flex cursor-pointer items-center gap-2 text-[12px] text-[var(--ink-soft)]">
@@ -110,13 +118,13 @@ export function CatalogGrid({ episodes }: { episodes: EpisodeSummary[] }) {
             onChange={(event) => setReadyOnly(event.target.checked)}
             className="accent-[var(--accent-ring)]"
           />
-          nur mit Transkript
+          {t("catalog.transcriptOnly")}
         </label>
       </div>
 
       {visible.length === 0 ? (
         <p className="py-16 text-center text-sm text-[var(--ink-faint)]">
-          Nichts gefunden. Filter zurücksetzen?
+          {t("catalog.noResults")}
         </p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -132,6 +140,7 @@ export function CatalogGrid({ episodes }: { episodes: EpisodeSummary[] }) {
 }
 
 function EpisodeCard({ episode }: { episode: EpisodeSummary }) {
+  const { t } = useUi();
   const pending = episode.transcriptStatus === "pending";
   const body = (
     <article className="card flex h-full flex-col gap-3 p-4 transition-transform hover:-translate-y-0.5">
@@ -157,19 +166,16 @@ function EpisodeCard({ episode }: { episode: EpisodeSummary }) {
         ))}
         <span className="chip">{formatDuration(episode.durationSec)}</span>
         {pending ? (
-          <span className="chip border-dashed text-[var(--ink-faint)]">noch kein Transkript</span>
-        ) : null}
+          <span className="chip border-dashed text-[var(--ink-faint)]">{t("catalog.noTranscript")}</span>
+        ) : (
+          <span className="chip border-[var(--accent-ring)] text-[var(--accent)]">
+            {t("catalog.readyToPlay")}
+          </span>
+        )}
       </div>
     </article>
   );
 
-  if (pending) {
-    return (
-      <Link href={`/watch/${episode.slug}`} className="block h-full opacity-80">
-        {body}
-      </Link>
-    );
-  }
   return (
     <Link href={`/watch/${episode.slug}`} className="block h-full">
       {body}

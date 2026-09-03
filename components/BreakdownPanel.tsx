@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Segment } from "@/lib/types";
 import type { SyntaxNote } from "@/lib/german/syntax";
+import { useUi } from "@/lib/i18n";
 
 interface Response {
   rules: SyntaxNote[];
@@ -12,6 +13,7 @@ interface Response {
 
 /** The Grammar Deconstructor drawer. */
 export function BreakdownPanel({ segment, onClose }: { segment: Segment; onClose: () => void }) {
+  const { t } = useUi();
   const [data, setData] = useState<Response | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,10 +47,10 @@ export function BreakdownPanel({ segment, onClose }: { segment: Segment; onClose
     <aside className="card p-4">
       <div className="flex items-start gap-2">
         <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
-          Satzbau
+          {t("syntax.title")}
         </h3>
         <button type="button" onClick={onClose} className="btn ml-auto px-2 py-0.5 text-[11px]">
-          schließen
+          {t("common.close")}
         </button>
       </div>
 
@@ -67,7 +69,7 @@ export function BreakdownPanel({ segment, onClose }: { segment: Segment; onClose
 
       {error ? <p className="mt-2 text-[12px] text-rose-600">{error}</p> : null}
       {!data && !error ? (
-        <p className="mt-3 text-[12px] text-[var(--ink-faint)]">Wird analysiert …</p>
+        <p className="mt-3 text-[12px] text-[var(--ink-faint)]">{t("syntax.analysing")}</p>
       ) : null}
 
       {notes.length > 0 ? (
@@ -83,15 +85,15 @@ export function BreakdownPanel({ segment, onClose }: { segment: Segment; onClose
 
       {data && notes.length === 0 ? (
         <p className="mt-3 text-[12px] text-[var(--ink-faint)]">
-          Nichts Auffälliges: Verb an Position zwei, keine Klammer, keine Nebensätze.
+          {t("syntax.nothing")}
         </p>
       ) : null}
 
       {data ? (
         <p className="mt-3 border-t border-[var(--rule)] pt-2 text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">
           {data.source === "rules"
-            ? "regelbasiert · setze ANTHROPIC_API_KEY für zusätzliche Erklärungen"
-            : "regelbasiert + Modell"}
+            ? t("syntax.rulesOnly")
+            : t("syntax.rulesModel")}
         </p>
       ) : null}
     </aside>

@@ -4,23 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Segment } from "@/lib/types";
 import { analysePitch, contourSimilarity, decodeToMono, smoothContour, toSemitones } from "@/lib/audio/pitch";
 import { scorePronunciation, type PronunciationScore } from "@/lib/audio/scoring";
-
-interface SpeechRecognitionLike extends EventTarget {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  start(): void;
-  stop(): void;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onerror: ((event: unknown) => void) | null;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognitionLike;
-    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-  }
-}
+import { getSpeechRecognition, type SpeechRecognitionLike } from "@/lib/audio/speech";
+import { useUi } from "@/lib/i18n";
 
 interface Props {
   segment: Segment | null;
@@ -34,6 +19,7 @@ interface Props {
  * network unless the browser's own speech recogniser does.
  */
 export function ShadowRecorder({ segment, onRegisterToggle }: Props) {
+  const { t } = useUi();
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contour, setContour] = useState<number[] | null>(null);
@@ -69,7 +55,7 @@ export function ShadowRecorder({ segment, onRegisterToggle }: Props) {
     heardRef.current = "";
 
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      setError("Dieser Browser gibt keinen Mikrofonzugriff frei.");
+      setError("This browser does not allow microphone access.");
       return;
     }
 
@@ -77,7 +63,7 @@ export function ShadowRecorder({ segment, onRegisterToggle }: Props) {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      setError("Kein Zugriff auf das Mikrofon. Bitte die Berechtigung erlauben.");
+      setError("No access to the microphone. Please allow the permission.");
       return;
     }
 
@@ -103,7 +89,7 @@ export function ShadowRecorder({ segment, onRegisterToggle }: Props) {
         const native = segmentRef.current?.f0;
         if (native?.length) setProsody(Math.round(contourSimilarity(native, smoothed) * 100));
       } catch {
-        setError("Die Aufnahme ließ sich nicht analysieren.");
+        setError("That recording could not be analysed.");
       }
       if (heardRef.current && segmentRef.current) {
         setScore(scorePronunciation(segmentRef.current.de, heardRef.current));
@@ -113,7 +99,7 @@ export function ShadowRecorder({ segment, onRegisterToggle }: Props) {
     recorder.start();
     setRecording(true);
 
-    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    const Recognition = getSpeechRecognition();
     if (Recognition) {
       const recognition = new Recognition();
       recognition.lang = "de-DE";
@@ -145,8 +131,8 @@ export function ShadowRecorder({ segment, onRegisterToggle }: Props) {
 
   useEffect(() => () => stop(), [stop]);
 
-  const hasSpeechApi =
-    typeof window !== "undefined" && Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+  const [hasSpeechApi, setHasSpeechApi] = useState(true);
+  useEffect(() => setHasSpeechApi(Boolean(getSpeechRecognition())), []);
 
   return (
     <div className="card p-3.5">
@@ -158,18 +144,18 @@ export function ShadowRecorder({ segment, onRegisterToggle }: Props) {
           disabled={!segment}
           data-active={recording}
         >
-          {recording ? "Aufnahme stoppen" : "Nachsprechen"}
+          {recording ? t("controls.stopRecording") : t("controls.record")}
         </button>
         {audioUrl ? (
           <audio controls src={audioUrl} className="h-8 max-w-[220px]" />
         ) : (
           <span className="text-[11px] text-[var(--ink-faint)]">
-            {segment ? "Satz wählen, Taste R drücken, nachsprechen." : "Erst einen Satz in Schleife legen."}
+            {segment ? t("controls.recordHint") : t("controls.recordPick")}
           </span>
         )}
         {prosody !== null ? (
           <span className="ml-auto text-[11px] text-[var(--ink-soft)]">
-            Melodie-Übereinstimmung <strong className="text-[var(--accent)]">{prosody}%</strong>
+            Melody match <strong className="text-[var(--accent)]">{prosody}%</strong>
           </span>
         ) : null}
       </div>
@@ -182,17 +168,17 @@ export function ShadowRecorder({ segment, onRegisterToggle }: Props) {
         <div className="mt-3 border-t border-[var(--rule)] pt-2.5">
           <div className="mb-1.5 flex gap-4 text-[11px] text-[var(--ink-faint)]">
             <span>
-              Genauigkeit <strong className="text-[var(--ink)]">{score.accuracy}%</strong>
+              Accuracy <strong className="text-[var(--ink)]">{score.accuracy}%</strong>
             </span>
             <span>
-              Vollständigkeit <strong className="text-[var(--ink)]">{score.completeness}%</strong>
+              Completeness <strong className="text-[var(--ink)]">{score.completeness}%</strong>
             </span>
           </div>
           <p className="text-[15px] leading-relaxed" style={{ fontFamily: "var(--font-display)" }}>
             {score.words.map((word, index) => (
               <span
                 key={index}
-                title={word.heard ? `gehört: ${word.heard}` : "nicht erkannt"}
+                title={word.heard ? `heard: ${word.heard}` : "not recognised"}
                 className={
                   word.verdict === "good"
                     ? "text-emerald-600 dark:text-emerald-400"
@@ -210,8 +196,8 @@ export function ShadowRecorder({ segment, onRegisterToggle }: Props) {
 
       {!hasSpeechApi && contour ? (
         <p className="mt-2 text-[11px] text-[var(--ink-faint)]">
-          Wortbewertung braucht die Web-Speech-API, die dieser Browser nicht anbietet. Die Tonhöhenkurve
-          oben stammt aus der Analyse deiner Aufnahme und funktioniert überall.
+          Word scoring needs the Web Speech API, which this browser does not offer. The pitch contour
+          above comes from analysing your own recording and works everywhere.
         </p>
       ) : null}
     </div>
@@ -251,7 +237,7 @@ function PitchPlot({ mine, native }: { mine: number[]; native?: number[] }) {
         viewBox={`0 0 ${width} ${height}`}
         className="h-[84px] w-full"
         role="img"
-        aria-label="Tonhöhenverlauf der Aufnahme"
+        aria-label="Pitch contour of the recording"
       >
         <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke="var(--rule)" strokeWidth="1" />
         {native?.length ? (
@@ -261,15 +247,15 @@ function PitchPlot({ mine, native }: { mine: number[]; native?: number[] }) {
       </svg>
       <figcaption className="mt-1 flex gap-4 text-[10px] text-[var(--ink-faint)]">
         <span className="flex items-center gap-1">
-          <span className="inline-block h-[2px] w-4 bg-[var(--accent-ring)]" /> deine Aufnahme
+          <span className="inline-block h-[2px] w-4 bg-[var(--accent-ring)]" /> your recording
         </span>
         {native?.length ? (
           <span className="flex items-center gap-1">
             <span className="inline-block h-[2px] w-4 border-t-2 border-dashed border-[var(--ink-faint)]" />{" "}
-            Originalsprecher
+            native speaker
           </span>
         ) : (
-          <span>Originalkurve erscheint, sobald der Ingest-Worker sie mitliefert.</span>
+          <span>The native contour appears once the ingest worker supplies it.</span>
         )}
       </figcaption>
     </figure>

@@ -5,6 +5,7 @@ import type { LookupResult, Segment, TargetLang, Cefr } from "@/lib/types";
 import type { RenderedWord } from "@/lib/german/render";
 import { HAZARD_LABEL } from "@/lib/german/render";
 import { addEntry, hasEntry } from "@/lib/vault";
+import { useUi } from "@/lib/i18n";
 
 export interface WordSelection {
   token: string;
@@ -21,9 +22,10 @@ interface Props {
   onSaved: () => void;
 }
 
-const LANG_LABEL: Record<TargetLang, string> = { en: "Englisch", vi: "Vietnamesisch" };
+const LANG_LABEL: Record<TargetLang, string> = { en: "English", vi: "Vietnamese" };
 
 export function WordPopover({ selection, lang, episode, onClose, onSaved }: Props) {
+  const { t } = useUi();
   const [result, setResult] = useState<LookupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -129,7 +131,7 @@ export function WordPopover({ selection, lang, episode, onClose, onSaved }: Prop
             </span>
             {result?.noun?.plural ? (
               <span className="text-[12px] text-[var(--ink-faint)]">
-                Pl. die {result.noun.plural}
+                {t("word.plural")} die {result.noun.plural}
               </span>
             ) : null}
           </div>
@@ -137,12 +139,12 @@ export function WordPopover({ selection, lang, episode, onClose, onSaved }: Prop
             <span>{result?.pos ?? "…"}</span>
             {result && result.surface.toLowerCase() !== result.lemma.toLowerCase() ? (
               <span>
-                im Text: <span className="italic">{result.surface}</span>
+                {t("word.inText")}: <span className="italic">{result.surface}</span>
               </span>
             ) : null}
             {result?.separable ? (
               <span className="text-[var(--accent)]">
-                trennbar: {result.separable.prefix} + {result.separable.stem}
+                {t("word.separable")}: {result.separable.prefix} + {result.separable.stem}
               </span>
             ) : null}
           </div>
@@ -155,7 +157,7 @@ export function WordPopover({ selection, lang, episode, onClose, onSaved }: Prop
       {error ? <p className="mt-2 text-[12px] text-rose-600">{error}</p> : null}
 
       {!result && !error ? (
-        <p className="mt-3 text-[12px] text-[var(--ink-faint)]">Wird nachgeschlagen …</p>
+        <p className="mt-3 text-[12px] text-[var(--ink-faint)]">{t("word.lookingUp")}</p>
       ) : null}
 
       {result ? (
@@ -165,7 +167,7 @@ export function WordPopover({ selection, lang, episode, onClose, onSaved }: Prop
               glosses.join(", ")
             ) : (
               <span className="text-[var(--ink-faint)]">
-                Keine {LANG_LABEL[lang]}-Übersetzung offline verfügbar.
+                {t("word.noOffline", { lang: LANG_LABEL[lang] })}
               </span>
             )}
           </p>
@@ -187,7 +189,7 @@ export function WordPopover({ selection, lang, episode, onClose, onSaved }: Prop
 
           <div className="mt-3 flex items-center gap-2">
             <button type="button" className="btn btn-primary flex-1" onClick={save} disabled={saved}>
-              {saved ? "Im Vokabelheft" : "Wort speichern"}
+              {saved ? t("word.saved") : t("word.save")}
             </button>
             <span className="text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">
               {result.source}
@@ -200,6 +202,7 @@ export function WordPopover({ selection, lang, episode, onClose, onSaved }: Prop
 }
 
 function PhoneticNote({ rendered }: { rendered: RenderedWord }) {
+  const { t } = useUi();
   const kinds = [...new Set(rendered.hazards.map((h) => h.kind))];
   if (rendered.syllables.length < 2 && kinds.length === 0) return null;
 
@@ -216,7 +219,7 @@ function PhoneticNote({ rendered }: { rendered: RenderedWord }) {
         ))}
         {rendered.parts.length > 1 ? (
           <span className="ml-2 text-[11px] text-[var(--ink-faint)]">
-            Kompositum: {rendered.parts.join(" + ")}
+            {t("word.compound")}: {rendered.parts.join(" + ")}
           </span>
         ) : null}
       </p>

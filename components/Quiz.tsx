@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import type { QuizQuestion } from "@/lib/types";
+import { useUi } from "@/lib/i18n";
 
 /**
  * Comprehension check. It exists to catch the failure mode this whole app
  * invites: reading the English column and calling it listening practice.
  */
 export function Quiz({ slug, onSeek }: { slug: string; onSeek: (seconds: number) => void }) {
+  const { t } = useUi();
   const [questions, setQuestions] = useState<QuizQuestion[] | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -42,15 +44,15 @@ export function Quiz({ slug, onSeek }: { slug: string; onSeek: (seconds: number)
     <div>
       <div className="mb-3 flex items-baseline gap-3">
         <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
-          Verständnis-Check
+          {t("quiz.title")}
         </h3>
         {revealed ? (
           <span className="text-[12px] text-[var(--ink-soft)]">
-            {correct} von {questions.length} richtig
+            {t("quiz.score", { n: correct, total: questions.length })}
           </span>
         ) : (
           <span className="text-[12px] text-[var(--ink-faint)]">
-            {answered}/{questions.length} beantwortet
+            {t("quiz.answered", { n: answered, total: questions.length })}
           </span>
         )}
       </div>
@@ -99,7 +101,7 @@ export function Quiz({ slug, onSeek }: { slug: string; onSeek: (seconds: number)
                     className="btn px-2 py-0.5 text-[11px]"
                     onClick={() => onSeek(question.anchor)}
                   >
-                    Stelle anhören
+                    {t("quiz.listen")}
                   </button>
                 </p>
               ) : null}
@@ -115,7 +117,7 @@ export function Quiz({ slug, onSeek }: { slug: string; onSeek: (seconds: number)
           disabled={answered < questions.length || revealed}
           onClick={() => setRevealed(true)}
         >
-          Auswerten
+          {t("quiz.evaluate")}
         </button>
         {revealed ? (
           <button
@@ -126,7 +128,7 @@ export function Quiz({ slug, onSeek }: { slug: string; onSeek: (seconds: number)
               setRevealed(false);
             }}
           >
-            Nochmal
+            {t("quiz.retry")}
           </button>
         ) : null}
       </div>

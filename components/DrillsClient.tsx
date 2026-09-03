@@ -6,6 +6,7 @@ import { CEFR_LEVELS, type Cefr } from "@/lib/types";
 import { LevelBadge } from "./LevelBadge";
 import { ShadowingBadge } from "./ShadowingBadge";
 import { formatTimestamp } from "@/lib/export";
+import { useUi } from "@/lib/i18n";
 
 export interface DrillItem {
   episodeSlug: string;
@@ -33,6 +34,7 @@ const SPRINT_SECONDS = 300;
  * they happen to sit in the episode, is a session that survives a lunch break.
  */
 export function DrillsClient({ drills }: { drills: DrillItem[] }) {
+  const { t } = useUi();
   const [level, setLevel] = useState<Cefr | "">("");
   const [running, setRunning] = useState(false);
   const [remaining, setRemaining] = useState(SPRINT_SECONDS);
@@ -67,17 +69,16 @@ export function DrillsClient({ drills }: { drills: DrillItem[] }) {
     <div>
       <header className="mb-5 max-w-2xl">
         <h1 className="text-[26px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-          Fünf Minuten, fünf Sätze
+          {t("drills.title")}
         </h1>
-        <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-soft)]">
-          Aus jeder Folge wählt Hörbar die Sätze mit dem höchsten Lernwert: lang genug, um eine echte
-          Phrase zu sein, kurz genug fürs Arbeitsgedächtnis, lexikalisch dicht und ohne phonetische
-          Sackgassen. Jeder Satz öffnet direkt im Echo-Modus.
+        <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-soft)]">{t("drills.lede")}</p>
+        <p className="mt-3 rounded-xl bg-[var(--surface)] px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-soft)]">
+          {t("drills.what")}
         </p>
       </header>
 
       <div className="mb-5 flex flex-wrap items-center gap-2 border-y border-[var(--rule)] py-2.5">
-        <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">Niveau</span>
+        <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">{t("common.level")}</span>
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
@@ -85,7 +86,7 @@ export function DrillsClient({ drills }: { drills: DrillItem[] }) {
             data-active={level === ""}
             onClick={() => setLevel("")}
           >
-            alle
+            {t("common.all")}
           </button>
           {CEFR_LEVELS.map((option) => {
             const count = drills.filter((drill) => drill.cefr === option).length;
@@ -122,14 +123,14 @@ export function DrillsClient({ drills }: { drills: DrillItem[] }) {
               setRunning(true);
             }}
           >
-            {running ? "Pause" : remaining === SPRINT_SECONDS ? "Sprint starten" : "Weiter"}
+            {running ? t("common.pause") : remaining === SPRINT_SECONDS ? t("drills.start") : t("drills.continue")}
           </button>
         </div>
       </div>
 
       {sprint.length === 0 ? (
         <p className="py-16 text-center text-[13px] text-[var(--ink-faint)]">
-          Für dieses Niveau gibt es noch keine Drills. Lies zuerst eine Folge mit dem Ingest-Worker ein.
+          {t("drills.empty")}
         </p>
       ) : (
         <ol className="space-y-3">
@@ -159,13 +160,13 @@ export function DrillsClient({ drills }: { drills: DrillItem[] }) {
                     href={`/watch/${drill.episodeSlug}?seg=${drill.segmentId}&mode=echo`}
                     className="btn btn-primary text-[12px]"
                   >
-                    Echo üben
+                    {t("drills.practiseEcho")}
                   </Link>
                   <Link
                     href={`/watch/${drill.episodeSlug}?seg=${drill.segmentId}&mode=loop`}
                     className="btn text-[12px]"
                   >
-                    In Schleife
+                    {t("drills.practiseLoop")}
                   </Link>
                   <button
                     type="button"
@@ -179,10 +180,10 @@ export function DrillsClient({ drills }: { drills: DrillItem[] }) {
                       })
                     }
                   >
-                    {done ? "wieder öffnen" : "abgehakt"}
+                    {done ? t("drills.reopen") : t("drills.done")}
                   </button>
                   <span className="ml-auto text-[11px] text-[var(--ink-faint)]">
-                    {drill.rate.toFixed(1)} Silben/s · {(drill.end - drill.start).toFixed(1)} s
+                    {drill.rate.toFixed(1)} syll/s · {(drill.end - drill.start).toFixed(1)} s
                   </span>
                 </div>
               </li>

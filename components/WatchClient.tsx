@@ -5,8 +5,12 @@ import Link from "next/link";
 import type { Episode, Segment, TargetLang } from "@/lib/types";
 import type { RenderedWord } from "@/lib/german/render";
 import { useYouTube } from "./player/useYouTube";
-import { useAudio } from "./player/useAudio";
+import { useMediaElement } from "./player/useMediaElement";
 import { useTimeline } from "./player/useTimeline";
+import { Transport } from "./player/Transport";
+import { MediaAttach } from "./MediaAttach";
+import { StreamControls } from "./StreamControls";
+import { resolveMedia, type StoredMedia } from "@/lib/mediaStore";
 import { useShadowEngine, type ShadowMode } from "./player/useShadowEngine";
 import { NOOP_PLAYER } from "./player/types";
 import { Transcript } from "./Transcript";
@@ -18,6 +22,8 @@ import { Quiz } from "./Quiz";
 import { LevelBadge } from "./LevelBadge";
 import { ShadowingBadge } from "./ShadowingBadge";
 import { loadSettings, loadVault, saveSettings } from "@/lib/vault";
+import { useUi } from "@/lib/i18n";
+import { FindSourceButton } from "./FindSourceButton";
 
 interface Props {
   episode: Episode;
@@ -30,20 +36,33 @@ interface Props {
 }
 
 export function WatchClient({ episode, initialTime = 0, initialSegmentId, initialMode }: Props) {
-  const source = episode.source;
+  const { t } = useUi();
+  // A stream the learner attached themselves wins over whatever the catalog
+  // shipped, so a transcript-only episode becomes playable without a redeploy.
+  const [attached, setAttached] = useState<StoredMedia | null>(null);
+  const refreshMedia = useCallback(() => setAttached(resolveMedia(episode.slug)), [episode.slug]);
+
+  useEffect(() => {
+    refreshMedia();
+    window.addEventListener("hoerbar:media-changed", refreshMedia);
+    return () => window.removeEventListener("hoerbar:media-changed", refreshMedia);
+  }, [refreshMedia]);
+
+  const source = attached?.source ?? episode.source;
   const youtubeId = source.kind === "youtube" ? source.youtubeId : null;
-  const audioUrl = source.kind === "audio" ? source.audioUrl : null;
+  const streamUrl =
+    source.kind === "audio" ? source.audioUrl : source.kind === "video" ? source.videoUrl : null;
 
   const youtube = useYouTube(youtubeId);
-  const audio = useAudio(audioUrl);
+  const media = useMediaElement(streamUrl);
   const timeline = useTimeline(episode.durationSec);
 
   const handle = useMemo(() => {
     if (source.kind === "youtube") return youtube.handle;
-    if (source.kind === "audio") return audio.handle;
+    if (source.kind === "audio" || source.kind === "video") return media.handle;
     if (source.kind === "timeline") return timeline.handle;
     return NOOP_PLAYER;
-  }, [source.kind, youtube.handle, audio.handle, timeline.handle]);
+  }, [source.kind, youtube.handle, media.handle, timeline.handle]);
 
   const [values, setValues] = useState<ControlValues>({
     mode: initialMode ?? "free",
@@ -285,14 +304,65 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
               className="aspect-video w-full overflow-hidden rounded-xl border border-[var(--rule)] bg-black [&_iframe]:h-full [&_iframe]:w-full"
             />
           ) : null}
+          {source.kind === "video" ? (
+            <video
+              ref={media.mediaRef as React.RefObject<HTMLVideoElement>}
+              src={streamUrl ?? undefined}
+              poster={source.poster}
+              playsInline
+              preload="metadata"
+              className="aspect-video w-full rounded-xl border border-[var(--rule)] bg-black"
+            />
+          ) : null}
           {source.kind === "audio" ? (
-            <audio ref={audio.audioRef} src={audioUrl ?? undefined} controls className="w-full" preload="metadata" />
+            <audio
+              ref={media.mediaRef as React.RefObject<HTMLAudioElement>}
+              src={streamUrl ?? undefined}
+              preload="metadata"
+              className="hidden"
+            />
           ) : null}
           {source.kind === "timeline" ? (
-            <TimelineNotice progressRef={engine.progressRef} />
+            <TimelineNotice
+              progressRef={engine.progressRef}
+              slug={episode.slug}
+              title={episode.title}
+              publisher={episode.publisher}
+              onChange={refreshMedia}
+            />
           ) : null}
-          {source.kind === "pending" ? <PendingNotice episode={episode} /> : null}
+          {source.kind === "pending" ? (
+            <PendingNotice episode={episode} onChange={refreshMedia} />
+          ) : null}
+
+          {source.kind !== "timeline" && source.kind !== "pending" ? (
+            <div className="mt-2">
+              <MediaAttach slug={episode.slug} current={attached} onChange={refreshMedia} />
+            </div>
+          ) : null}
         </div>
+
+        {/*
+          The transport sits directly in the column, not inside the media block:
+          a sticky element can only stick within its own parent, and the media
+          block is only a few hundred pixels tall. The transcript scrolls itself
+          to follow playback, so without this the transport is far up the page
+          by the second sentence - exactly when you reach for slower or back.
+        */}
+        {source.kind === "audio" || source.kind === "video" ? (
+          <div className="sticky top-[50px] z-30 -mx-1 mb-4 rounded-xl bg-[color-mix(in_oklab,var(--paper)_90%,transparent)] px-1 py-1 backdrop-blur">
+            <Transport handle={handle} state={media.state} onRetry={media.retry} />
+          </div>
+        ) : null}
+
+        {episode.transcript.length === 0 && (source.kind === "audio" || source.kind === "video" || source.kind === "youtube") ? (
+          <div className="mb-4">
+            <StreamControls handle={handle} />
+            <p className="mt-2 text-[12px] leading-relaxed text-[var(--ink-faint)]">
+              {t("watch.streamNoTranscript")}
+            </p>
+          </div>
+        ) : null}
 
         {episode.transcript.length > 0 ? (
           <>
@@ -362,6 +432,7 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
 }
 
 function EpisodeHeader({ episode }: { episode: Episode }) {
+  const { t } = useUi();
   return (
     <header className="mb-4">
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -369,7 +440,7 @@ function EpisodeHeader({ episode }: { episode: Episode }) {
         <span className="text-[12px] text-[var(--ink-faint)]">{episode.publisher}</span>
         <ShadowingBadge sdm={episode.metrics.sdm} />
         {episode.transcriptStatus === "demo" ? (
-          <span className="chip border-dashed">Demo-Transkript</span>
+          <span className="chip chip-quiet">{t("watch.demoTranscript")}</span>
         ) : null}
       </div>
       <h1 className="text-[24px] font-semibold leading-tight sm:text-[28px]" style={{ fontFamily: "var(--font-display)" }}>
@@ -382,14 +453,27 @@ function EpisodeHeader({ episode }: { episode: Episode }) {
   );
 }
 
-function TimelineNotice({ progressRef }: { progressRef: React.RefObject<HTMLElement | null> }) {
+function TimelineNotice({
+  progressRef,
+  slug,
+  title,
+  publisher,
+  onChange,
+}: {
+  progressRef: React.RefObject<HTMLElement | null>;
+  slug: string;
+  title: string;
+  publisher: string;
+  onChange: () => void;
+}) {
+  const { t } = useUi();
   return (
     <div className="card p-4">
-      <p className="text-[13px] leading-relaxed text-[var(--ink-soft)]">
-        Diese Folge läuft auf der Transkript-Zeitachse, ohne Ton. Alles andere funktioniert schon:
-        Satz-Synchronisierung, Wort-Teleprompter, Schleifen, Echo-Pausen, Wörterbuch und Vokabelheft.
-        Sobald der Ingest-Worker eine Aufnahme anhängt, spielt genau dieselbe Ansicht das echte Audio.
-      </p>
+      <p className="text-[13px] leading-relaxed text-[var(--ink-soft)]">{t("watch.timelineNotice")}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <FindSourceButton title={title} publisher={publisher} slug={slug} onAttached={onChange} />
+        <MediaAttach slug={slug} current={null} onChange={onChange} />
+      </div>
       <div
         ref={progressRef as React.RefObject<HTMLDivElement>}
         className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--rule)]"
@@ -403,30 +487,50 @@ function TimelineNotice({ progressRef }: { progressRef: React.RefObject<HTMLElem
   );
 }
 
-function PendingNotice({ episode }: { episode: Episode }) {
-  const hint = episode.source.kind === "pending" ? episode.source.ingestHint : undefined;
+/**
+ * What a learner sees on an entry that has no audio attached yet.
+ *
+ * This used to print the maintainer's shell command, which is the wrong thing
+ * to show a person who came here to listen to German: it is not an action they
+ * can take, and it makes the app look unfinished at exactly the moment it needs
+ * to look useful. What they can actually do is have the app find the show, or
+ * paste a stream themselves, so those are the two buttons, and everything else
+ * is a quiet link.
+ */
+function PendingNotice({ episode, onChange }: { episode: Episode; onChange: () => void }) {
+  const { t } = useUi();
   const pageUrl = episode.source.kind === "pending" ? episode.source.pageUrl : undefined;
   return (
     <div className="card p-5">
-      <h2 className="text-[14px] font-semibold">Kuratiert, aber noch nicht eingelesen</h2>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--ink-soft)]">
-        Diese Sendung steht mit einer redaktionellen Niveau-Einstufung im Katalog. Transkript, Wort-Timing
-        und Übersetzungen entstehen im Ingest-Worker; danach erscheint hier derselbe Player wie bei den
-        fertigen Folgen.
-      </p>
-      {hint ? (
-        <pre className="mt-3 overflow-x-auto rounded-lg border border-[var(--rule)] bg-[var(--paper)] p-2.5 font-mono text-[11px] text-[var(--ink-soft)]">
-          {hint}
-        </pre>
-      ) : null}
-      <div className="mt-3 flex gap-2">
+      <h2 className="text-[15px] font-semibold">{t("watch.pendingTitle")}</h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--ink-soft)]">{t("watch.pendingBody")}</p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <FindSourceButton
+          title={episode.title}
+          publisher={episode.publisher}
+          slug={episode.slug}
+          onAttached={onChange}
+        />
+        <MediaAttach slug={episode.slug} current={null} onChange={onChange} />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--rule)] pt-3 text-[12px]">
+        <Link href="/" className="py-1.5 text-[var(--ink-faint)] hover:text-[var(--accent)]">
+          {t("watch.pendingBrowse")}
+        </Link>
         {pageUrl ? (
-          <a href={pageUrl} target="_blank" rel="noreferrer noopener" className="btn">
-            Zur Sendung
+          <a
+            href={pageUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="py-1.5 text-[var(--ink-faint)] hover:text-[var(--accent)]"
+          >
+            {t("watch.pendingOpenShow")}
           </a>
         ) : null}
-        <Link href="/about" className="btn">
-          Wie der Ingest läuft
+        <Link href="/about" className="py-1.5 text-[var(--ink-faint)] hover:text-[var(--accent)]">
+          {t("nav.about")}
         </Link>
       </div>
     </div>
@@ -434,26 +538,38 @@ function PendingNotice({ episode }: { episode: Episode }) {
 }
 
 function MetricsPanel({ episode }: { episode: Episode }) {
+  const { t } = useUi();
   const rows: Array<[string, string]> = [
-    ["Silben pro Sekunde", episode.metrics.syllablesPerSecond ? episode.metrics.syllablesPerSecond.toFixed(2) : "-"],
-    ["Lexikalische Vielfalt", episode.metrics.lexicalDiversity ? episode.metrics.lexicalDiversity.toFixed(2) : "-"],
-    ["Phonetische Last", episode.metrics.phoneticComplexity ? episode.metrics.phoneticComplexity.toFixed(2) : "-"],
-    ["Wortschatz A1-B1", episode.metrics.goetheCoverage.B1 ? `${Math.round(episode.metrics.goetheCoverage.B1 * 100)}%` : "-"],
-    ["außerhalb der Listen", episode.metrics.outOfListRatio ? `${Math.round(episode.metrics.outOfListRatio * 100)}%` : "-"],
+    ["Syllables per second", episode.metrics.syllablesPerSecond ? episode.metrics.syllablesPerSecond.toFixed(2) : "-"],
+    ["Lexical diversity", episode.metrics.lexicalDiversity ? episode.metrics.lexicalDiversity.toFixed(2) : "-"],
+    ["Phonetic load", episode.metrics.phoneticComplexity ? episode.metrics.phoneticComplexity.toFixed(2) : "-"],
+    ["Vocabulary in A1-B1", episode.metrics.goetheCoverage.B1 ? `${Math.round(episode.metrics.goetheCoverage.B1 * 100)}%` : "-"],
+    ["Outside the lists", episode.metrics.outOfListRatio ? `${Math.round(episode.metrics.outOfListRatio * 100)}%` : "-"],
   ];
+  // Every measurement here is derived from a transcript. Before one exists the
+  // table is five dashes, which reads as a broken panel rather than an honest
+  // "not yet", so it says so in a sentence instead.
+  const measured = rows.some(([, value]) => value !== "-");
+
   return (
     <section className="card p-4">
       <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
-        Messwerte
+        {t("watch.metrics")}
       </h3>
-      <dl className="mt-2.5 space-y-1.5">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-3 text-[12.5px]">
-            <dt className="text-[var(--ink-soft)]">{label}</dt>
-            <dd className="font-mono text-[12px]">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      {measured ? (
+        <dl className="mt-2.5 space-y-1.5">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex items-baseline justify-between gap-3 text-[12.5px]">
+              <dt className="text-[var(--ink-soft)]">{label}</dt>
+              <dd className="font-mono text-[12px]">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--ink-faint)]">
+          {t("watch.metricsPending")}
+        </p>
+      )}
       {episode.cefrNote ? (
         <p className="mt-3 border-t border-[var(--rule)] pt-2 text-[11.5px] leading-relaxed text-[var(--ink-faint)]">
           {episode.cefrNote}
@@ -465,29 +581,30 @@ function MetricsPanel({ episode }: { episode: Episode }) {
 }
 
 function HazardLegend() {
+  const { t } = useUi();
   return (
     <section className="card p-4">
       <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
-        Aussprache-Markierungen
+        {t("watch.hazards")}
       </h3>
       <ul className="mt-2.5 space-y-1.5 text-[12px] leading-snug text-[var(--ink-soft)]">
         <li>
-          <span className="hz hz-ich px-1">ch</span> Ich-Laut [ç]: vorne, weich, nach hellen Vokalen.
+          <span className="hz hz-ich px-1">ch</span> Ich-Laut [ç]: forward and soft, after front vowels.
         </li>
         <li>
-          <span className="hz hz-ach px-1">ch</span> Ach-Laut [x]: hinten im Rachen, nach a, o, u, au.
+          <span className="hz hz-ach px-1">ch</span> Ach-Laut [x]: back of the throat, after a, o, u, au.
         </li>
         <li>
-          <span className="hz hz-devoice px-1">d</span> Auslautverhärtung: b, d, g werden am Ende zu p, t, k.
+          <span className="hz hz-devoice px-1">d</span> Final devoicing: b, d, g harden to p, t, k.
         </li>
         <li>
-          <span className="hz hz-cluster px-1">rbst</span> Konsonantencluster: Zunge vorher in Position bringen.
+          <span className="hz hz-cluster px-1">rbst</span> Consonant cluster: set your tongue before you start.
         </li>
         <li>
-          <span className="hz hz-onset px-1">st</span> st- und sp- am Wortanfang klingen wie scht-, schp-.
+          <span className="hz hz-onset px-1">st</span> st- and sp- at the start of a stem sound like scht-, schp-.
         </li>
         <li>
-          <span className="hz hz-r px-1">er</span> Endungs-r wird zum dunklen Vokal [ɐ].
+          <span className="hz hz-r px-1">er</span> Final -r becomes the dark vowel [ɐ].
         </li>
       </ul>
     </section>

@@ -4,14 +4,25 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { loadSettings, loadVault, removeEntry, saveSettings, type VaultEntry } from "@/lib/vault";
 import { describeDue, isDue, leitnerBox, LEITNER_INTERVALS } from "@/lib/srs";
-import { contextLink, formatTimestamp, toAnkiTsv, toClozeTsv, toCsv } from "@/lib/export";
+import {
+  contextLink,
+  formatTimestamp,
+  toAnkiTsv,
+  toClozeTsv,
+  toCsv,
+  toNotionCsv,
+  toObsidianMarkdown,
+  toQuizlet,
+} from "@/lib/export";
 import { CEFR_LEVELS, type Cefr, type TargetLang } from "@/lib/types";
 import { LevelBadge } from "@/components/LevelBadge";
 import { ReviewSession } from "./ReviewSession";
+import { useUi } from "@/lib/i18n";
 
 type Tab = "list" | "review";
 
 export function VaultClient() {
+  const { t } = useUi();
   const [entries, setEntries] = useState<VaultEntry[]>([]);
   const [lang, setLang] = useState<TargetLang>("en");
   const [tab, setTab] = useState<Tab>("list");
@@ -69,22 +80,20 @@ export function VaultClient() {
   }
 
   if (!hydrated) {
-    return <p className="py-16 text-center text-[13px] text-[var(--ink-faint)]">Vokabelheft wird geladen …</p>;
+    return <p className="py-16 text-center text-[13px] text-[var(--ink-faint)]">{t("common.loading")}</p>;
   }
 
   if (entries.length === 0) {
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
         <h1 className="text-[20px] font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-          Noch keine Wörter
+          {t("vault.empty")}
         </h1>
         <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--ink-soft)]">
-          Klick im Transkript auf ein Wort und speichere es. Hörbar legt dann automatisch drei Dinge ab:
-          das Wort, den Satz mit Zeitstempel als echtes Kontextbeispiel und den Link zurück an genau
-          die Stelle im Video.
+          {t("vault.emptyBody")}
         </p>
-        <Link href="/" className="btn btn-primary mt-4">
-          Zum Katalog
+        <Link href="/catalog" className="btn btn-primary mt-4">
+          {t("vault.toCatalog")}
         </Link>
       </div>
     );
@@ -95,10 +104,10 @@ export function VaultClient() {
       <header className="mb-5 flex flex-wrap items-end gap-x-4 gap-y-2">
         <div>
           <h1 className="text-[24px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-            Vokabelheft
+            {t("vault.title")}
           </h1>
           <p className="mt-0.5 text-[13px] text-[var(--ink-soft)]">
-            {entries.length === 1 ? "1 Wort" : `${entries.length} Wörter`} · {due.length} heute fällig
+            {entries.length === 1 ? t("vault.wordCountOne") : t("vault.wordCount", { n: entries.length })} · {t("vault.dueToday", { n: due.length })}
           </p>
         </div>
 
@@ -122,7 +131,7 @@ export function VaultClient() {
             onClick={() => setTab(tab === "review" ? "list" : "review")}
             disabled={due.length === 0 && tab === "list"}
           >
-            {tab === "review" ? "Zur Liste" : `Wiederholen (${due.length})`}
+            {tab === "review" ? t("vault.toList") : t("vault.review", { n: due.length })}
           </button>
         </div>
       </header>
@@ -139,7 +148,7 @@ export function VaultClient() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Suchen …"
+              placeholder={t("vault.searchPlaceholder")}
               className="btn w-[180px] justify-start font-normal"
             />
             <select
@@ -147,7 +156,7 @@ export function VaultClient() {
               onChange={(event) => setLevelFilter(event.target.value as Cefr | "")}
               className="btn py-1 text-[12px]"
             >
-              <option value="">alle Niveaus</option>
+              <option value="">{t("vault.allLevels")}</option>
               {CEFR_LEVELS.map((level) => (
                 <option key={level} value={level}>
                   {level}
@@ -163,7 +172,7 @@ export function VaultClient() {
                   download("hoerbar-anki.txt", toAnkiTsv(visible, { lang }), "text/plain;charset=utf-8")
                 }
               >
-                Anki-Export
+                {t("vault.export")}
               </button>
               <button
                 type="button"
@@ -172,7 +181,7 @@ export function VaultClient() {
                   download("hoerbar-cloze.txt", toClozeTsv(visible, { lang }), "text/plain;charset=utf-8")
                 }
               >
-                Lückensätze
+                {t("vault.cloze")}
               </button>
               <button
                 type="button"
@@ -180,6 +189,37 @@ export function VaultClient() {
                 onClick={() => download("hoerbar-vokabeln.csv", toCsv(visible, { lang }), "text/csv;charset=utf-8")}
               >
                 CSV
+              </button>
+              <button
+                type="button"
+                className="btn text-[12px]"
+                onClick={() =>
+                  download("hoerbar-quizlet.txt", toQuizlet(visible, { lang }), "text/plain;charset=utf-8")
+                }
+              >
+                Quizlet
+              </button>
+              <button
+                type="button"
+                className="btn text-[12px]"
+                onClick={() =>
+                  download("hoerbar-notion.csv", toNotionCsv(visible, { lang }), "text/csv;charset=utf-8")
+                }
+              >
+                Notion
+              </button>
+              <button
+                type="button"
+                className="btn text-[12px]"
+                onClick={() =>
+                  download(
+                    "hoerbar-vokabeln.md",
+                    toObsidianMarkdown(visible, { lang }),
+                    "text/markdown;charset=utf-8",
+                  )
+                }
+              >
+                Obsidian
               </button>
             </div>
           </div>
@@ -194,7 +234,7 @@ export function VaultClient() {
                       {entry.lemma}
                     </span>
                     {entry.plural ? (
-                      <span className="text-[11px] text-[var(--ink-faint)]">Pl. die {entry.plural}</span>
+                      <span className="text-[11px] text-[var(--ink-faint)]">{t("word.plural")} die {entry.plural}</span>
                     ) : null}
                     <span className="text-[13px] text-[var(--ink-soft)]">
                       {entry.translations[lang].join(", ")}
@@ -215,7 +255,7 @@ export function VaultClient() {
                 </div>
 
                 <div className="flex flex-col items-end gap-1 text-right">
-                  <span className="chip">Box {leitnerBox(entry.srs)}</span>
+                  <span className="chip">{t("review.box", { n: leitnerBox(entry.srs) })}</span>
                   <span className="text-[11px] text-[var(--ink-faint)]">{describeDue(entry.srs)}</span>
                   <button
                     type="button"
@@ -225,7 +265,7 @@ export function VaultClient() {
                       refresh();
                     }}
                   >
-                    entfernen
+                    {t("vault.remove")}
                   </button>
                 </div>
               </li>
@@ -238,14 +278,15 @@ export function VaultClient() {
 }
 
 function LeitnerStrip({ boxes, total }: { boxes: number[]; total: number }) {
+  const { t } = useUi();
   return (
     <div className="card p-3.5">
       <div className="flex items-baseline gap-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
-          Leitner-Kästen
+          {t("vault.leitner")}
         </h2>
         <span className="text-[11px] text-[var(--ink-faint)]">
-          Intervalle {LEITNER_INTERVALS.join(", ")} Tage
+          {t("vault.intervals", { list: LEITNER_INTERVALS.join(", ") })}
         </span>
       </div>
       <div className="mt-2.5 flex gap-2">
@@ -258,7 +299,7 @@ function LeitnerStrip({ boxes, total }: { boxes: number[]; total: number }) {
               />
             </div>
             <p className="mt-1 text-[10px] text-[var(--ink-faint)]">
-              Box {index + 1} · {count}
+              {t("review.box", { n: index + 1 })} · {count}
             </p>
           </div>
         ))}
