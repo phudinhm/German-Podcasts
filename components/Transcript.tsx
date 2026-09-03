@@ -112,7 +112,7 @@ const SegmentRow = memo(function SegmentRow({
 
       <div className="min-w-0">
         <p
-          className="cursor-pointer text-[16px] leading-[1.7] text-[var(--ink)]"
+          className="de-line cursor-pointer text-[16px] leading-[1.7] text-[var(--ink)]"
           style={{ fontFamily: "var(--font-display)" }}
           onClick={() => onSeek(index)}
         >

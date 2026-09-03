@@ -114,3 +114,162 @@ export function formatTimestamp(seconds: number): string {
 export function contextLink(entry: VaultEntry): string {
   return `/watch/${entry.context.episodeSlug}?t=${Math.floor(entry.context.start)}&seg=${entry.context.segmentId}`;
 }
+
+/**
+ * Quizlet's importer asks for a separator between the two sides of a card and
+ * another between cards. Tab and newline are its own defaults, so a plain paste
+ * into the import box works with nothing to configure. Only two fields exist
+ * there, so the sentence rides along on the back, where it is still useful.
+ */
+export function toQuizlet(entries: VaultEntry[], options: ExportOptions): string {
+  return entries
+    .map((entry) => {
+      const front = entry.article ? `${entry.article} ${entry.lemma}` : entry.lemma;
+      const translation = entry.translations[options.lang].join(", ");
+      const back =
+        options.includeContext === false ? translation : `${translation} — ${entry.context.de}`;
+      return `${escapeField(front)}\t${escapeField(back)}`;
+    })
+    .join("\n");
+}
+
+/**
+ * Notion builds a database from a CSV whose first row is the column names, and
+ * it types the columns from what it finds. Dates are given as ISO so it reads
+ * them as dates rather than text, which is what makes the review queue
+ * sortable once it is in there.
+ */
+export function toNotionCsv(entries: VaultEntry[], options: ExportOptions): string {
+  const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const header = ["Word", "Article", "Plural", "Part of speech", "Translation", "Sentence", "Sentence translation", "Episode", "Timestamp", "Level", "Due", "Saved"];
+  const rows = entries.map((entry) =>
+    [
+      entry.lemma,
+      entry.article ?? "",
+      entry.plural ?? "",
+      entry.pos,
+      entry.translations[options.lang].join(", "),
+      entry.context.de,
+      (options.lang === "en" ? entry.context.en : entry.context.vi) ?? "",
+      entry.context.episodeTitle,
+      formatTimestamp(entry.context.start),
+      entry.context.cefr,
+      entry.srs.due,
+      entry.savedAt,
+    ]
+      .map(quote)
+      .join(","),
+  );
+  return [header.join(","), ...rows].join("\n");
+}
+
+/**
+ * One Markdown note for Obsidian.
+ *
+ * Written to be useful twice: readable as a note on its own, and directly
+ * reviewable by the Spaced Repetition plugin, which turns any `front::back`
+ * line into a card. Frontmatter carries the counts so the note sorts and
+ * queries alongside the rest of a vault.
+ */
+export function toObsidianMarkdown(entries: VaultEntry[], options: ExportOptions): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const out: string[] = [
+    "---",
+    "tags: [german, hoerbar]",
+    `exported: ${today}`,
+    `words: ${entries.length}`,
+    "---",
+    "",
+    "# German vocabulary",
+    "",
+    `Exported from Hörbar on ${today}. Lines written as \`front::back\` are picked up`,
+    "by the Spaced Repetition plugin as cards.",
+    "",
+  ];
+
+  const byEpisode = new Map<string, VaultEntry[]>();
+  for (const entry of entries) {
+    const key = entry.context.episodeTitle || "Unsorted";
+    const list = byEpisode.get(key) ?? [];
+    list.push(entry);
+    byEpisode.set(key, list);
+  }
+
+  for (const [episode, list] of byEpisode) {
+    out.push(`## ${episode}`, "");
+    for (const entry of list) {
+      const front = entry.article ? `${entry.article} ${entry.lemma}` : entry.lemma;
+      const plural = entry.plural ? ` (pl. ${entry.plural})` : "";
+      const translation = entry.translations[options.lang].join(", ");
+      out.push(`**${front}${plural}**::${translation}`);
+      if (options.includeContext !== false) {
+        out.push(`> ${entry.context.de}`);
+        const gloss = options.lang === "en" ? entry.context.en : entry.context.vi;
+        if (gloss) out.push(`> *${gloss}*`);
+      }
+      out.push(`<small>${entry.context.cefr} · ${formatTimestamp(entry.context.start)}</small>`, "");
+    }
+  }
+
+  return out.join("\n");
+}
+
+/** A line of timed text, which is all a subtitle file is. */
+export interface TimedLine {
+  at: number;
+  until: number;
+  de: string;
+  translation?: string;
+}
+
+function clockSrt(seconds: number): string {
+  const ms = Math.max(0, Math.round(seconds * 1000));
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  const s = Math.floor((ms % 60_000) / 1000);
+  const rest = ms % 1000;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(rest).padStart(3, "0")}`;
+}
+
+function clockVtt(seconds: number): string {
+  return clockSrt(seconds).replace(",", ".");
+}
+
+export type SubtitleFlavour = "original" | "both" | "translated";
+
+function subtitleText(line: TimedLine, flavour: SubtitleFlavour): string | null {
+  if (flavour === "original") return line.de;
+  if (flavour === "translated") return line.translation ?? null;
+  return line.translation ? `${line.de}\n${line.translation}` : line.de;
+}
+
+/**
+ * SubRip. Every player made in the last twenty years reads it, which is the
+ * point: a transcript captured here should be usable in VLC, on a TV, or in
+ * whatever the learner already watches things in.
+ */
+export function toSrt(lines: TimedLine[], flavour: SubtitleFlavour = "both"): string {
+  const blocks: string[] = [];
+  let index = 1;
+  for (const line of lines) {
+    const text = subtitleText(line, flavour);
+    if (!text) continue;
+    // A cue with no duration never renders, and rounding can produce one.
+    const end = Math.max(line.until, line.at + 0.2);
+    blocks.push(`${index}\n${clockSrt(line.at)} --> ${clockSrt(end)}\n${text}\n`);
+    index += 1;
+  }
+  return blocks.join("\n");
+}
+
+/** WebVTT, which is what a browser's own <track> element wants. */
+export function toVtt(lines: TimedLine[], flavour: SubtitleFlavour = "both"): string {
+  const blocks: string[] = ["WEBVTT", ""];
+  for (const line of lines) {
+    const text = subtitleText(line, flavour);
+    if (!text) continue;
+    const end = Math.max(line.until, line.at + 0.2);
+    blocks.push(`${clockVtt(line.at)} --> ${clockVtt(end)}\n${text}\n`);
+  }
+  return blocks.join("\n");
+}

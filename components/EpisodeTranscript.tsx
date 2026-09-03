@@ -92,7 +92,7 @@ export function EpisodeTranscript({
           handle.play();
         };
         const german = (
-          <p className="cursor-pointer text-[15px] leading-[1.6]" onClick={seek}>
+          <p className="de-line cursor-pointer text-[15px] leading-[1.6]" onClick={seek}>
             {onWord
               ? splitLine(segment.de).map((piece, pieceIndex) =>
                   /^\s+$/.test(piece) ? (

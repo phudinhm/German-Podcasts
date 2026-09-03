@@ -16,145 +16,11 @@ export interface Suggestion {
   cefr: Cefr;
   why: string;
   topics: string[];
+  /** Watchable rather than only listenable, so the video filter can find it. */
+  video?: boolean;
 }
 
 export const SUGGESTIONS: Suggestion[] = [
-  {
-    query: "Nachrichtenleicht",
-    label: "Nachrichtenleicht",
-    publisher: "Deutschlandfunk",
-    cefr: "A1",
-    why: "Weekly news in deliberately simple German. Very short sentences, clear delivery.",
-    topics: ["News", "Easy German"],
-  },
-  {
-    query: "Langsam gesprochene Nachrichten",
-    label: "Langsam gesprochene Nachrichten",
-    publisher: "Deutsche Welle",
-    cefr: "A2",
-    why: "The day's news read slowly on purpose. The classic bridge from A2 to B1.",
-    topics: ["News"],
-  },
-  {
-    query: "Slow German mit Annik Rubens",
-    label: "Slow German",
-    publisher: "Annik Rubens",
-    cefr: "A2",
-    why: "Monologues on everyday German culture, well under native pace.",
-    topics: ["Culture", "Everyday life"],
-  },
-  {
-    query: "Easy German",
-    label: "Easy German",
-    publisher: "Easy German",
-    cefr: "B1",
-    why: "Street interviews with subtitles. Real colloquial German in digestible portions.",
-    topics: ["Interviews", "Colloquial"],
-  },
-  {
-    query: "Deutsch lernen mit Nachrichten",
-    label: "Deutsch lernen mit Nachrichten",
-    publisher: "Various",
-    cefr: "B1",
-    why: "News rewritten for learners, with vocabulary explained as it goes.",
-    topics: ["News", "Learners"],
-  },
-  {
-    query: "Was jetzt ZEIT ONLINE",
-    label: "Was jetzt?",
-    publisher: "ZEIT ONLINE",
-    cefr: "B2",
-    why: "Daily news podcast with interviews. Journalistic register, normal pace.",
-    topics: ["News", "Politics"],
-  },
-  {
-    query: "Auf den Punkt Süddeutsche Zeitung",
-    label: "Auf den Punkt",
-    publisher: "Süddeutsche Zeitung",
-    cefr: "B2",
-    why: "One topic, one conversation, clear structure. A good on-ramp to C1 journalism.",
-    topics: ["News", "Analysis"],
-  },
-  {
-    query: "Quarks Daily",
-    label: "Quarks Daily",
-    publisher: "WDR",
-    cefr: "B2",
-    why: "Science explained for a general audience. Precise but not specialist.",
-    topics: ["Science"],
-  },
-  {
-    query: "Handelsblatt Today",
-    label: "Handelsblatt Today",
-    publisher: "Handelsblatt",
-    cefr: "C1",
-    why: "Business and markets daily. Specialist vocabulary, numbers, fast handovers.",
-    topics: ["Business", "Finance"],
-  },
-  {
-    query: "Lage der Nation",
-    label: "Lage der Nation",
-    publisher: "Lage der Nation",
-    cefr: "C1",
-    why: "Unscripted political review of the week, with interruptions and irony.",
-    topics: ["Politics", "Analysis"],
-  },
-  {
-    query: "OMR Podcast",
-    label: "OMR Podcast",
-    publisher: "OMR",
-    cefr: "C1",
-    why: "Long-form business and marketing interviews. Anglicisms and startup jargon throughout.",
-    topics: ["Business", "Marketing"],
-  },
-  {
-    query: "Coffee Break German",
-    label: "Coffee Break German",
-    publisher: "Coffee Break Languages",
-    cefr: "A1",
-    why: "Structured lessons that explain as they go. A gentle first listen.",
-    topics: ["Learners", "Course"],
-  },
-  {
-    query: "Deutsch Warum Nicht",
-    label: "Deutsch - warum nicht?",
-    publisher: "Deutsche Welle",
-    cefr: "A1",
-    why: "The classic DW radio course, story-driven and slow.",
-    topics: ["Learners", "Course"],
-  },
-  {
-    query: "Der Trapp Podcast Deutsch lernen",
-    label: "Deutsch lernen mit Geschichten",
-    publisher: "Various",
-    cefr: "A2",
-    why: "Short stories retold at learner pace, then discussed.",
-    topics: ["Learners", "Stories"],
-  },
-  {
-    query: "Dinge Erklärt Kurzgesagt",
-    label: "Dinge Erklärt - Kurzgesagt",
-    publisher: "Kurzgesagt",
-    cefr: "B1",
-    why: "Big questions answered in eight minutes, with visuals to lean on.",
-    topics: ["Science", "Video"],
-  },
-  {
-    query: "Gemischtes Hack",
-    label: "Gemischtes Hack",
-    publisher: "Felix Lobrecht, Tommi Schmitt",
-    cefr: "C1",
-    why: "Fast, slangy, unscripted comedy. The hardest listening on this list.",
-    topics: ["Comedy", "Colloquial"],
-  },
-  {
-    query: "Fest und Flauschig",
-    label: "Fest & Flauschig",
-    publisher: "Jan Böhmermann, Olli Schulz",
-    cefr: "C1",
-    why: "Two friends talking over each other. Irony, register shifts, interruptions.",
-    topics: ["Comedy", "Colloquial"],
-  },
   {
     query: "Zeit Verbrechen",
     label: "ZEIT Verbrechen",
@@ -289,7 +155,122 @@ export const NEWS_SOURCES: Suggestion[] = [
 ];
 
 /** Everything, for the category browser. */
-export const ALL_SUGGESTIONS: Suggestion[] = [...SUGGESTIONS, ...NEWS_SOURCES];
+/**
+ * Podcasts made for German speakers rather than for learners.
+ *
+ * This is where a learner goes once graded material stops teaching them
+ * anything: the pace is native, the vocabulary is unrestricted, and the
+ * subject is something worth an hour of attention. Grouped wide on purpose,
+ * because interest carries a listener through difficulty better than any
+ * grading does.
+ */
+export const NATIVE_SOURCES: Suggestion[] = [
+  { query: "11KM der tagesschau Podcast", label: "11KM", publisher: "ARD", cefr: "B2", why: "One story a day, explained in eleven minutes by the reporter who covered it.", topics: ["News", "Analysis"] },
+  { query: "Was jetzt ZEIT ONLINE", label: "Was jetzt?", publisher: "ZEIT ONLINE", cefr: "B2", why: "Twice-daily news briefing, clearly structured and easy to follow.", topics: ["News"] },
+  { query: "Deutschlandfunk Nova Update", label: "Nova Update", publisher: "Deutschlandfunk Nova", cefr: "B1", why: "News for a young audience: plainer wording, faster delivery.", topics: ["News"] },
+  { query: "Steingarts Morning Briefing", label: "Morning Briefing", publisher: "Pioneer", cefr: "C1", why: "Business and politics with strong opinions and a dense register.", topics: ["Business", "Politics"] },
+  { query: "Alles auf Aktien", label: "Alles auf Aktien", publisher: "WELT", cefr: "C1", why: "Daily markets in fifteen minutes. Finance vocabulary at speed.", topics: ["Finance", "Business"] },
+  { query: "Handelsblatt Morning Briefing", label: "Handelsblatt Morning Briefing", publisher: "Handelsblatt", cefr: "C1", why: "The business day ahead, read as a written column.", topics: ["Business", "Finance"] },
+  { query: "Wirtschaft Welt und Weit", label: "Wirtschaft Welt & Weit", publisher: "Deutsche Welle", cefr: "B2", why: "Global economics for a general audience.", topics: ["Business"] },
+  { query: "Zeit Verbrechen", label: "ZEIT Verbrechen", publisher: "ZEIT", cefr: "B2", why: "Two journalists retell a criminal case. Narrative, slow, gripping.", topics: ["True crime"] },
+  { query: "Mordlust", label: "Mordlust", publisher: "Funk", cefr: "B2", why: "Two cases per episode with the legal reasoning explained.", topics: ["True crime"] },
+  { query: "Verbrechen von nebenan", label: "Verbrechen von nebenan", publisher: "RTL+", cefr: "B2", why: "Small-town cases, told conversationally.", topics: ["True crime"] },
+  { query: "Sprechen wir über Mord", label: "Sprechen wir über Mord?!", publisher: "MDR", cefr: "C1", why: "A judge and a journalist argue about real verdicts.", topics: ["True crime", "Law"] },
+  { query: "Geschichten aus der Geschichte", label: "Geschichten aus der Geschichte", publisher: "Zeitsprung", cefr: "B2", why: "Two historians tell each other a story neither knew.", topics: ["History"] },
+  { query: "His2Go Geschichte Podcast", label: "His2Go", publisher: "His2Go", cefr: "B2", why: "Long-form history, one episode per event.", topics: ["History"] },
+  { query: "Zeitblende SRF", label: "Zeitblende", publisher: "SRF", cefr: "C1", why: "Swiss history. Useful exposure to Swiss standard German.", topics: ["History", "Swiss"] },
+  { query: "Radiowissen Bayern 2", label: "radioWissen", publisher: "Bayerischer Rundfunk", cefr: "B2", why: "A well-made feature on one subject, scripted and clearly read.", topics: ["Science", "History"] },
+  { query: "Das Wissen SWR", label: "Das Wissen", publisher: "SWR", cefr: "B2", why: "Daily knowledge feature, scripted and evenly paced.", topics: ["Science"] },
+  { query: "Synapsen NDR", label: "Synapsen", publisher: "NDR Info", cefr: "C1", why: "A science journalist walks through one paper in depth.", topics: ["Science"] },
+  { query: "IQ Wissenschaft und Forschung", label: "IQ", publisher: "Bayerischer Rundfunk", cefr: "B2", why: "Research news, short and well structured.", topics: ["Science"] },
+  { query: "Forschung aktuell Deutschlandfunk", label: "Forschung aktuell", publisher: "Deutschlandfunk", cefr: "C1", why: "Daily research news at public-radio register.", topics: ["Science"] },
+  { query: "Soziopod", label: "Soziopod", publisher: "Soziopod", cefr: "C1", why: "Philosophy and sociology argued out loud. Demanding and rewarding.", topics: ["Philosophy", "Society"] },
+  { query: "Betreutes Fühlen", label: "Betreutes Fühlen", publisher: "Podimo", cefr: "B2", why: "A psychologist and a journalist on how minds work.", topics: ["Psychology"] },
+  { query: "Hotel Matze", label: "Hotel Matze", publisher: "Matze Hielscher", cefr: "C1", why: "Long, patient interviews. Unscripted speech at its most natural.", topics: ["Interviews"] },
+  { query: "Alles gesagt", label: "Alles gesagt?", publisher: "ZEIT", cefr: "C1", why: "The interview ends when the guest decides. Sometimes nine hours.", topics: ["Interviews"] },
+  { query: "SWR1 Leute", label: "SWR1 Leute", publisher: "SWR", cefr: "B2", why: "An hour with one guest, at an unhurried radio pace.", topics: ["Interviews"] },
+  { query: "Lage der Nation", label: "Lage der Nation", publisher: "Lage der Nation", cefr: "C1", why: "German politics explained weekly by a lawyer and a journalist.", topics: ["Politics"] },
+  { query: "Apokalypse und Filterkaffee", label: "Apokalypse & Filterkaffee", publisher: "Micky Beisenherz", cefr: "C1", why: "The morning's news read sideways, fast and full of idiom.", topics: ["News", "Comedy"] },
+  { query: "Baywatch Berlin", label: "Baywatch Berlin", publisher: "Studio Bummens", cefr: "C1", why: "Three friends, no topic. The hardest and funniest German here.", topics: ["Comedy"] },
+  { query: "Fussball MML", label: "FUSSBALL MML", publisher: "Studio Bummens", cefr: "C1", why: "Football talk full of slang and interruption.", topics: ["Sport", "Colloquial"] },
+  { query: "Rasenfunk", label: "Rasenfunk", publisher: "Rasenfunk", cefr: "C1", why: "Tactical football analysis at high speed.", topics: ["Sport"] },
+  { query: "kicker Fussball Podcast", label: "kicker", publisher: "kicker", cefr: "B2", why: "Matchday reporting and analysis.", topics: ["Sport"] },
+  { query: "OMR Podcast", label: "OMR Podcast", publisher: "OMR", cefr: "C1", why: "Founders and marketers interviewed at length.", topics: ["Business", "Tech"] },
+  { query: "Doppelgänger Tech Talk", label: "Doppelgänger Tech Talk", publisher: "Doppelgänger", cefr: "C1", why: "Two investors on tech and markets. Heavy anglicism, very fast.", topics: ["Tech", "Finance"] },
+  { query: "Finanzfluss Podcast", label: "Finanzfluss", publisher: "Finanzfluss", cefr: "B2", why: "Personal finance explained patiently and repeatedly.", topics: ["Finance"] },
+  { query: "Lesart Deutschlandfunk Kultur", label: "Lesart", publisher: "Deutschlandfunk Kultur", cefr: "C1", why: "Daily books programme with author interviews.", topics: ["Books", "Culture"] },
+  { query: "Ohrenbär", label: "Ohrenbär", publisher: "rbb", cefr: "A2", why: "Bedtime stories for children: short, slow, and complete every time.", topics: ["Stories", "Children"] },
+  { query: "Die Sendung mit der Maus zum Hören", label: "Sendung mit der Maus", publisher: "WDR", cefr: "A2", why: "Explanations built for six-year-olds, which is exactly right at A2.", topics: ["Children", "Explainers"] },
+  { query: "Kakadu Deutschlandfunk Kultur", label: "Kakadu", publisher: "Deutschlandfunk Kultur", cefr: "A2", why: "Children's radio: clear diction, concrete vocabulary.", topics: ["Children"] },
+  { query: "Checker Tobi Podcast", label: "Checker Tobi", publisher: "Bayerischer Rundfunk", cefr: "B1", why: "One question per episode, answered by asking experts.", topics: ["Children", "Explainers"] },
+  { query: "SRF News Plus", label: "SRF News Plus", publisher: "SRF", cefr: "C1", why: "Swiss news in standard German. A different accent to train on.", topics: ["News", "Swiss"] },
+  { query: "Ö1 Journale", label: "Ö1 Journale", publisher: "ORF", cefr: "C1", why: "Austrian public radio bulletins. Austrian vocabulary and melody.", topics: ["News", "Austrian"] },
+  { query: "FM4 Podcast", label: "FM4", publisher: "ORF", cefr: "C1", why: "Austrian youth radio, colloquial and quick.", topics: ["Culture", "Austrian"] },
+  { query: "ARD Radio Tatort", label: "ARD Radio Tatort", publisher: "ARD", cefr: "C1", why: "Original radio crime drama. Several voices, atmosphere, no narrator.", topics: ["Drama", "Fiction"] },
+  { query: "Die drei Fragezeichen", label: "Die drei ???", publisher: "Europa", cefr: "B1", why: "The audio drama a generation of Germans grew up on.", topics: ["Drama", "Fiction"] },
+  { query: "Zeitfragen Deutschlandfunk Kultur", label: "Zeitfragen", publisher: "Deutschlandfunk Kultur", cefr: "C1", why: "Culture and society features, scripted and dense.", topics: ["Society", "Culture"] },
+  { query: "Der Rest ist Geschichte", label: "Der Rest ist Geschichte", publisher: "ZDF", cefr: "B2", why: "Historical background to what is in the news now.", topics: ["History", "News"] },
+];
+
+/**
+ * YouTube channels.
+ *
+ * A channel's public Atom feed lists its recent uploads without a key, so
+ * these behave like any other subscription. Video matters for a learner in a
+ * way it does not for a native listener: lip movement, gesture and the scene
+ * itself carry meaning the ear has not yet learned to take from the sound.
+ */
+export const YOUTUBE_SOURCES: Suggestion[] = [
+  { query: "https://www.youtube.com/@EasyGerman", label: "Easy German", publisher: "Easy German", cefr: "A2", why: "Street interviews with German and English subtitles burnt in.", topics: ["Interviews", "Colloquial"], video: true },
+  { query: "https://www.youtube.com/@DeutschlernenmitderDW", label: "DW Deutsch lernen", publisher: "Deutsche Welle", cefr: "A1", why: "The full A1 to C2 course library, free and structured.", topics: ["Learners", "Course"], video: true },
+  { query: "https://www.youtube.com/@LearnGermanwithAnja", label: "Learn German with Anja", publisher: "Anja", cefr: "A1", why: "Grammar taught slowly and very deliberately.", topics: ["Learners", "Grammar"], video: true },
+  { query: "https://www.youtube.com/@DeutschMitMarija", label: "Deutsch mit Marija", publisher: "Marija", cefr: "A2", why: "Grammar and everyday phrasing, spoken clearly throughout.", topics: ["Learners", "Grammar"], video: true },
+  { query: "https://www.youtube.com/@benjamin", label: "Deutsch mit Benjamin", publisher: "Benjamin", cefr: "B1", why: "Explanations entirely in German at a manageable pace.", topics: ["Learners"], video: true },
+  { query: "https://www.youtube.com/@GetGermanized", label: "Get Germanized", publisher: "Dominik Hammes", cefr: "B1", why: "Language and culture, bilingual where it helps.", topics: ["Learners", "Culture"], video: true },
+  { query: "https://www.youtube.com/@DingeErklaertKurzgesagt", label: "Dinge Erklärt – Kurzgesagt", publisher: "Kurzgesagt", cefr: "B1", why: "Big questions animated. Pictures carry half the meaning.", topics: ["Science", "Explainers"], video: true },
+  { query: "https://www.youtube.com/@MrWissen2go", label: "MrWissen2go", publisher: "Mirko Drotschmann", cefr: "B2", why: "Current affairs explained by a former news journalist.", topics: ["News", "Explainers"], video: true },
+  { query: "https://www.youtube.com/@MrWissen2goGeschichte", label: "MrWissen2go Geschichte", publisher: "Mirko Drotschmann", cefr: "B2", why: "History with maps and archive footage to lean on.", topics: ["History"], video: true },
+  { query: "https://www.youtube.com/@maiLab", label: "maiLab", publisher: "Mai Thi Nguyen-Kim", cefr: "C1", why: "Science argued carefully. Fast, precise, technical.", topics: ["Science"], video: true },
+  { query: "https://www.youtube.com/@simplicissimus", label: "Simplicissimus", publisher: "Simplicissimus", cefr: "C1", why: "Well-researched essays on how things actually work.", topics: ["Explainers", "Society"], video: true },
+  { query: "https://www.youtube.com/@STRGF", label: "STRG_F", publisher: "NDR / funk", cefr: "C1", why: "Investigative reporting, on location and unscripted.", topics: ["Documentary"], video: true },
+  { query: "https://www.youtube.com/@ykollektiv", label: "Y-Kollektiv", publisher: "funk", cefr: "C1", why: "First-person documentaries from inside the story.", topics: ["Documentary"], video: true },
+  { query: "https://www.youtube.com/@DoktorWhatson", label: "Doktor Whatson", publisher: "Cedric Engels", cefr: "B2", why: "Technology and science explained without jargon.", topics: ["Science", "Tech"], video: true },
+  { query: "https://www.youtube.com/@BreakingLab", label: "Breaking Lab", publisher: "Jacob Beautemps", cefr: "B2", why: "Energy and climate technology, numbers on screen.", topics: ["Science"], video: true },
+  { query: "https://www.youtube.com/@tagesschau", label: "tagesschau", publisher: "ARD", cefr: "B2", why: "The evening bulletin, with the pictures that go with it.", topics: ["News"], video: true },
+  { query: "https://www.youtube.com/@ZDFheute", label: "ZDFheute Nachrichten", publisher: "ZDF", cefr: "B1", why: "News clips short enough to shadow one at a time.", topics: ["News"], video: true },
+  { query: "https://www.youtube.com/@logo", label: "logo!", publisher: "ZDF", cefr: "A2", why: "The news written for children. The gentlest real news in German.", topics: ["News", "Children"], video: true },
+  { query: "https://www.youtube.com/@DieSendungmitderMaus", label: "Sendung mit der Maus", publisher: "WDR", cefr: "A2", why: "How things are made, shown as well as said.", topics: ["Children", "Explainers"], video: true },
+  { query: "https://www.youtube.com/@TerraX", label: "Terra X", publisher: "ZDF", cefr: "B2", why: "Documentary narration over documentary pictures.", topics: ["Documentary", "History"], video: true },
+  { query: "https://www.youtube.com/@quarks", label: "Quarks", publisher: "WDR", cefr: "B2", why: "Science television, clearly narrated.", topics: ["Science"], video: true },
+  { query: "https://www.youtube.com/@DWDocumentary", label: "DW Dokumentation", publisher: "Deutsche Welle", cefr: "B2", why: "Full-length documentaries, often with German subtitles.", topics: ["Documentary"], video: true },
+  { query: "https://www.youtube.com/@auf-klo", label: "Auf Klo", publisher: "funk", cefr: "B2", why: "Personal conversations in the smallest room. Unfiltered speech.", topics: ["Interviews", "Colloquial"], video: true },
+  { query: "https://www.youtube.com/@DieDaOben", label: "Die Da Oben!", publisher: "funk", cefr: "B2", why: "Politics explained for people who find politics tiring.", topics: ["Politics"], video: true },
+  { query: "https://www.youtube.com/@WissenmachtAh", label: "Wissen macht Ah!", publisher: "WDR", cefr: "A2", why: "Small questions answered with a demonstration.", topics: ["Children", "Explainers"], video: true },
+];
+
+/**
+ * Everything, with duplicates folded away.
+ *
+ * The lists overlap deliberately - a show can be both a news source and a good
+ * first podcast - and the label is the identity, because two entries pointing
+ * at the same show under different search terms are still one show.
+ */
+export const ALL_SUGGESTIONS: Suggestion[] = (() => {
+  const seen = new Set<string>();
+  const all: Suggestion[] = [];
+  for (const item of [...SUGGESTIONS, ...NEWS_SOURCES, ...NATIVE_SOURCES, ...YOUTUBE_SOURCES]) {
+    const key = `${item.label.toLowerCase()}|${item.video ? "v" : "a"}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    all.push(item);
+  }
+  return all;
+})();
+
+/** Only what can be watched, for the video filter. */
+export function videoOnly(items: Suggestion[]): Suggestion[] {
+  return items.filter((item) => item.video);
+}
 
 export function topicsOf(items: Suggestion[]): string[] {
   return [...new Set(items.flatMap((item) => item.topics))].sort((a, b) => a.localeCompare(b));

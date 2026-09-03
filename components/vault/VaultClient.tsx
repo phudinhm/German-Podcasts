@@ -4,7 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { loadSettings, loadVault, removeEntry, saveSettings, type VaultEntry } from "@/lib/vault";
 import { describeDue, isDue, leitnerBox, LEITNER_INTERVALS } from "@/lib/srs";
-import { contextLink, formatTimestamp, toAnkiTsv, toClozeTsv, toCsv } from "@/lib/export";
+import {
+  contextLink,
+  formatTimestamp,
+  toAnkiTsv,
+  toClozeTsv,
+  toCsv,
+  toNotionCsv,
+  toObsidianMarkdown,
+  toQuizlet,
+} from "@/lib/export";
 import { CEFR_LEVELS, type Cefr, type TargetLang } from "@/lib/types";
 import { LevelBadge } from "@/components/LevelBadge";
 import { ReviewSession } from "./ReviewSession";
@@ -180,6 +189,37 @@ export function VaultClient() {
                 onClick={() => download("hoerbar-vokabeln.csv", toCsv(visible, { lang }), "text/csv;charset=utf-8")}
               >
                 CSV
+              </button>
+              <button
+                type="button"
+                className="btn text-[12px]"
+                onClick={() =>
+                  download("hoerbar-quizlet.txt", toQuizlet(visible, { lang }), "text/plain;charset=utf-8")
+                }
+              >
+                Quizlet
+              </button>
+              <button
+                type="button"
+                className="btn text-[12px]"
+                onClick={() =>
+                  download("hoerbar-notion.csv", toNotionCsv(visible, { lang }), "text/csv;charset=utf-8")
+                }
+              >
+                Notion
+              </button>
+              <button
+                type="button"
+                className="btn text-[12px]"
+                onClick={() =>
+                  download(
+                    "hoerbar-vokabeln.md",
+                    toObsidianMarkdown(visible, { lang }),
+                    "text/markdown;charset=utf-8",
+                  )
+                }
+              >
+                Obsidian
               </button>
             </div>
           </div>

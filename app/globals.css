@@ -61,6 +61,9 @@
 
 html {
   scroll-behavior: smooth;
+  /* iOS otherwise inflates text on rotation, which breaks the scale below. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -313,5 +316,67 @@ input[type="range"] {
   [data-dim="true"] {
     opacity: 0.6;
     filter: none;
+  }
+}
+
+/* --- reading on a phone -------------------------------------------------
+ *
+ * The desktop scale is deliberately compact: dense lists of episodes and long
+ * transcripts read well at twelve or thirteen pixels on a large screen held at
+ * arm's length. On a phone held closer but bounced around on a train, the same
+ * numbers are a squint, and squinting at a language you are still learning is
+ * the fastest way to stop.
+ *
+ * So the small end of the scale is lifted where it is actually read, rather
+ * than the whole page being scaled up, which would only push content off the
+ * screen. Headings are left alone: they are already large enough, and growing
+ * them costs vertical space that the text needs. The lift is written against
+ * the generated utilities so every screen benefits at once, instead of a
+ * hundred class names being edited one at a time and drifting apart later.
+ */
+@media (max-width: 640px) {
+  body {
+    letter-spacing: 0;
+  }
+
+  .text-\[10px\] {
+    font-size: 11px;
+  }
+  .text-\[11px\],
+  .text-\[11\.5px\] {
+    font-size: 12.5px;
+  }
+  .text-\[12px\],
+  .text-\[12\.5px\] {
+    font-size: 13.5px;
+  }
+  .text-\[13px\],
+  .text-\[13\.5px\] {
+    font-size: 14.5px;
+  }
+  .text-\[14px\],
+  .text-\[14\.5px\] {
+    font-size: 15.5px;
+  }
+  .text-\[15px\] {
+    font-size: 16px;
+  }
+
+  /* The transcript is the one surface people read rather than scan, so it gets
+     a full reading size and the line spacing to go with it. */
+  .caption-line,
+  .de-line {
+    font-size: 18px;
+    line-height: 1.65;
+  }
+
+  /* Touch targets. A word span is the smallest thing anyone taps here, and a
+     mistap in a transcript looks up the wrong word. */
+  .word {
+    padding: 1px 2px;
+  }
+
+  .btn {
+    min-height: 34px;
   }
 }

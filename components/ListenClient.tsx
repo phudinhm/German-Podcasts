@@ -16,6 +16,7 @@ import { EpisodeTranscript } from "./EpisodeTranscript";
 import { useCaptions, type CaptionLine, type CaptionMode } from "./captions/useCaptions";
 import { CaptionPanel } from "./captions/CaptionPanel";
 import { SubtitleButton, SubtitleOverlay, type SubtitleMode } from "./captions/SubtitleOverlay";
+import { SubtitleExport } from "./captions/SubtitleExport";
 import { QuickLookup, type QuickSelection } from "./QuickLookup";
 import { DiscoverPanel } from "./listen/DiscoverPanel";
 import { Art } from "./listen/Art";
@@ -87,6 +88,9 @@ export function ListenClient() {
   /** Title translations, keyed by the German title. */
   const [titles, setTitles] = useState<Record<string, string>>({});
   const [translateTitles, setTranslateTitles] = useState(false);
+
+  /** Narrows a mixed feed to the episodes that have a picture to watch. */
+  const [videoOnly, setVideoOnly] = useState(false);
 
   const [captionMode, setCaptionMode] = useState<CaptionMode>("internal");
   const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>("off");
@@ -285,13 +289,26 @@ export function ListenClient() {
   }, []);
 
   /**
+   * A feed can carry both, and a learner who wants to watch does not want to
+   * scroll past forty audio episodes to find the three with pictures. The
+   * toggle only appears when the feed actually has some of each.
+   */
+  const isVideoEpisode = (episode: FeedEpisode) =>
+    Boolean(episode.youtubeId) || episode.type.startsWith("video/");
+  const hasVideo = Boolean(feed?.episodes.some(isVideoEpisode));
+  const episodes = useMemo(() => {
+    const all = feed?.episodes ?? [];
+    return videoOnly ? all.filter(isVideoEpisode) : all;
+  }, [feed, videoOnly]);
+
+  /**
    * Translates the visible episode titles in one batch. German feed titles are
    * often the only clue to what an episode is about, and forty of them is a
    * wall of text to a learner who cannot yet skim German.
    */
   useEffect(() => {
     if (!translateTitles || !feed) return;
-    const pending = feed.episodes.slice(0, visible).map((e) => e.title).filter((title) => !titles[title]);
+    const pending = episodes.slice(0, visible).map((e) => e.title).filter((title) => !titles[title]);
     if (pending.length === 0) return;
     let cancelled = false;
     void (async () => {
@@ -318,7 +335,7 @@ export function ListenClient() {
     return () => {
       cancelled = true;
     };
-  }, [translateTitles, feed, visible, targetLang, titles]);
+  }, [translateTitles, feed, episodes, visible, targetLang, titles]);
 
   // Changing gloss language invalidates the cached title translations.
   useEffect(() => setTitles({}), [targetLang]);
@@ -393,16 +410,19 @@ export function ListenClient() {
     }
     if (transcript.length > 0) {
       return (
-        <EpisodeTranscript
-          segments={transcript}
-          handle={player.handle}
-          targetLang={targetLang}
-          showTranslation={dual}
-          layout={columns ? "columns" : "stacked"}
-          maxHeight={sidePanel ? "calc(100vh - 210px)" : 420}
-          onWord={onWord}
-          savedWords={savedWords}
-        />
+        <div>
+          <EpisodeTranscript
+            segments={transcript}
+            handle={player.handle}
+            targetLang={targetLang}
+            showTranslation={dual}
+            layout={columns ? "columns" : "stacked"}
+            maxHeight={sidePanel ? "calc(100vh - 210px)" : 420}
+            onWord={onWord}
+            savedWords={savedWords}
+          />
+          <SubtitleExport lines={subtitleLines} title={playing.title} />
+        </div>
       );
     }
     return (
@@ -420,6 +440,7 @@ export function ListenClient() {
           onWord={onWord}
           savedWords={savedWords}
         />
+        <SubtitleExport lines={captions.state.lines} title={playing.title} />
       </div>
     );
   }, [
@@ -435,6 +456,7 @@ export function ListenClient() {
     t,
     captions,
     captionMode,
+    subtitleLines,
   ]);
 
   const textControls = (
@@ -761,6 +783,16 @@ export function ListenClient() {
                   {following ? `✓ ${t("listen.following")}` : t("listen.follow")}
                 </button>
               ) : null}
+              {hasVideo ? (
+                <button
+                  type="button"
+                  className="btn text-[12.5px]"
+                  data-active={videoOnly}
+                  onClick={() => setVideoOnly((value) => !value)}
+                >
+                  {t("listen.videoEpisodes")}
+                </button>
+              ) : null}
               {results && results.length > 1 ? (
                 <button
                   type="button"
@@ -776,7 +808,7 @@ export function ListenClient() {
             </div>
 
             <ul>
-              {feed.episodes.slice(0, visible).map((episode) => (
+              {episodes.slice(0, visible).map((episode) => (
                 <li key={episode.guid}>
                   <button
                     type="button"
@@ -812,10 +844,10 @@ export function ListenClient() {
               ))}
             </ul>
 
-            {visible < feed.episodes.length ? (
+            {visible < episodes.length ? (
               <div className="mt-3 flex justify-center">
                 <button type="button" className="btn" onClick={() => setVisible((value) => value + PAGE_SIZE)}>
-                  {t("common.more")} ({feed.episodes.length - visible})
+                  {t("common.more")} ({episodes.length - visible})
                 </button>
               </div>
             ) : null}

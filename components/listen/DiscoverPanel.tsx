@@ -18,6 +18,7 @@ import { Art } from "./Art";
 export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
   const { t } = useUi();
   const [topic, setTopic] = useState("");
+  const [medium, setMedium] = useState<"all" | "video" | "audio">("all");
   const [charts, setCharts] = useState<ChartEntry[] | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
 
@@ -38,8 +39,12 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
     void loadCharts();
   }, [loadCharts]);
 
-  const topics = topicsOf(ALL_SUGGESTIONS);
-  const filtered = byTopic(ALL_SUGGESTIONS, topic);
+  const pool =
+    medium === "all"
+      ? ALL_SUGGESTIONS
+      : ALL_SUGGESTIONS.filter((item) => (medium === "video" ? item.video : !item.video));
+  const topics = topicsOf(pool);
+  const filtered = byTopic(pool, topic);
 
   return (
     <div className="mt-8 space-y-9">
@@ -91,6 +96,26 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
           <span className="text-[12px] text-[var(--ink-faint)]">
             {filtered.length} {filtered.length === 1 ? "show" : "shows"}
           </span>
+          <div className="flex overflow-hidden rounded-full border border-[var(--rule)]">
+            {(["all", "video", "audio"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                data-active={medium === option}
+                onClick={() => {
+                  setMedium(option);
+                  setTopic("");
+                }}
+                className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-1 text-[12px] last:border-r-0"
+              >
+                {option === "all"
+                  ? t("common.all")
+                  : option === "video"
+                    ? t("listen.videoOnly")
+                    : t("listen.audioOnly")}
+              </button>
+            ))}
+          </div>
           <div className="ml-auto flex flex-wrap gap-1">
             <button
               type="button"
@@ -131,7 +156,12 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
                       className="row-hover w-full p-2.5 text-left"
                       onClick={() => onPick(item.query)}
                     >
-                      <span className="block text-[14px] font-medium">{item.label}</span>
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="text-[14px] font-medium">{item.label}</span>
+                        {item.video ? (
+                          <span className="chip text-[10px]">{t("listen.video")}</span>
+                        ) : null}
+                      </span>
                       <span className="block text-[12px] text-[var(--ink-soft)]">{item.publisher}</span>
                       <span className="mt-1 block text-[12px] leading-snug text-[var(--ink-faint)]">
                         {item.why}
