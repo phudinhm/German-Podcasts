@@ -53,7 +53,9 @@ export function MiniPlayer() {
   }, [handle]);
 
   if (!track) return null;
-  if (pathname.startsWith("/listen")) return null;
+  // The listening page shows the full player already, so the bar would be a
+  // second set of the same controls.
+  if (pathname === "/") return null;
 
   const hasVideoLayer = track.kind !== "audio";
 
@@ -98,7 +100,7 @@ export function MiniPlayer() {
           0:00
         </span>
 
-        <Link href="/listen" className="btn shrink-0 px-2.5 py-1 text-[12px]">
+        <Link href="/" className="btn shrink-0 px-2.5 py-1 text-[12px]">
           {t("player.miniOpen")}
         </Link>
         <button

@@ -92,7 +92,7 @@ export function VaultClient() {
         <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--ink-soft)]">
           {t("vault.emptyBody")}
         </p>
-        <Link href="/" className="btn btn-primary mt-4">
+        <Link href="/catalog" className="btn btn-primary mt-4">
           {t("vault.toCatalog")}
         </Link>
       </div>

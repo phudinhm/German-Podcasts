@@ -38,6 +38,12 @@ export function CatalogGrid({ episodes }: { episodes: EpisodeSummary[] }) {
     });
 
     return filtered.sort((a, b) => {
+      // Whatever the sort, an episode you can actually open comes first. A grid
+      // that opens with ten entries that cannot be played reads as a broken
+      // app rather than a catalog with room to grow.
+      const readiness =
+        Number(a.transcriptStatus === "pending") - Number(b.transcriptStatus === "pending");
+      if (readiness !== 0) return readiness;
       if (sort === "sdm") return a.metrics.sdm - b.metrics.sdm;
       if (sort === "duration") return a.durationSec - b.durationSec;
       return (
@@ -161,18 +167,15 @@ function EpisodeCard({ episode }: { episode: EpisodeSummary }) {
         <span className="chip">{formatDuration(episode.durationSec)}</span>
         {pending ? (
           <span className="chip border-dashed text-[var(--ink-faint)]">{t("catalog.noTranscript")}</span>
-        ) : null}
+        ) : (
+          <span className="chip border-[var(--accent-ring)] text-[var(--accent)]">
+            {t("catalog.readyToPlay")}
+          </span>
+        )}
       </div>
     </article>
   );
 
-  if (pending) {
-    return (
-      <Link href={`/watch/${episode.slug}`} className="block h-full opacity-80">
-        {body}
-      </Link>
-    );
-  }
   return (
     <Link href={`/watch/${episode.slug}`} className="block h-full">
       {body}

@@ -6,8 +6,8 @@ import { useUi, type UiKey } from "@/lib/i18n";
 import { UiLangSwitch } from "./UiLangProvider";
 
 const ITEMS: Array<{ href: string; key: UiKey }> = [
-  { href: "/", key: "nav.catalog" },
-  { href: "/listen", key: "nav.listen" },
+  { href: "/", key: "nav.listen" },
+  { href: "/catalog", key: "nav.catalog" },
   { href: "/drills", key: "nav.drills" },
   { href: "/vault", key: "nav.vault" },
   { href: "/about", key: "nav.about" },

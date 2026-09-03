@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
-import { ListenClient } from "@/components/ListenClient";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Listen",
-  description:
-    "Find German podcasts on Apple Podcasts, Spotify, YouTube or any RSS feed and stream them straight away, with transcripts or live captions.",
-};
-
+/** Listening moved to the front door; old links still land in the right place. */
 export default function ListenPage() {
-  return <ListenClient />;
+  redirect("/");
 }

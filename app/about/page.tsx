@@ -166,7 +166,7 @@ export default function AboutPage() {
       </Section>
 
       <p className="mt-8 text-[13px]">
-        <Link href="/" className="btn">
+        <Link href="/catalog" className="btn">
           Back to the catalog
         </Link>
       </p>

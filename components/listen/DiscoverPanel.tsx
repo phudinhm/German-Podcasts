@@ -91,35 +91,47 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
       {chartError ? <p className="text-[12px] text-[var(--ink-faint)]">{chartError}</p> : null}
 
       <section>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <h2 className="text-[15px] font-semibold">{t("listen.suggested")}</h2>
-          <span className="text-[12px] text-[var(--ink-faint)]">
-            {filtered.length} {filtered.length === 1 ? "show" : "shows"}
-          </span>
-          <div className="flex overflow-hidden rounded-full border border-[var(--rule)]">
-            {(["all", "video", "audio"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                data-active={medium === option}
-                onClick={() => {
-                  setMedium(option);
-                  setTopic("");
-                }}
-                className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-1 text-[12px] last:border-r-0"
-              >
-                {option === "all"
-                  ? t("common.all")
-                  : option === "video"
-                    ? t("listen.videoOnly")
-                    : t("listen.audioOnly")}
-              </button>
-            ))}
+        <div className="mb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-[15px] font-semibold">{t("listen.suggested")}</h2>
+            <span className="text-[12px] text-[var(--ink-faint)]">
+              {filtered.length} {filtered.length === 1 ? "show" : "shows"}
+            </span>
+            <div className="flex overflow-hidden rounded-full border border-[var(--rule)] sm:ml-auto">
+              {(["all", "video", "audio"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  data-active={medium === option}
+                  onClick={() => {
+                    setMedium(option);
+                    setTopic("");
+                  }}
+                  className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-1 text-[12px] last:border-r-0"
+                >
+                  {option === "all"
+                    ? t("common.all")
+                    : option === "video"
+                      ? t("listen.videoOnly")
+                      : t("listen.audioOnly")}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="ml-auto flex flex-wrap gap-1">
+
+          {/*
+            Twenty-six topics wrap into eight rows on a phone, which pushed
+            every actual show below the fold - the filter took the whole screen
+            and the thing being filtered was nowhere. One scrolling row keeps it
+            to a single line until there is width to wrap into.
+          */}
+          <div className="-mx-4 mt-2 flex items-center gap-1 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+            <span className="shrink-0 pr-1 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">
+              {t("listen.topic")}
+            </span>
             <button
               type="button"
-              className="btn px-2.5 py-1 text-[12px]"
+              className="btn shrink-0 px-2.5 py-1 text-[12px]"
               data-active={topic === ""}
               onClick={() => setTopic("")}
             >
@@ -129,7 +141,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
               <button
                 key={item}
                 type="button"
-                className="btn px-2.5 py-1 text-[12px]"
+                className="btn shrink-0 px-2.5 py-1 text-[12px]"
                 data-active={topic === item}
                 onClick={() => setTopic(item)}
               >

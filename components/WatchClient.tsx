@@ -487,43 +487,51 @@ function TimelineNotice({
   );
 }
 
+/**
+ * What a learner sees on an entry that has no audio attached yet.
+ *
+ * This used to print the maintainer's shell command, which is the wrong thing
+ * to show a person who came here to listen to German: it is not an action they
+ * can take, and it makes the app look unfinished at exactly the moment it needs
+ * to look useful. What they can actually do is have the app find the show, or
+ * paste a stream themselves, so those are the two buttons, and everything else
+ * is a quiet link.
+ */
 function PendingNotice({ episode, onChange }: { episode: Episode; onChange: () => void }) {
   const { t } = useUi();
-  const hint = episode.source.kind === "pending" ? episode.source.ingestHint : undefined;
   const pageUrl = episode.source.kind === "pending" ? episode.source.pageUrl : undefined;
   return (
     <div className="card p-5">
-      <h2 className="text-[14px] font-semibold">{t("watch.pendingTitle")}</h2>
+      <h2 className="text-[15px] font-semibold">{t("watch.pendingTitle")}</h2>
       <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--ink-soft)]">{t("watch.pendingBody")}</p>
-      {hint ? (
-        <pre className="mt-3 overflow-x-auto rounded-lg border border-[var(--rule)] bg-[var(--paper)] p-2.5 font-mono text-[11px] text-[var(--ink-soft)]">
-          {hint}
-        </pre>
-      ) : null}
-      <div className="mt-3 flex flex-wrap gap-2">
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <FindSourceButton
+          title={episode.title}
+          publisher={episode.publisher}
+          slug={episode.slug}
+          onAttached={onChange}
+        />
+        <MediaAttach slug={episode.slug} current={null} onChange={onChange} />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--rule)] pt-3 text-[12px]">
+        <Link href="/" className="py-1.5 text-[var(--ink-faint)] hover:text-[var(--accent)]">
+          {t("watch.pendingBrowse")}
+        </Link>
         {pageUrl ? (
-          <a href={pageUrl} target="_blank" rel="noreferrer noopener" className="btn">
-            Open the show
+          <a
+            href={pageUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="py-1.5 text-[var(--ink-faint)] hover:text-[var(--accent)]"
+          >
+            {t("watch.pendingOpenShow")}
           </a>
         ) : null}
-        <Link href="/listen" className="btn">
-          {t("nav.listen")}
-        </Link>
-        <Link href="/about" className="btn">
+        <Link href="/about" className="py-1.5 text-[var(--ink-faint)] hover:text-[var(--accent)]">
           {t("nav.about")}
         </Link>
-      </div>
-      <div className="mt-3 border-t border-[var(--rule)] pt-3">
-        <p className="mb-2 text-[12px] text-[var(--ink-soft)]">{t("catalog.attachHint")}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <FindSourceButton
-            title={episode.title}
-            publisher={episode.publisher}
-            slug={episode.slug}
-            onAttached={onChange}
-          />
-          <MediaAttach slug={episode.slug} current={null} onChange={onChange} />
-        </div>
       </div>
     </div>
   );
@@ -538,19 +546,30 @@ function MetricsPanel({ episode }: { episode: Episode }) {
     ["Vocabulary in A1-B1", episode.metrics.goetheCoverage.B1 ? `${Math.round(episode.metrics.goetheCoverage.B1 * 100)}%` : "-"],
     ["Outside the lists", episode.metrics.outOfListRatio ? `${Math.round(episode.metrics.outOfListRatio * 100)}%` : "-"],
   ];
+  // Every measurement here is derived from a transcript. Before one exists the
+  // table is five dashes, which reads as a broken panel rather than an honest
+  // "not yet", so it says so in a sentence instead.
+  const measured = rows.some(([, value]) => value !== "-");
+
   return (
     <section className="card p-4">
       <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
         {t("watch.metrics")}
       </h3>
-      <dl className="mt-2.5 space-y-1.5">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-3 text-[12.5px]">
-            <dt className="text-[var(--ink-soft)]">{label}</dt>
-            <dd className="font-mono text-[12px]">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      {measured ? (
+        <dl className="mt-2.5 space-y-1.5">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex items-baseline justify-between gap-3 text-[12.5px]">
+              <dt className="text-[var(--ink-soft)]">{label}</dt>
+              <dd className="font-mono text-[12px]">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--ink-faint)]">
+          {t("watch.metricsPending")}
+        </p>
+      )}
       {episode.cefrNote ? (
         <p className="mt-3 border-t border-[var(--rule)] pt-2 text-[11.5px] leading-relaxed text-[var(--ink-faint)]">
           {episode.cefrNote}

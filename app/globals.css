@@ -377,6 +377,20 @@ input[type="range"] {
   }
 
   .btn {
-    min-height: 34px;
+    min-height: 38px;
+  }
+
+  /* A checkbox at its native 13px is hard to hit accurately with a thumb, and
+     the label beside it is doing the same job, so both grow together. */
+  input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* An inline link inside running text is a legitimate small target, but one
+     sitting on its own as an action needs room around it. */
+  nav a,
+  a.btn {
+    min-height: 38px;
   }
 }
