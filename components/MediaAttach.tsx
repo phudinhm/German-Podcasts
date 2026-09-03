@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { parseMediaUrl } from "@/lib/media";
 import { clearMedia, setMedia, type StoredMedia } from "@/lib/mediaStore";
+import { useUi } from "@/lib/i18n";
 
 /**
  * Attach a real stream to an episode.
@@ -20,6 +21,7 @@ export function MediaAttach({
   current: StoredMedia | null;
   onChange: () => void;
 }) {
+  const { t } = useUi();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -29,7 +31,7 @@ export function MediaAttach({
     setError(null);
     const parsed = parseMediaUrl(value);
     if (!parsed) {
-      setError("Das sieht nicht nach einer abspielbaren Adresse aus. Erwartet wird ein YouTube-Link oder die Adresse einer Audio- oder Videodatei.");
+      setError(t("watch.badUrl"));
       return;
     }
     setMedia(slug, { source: parsed.source, label: parsed.label, attachedAt: new Date().toISOString() });
@@ -43,7 +45,7 @@ export function MediaAttach({
     const isVideo = file.type.startsWith("video/");
     setMedia(slug, {
       source: isVideo ? { kind: "video", videoUrl: url } : { kind: "audio", audioUrl: url },
-      label: `${file.name} (lokal, nur diese Sitzung)`,
+      label: `${file.name} (local, this session only)`,
       attachedAt: new Date().toISOString(),
       ephemeral: true,
     });
@@ -63,7 +65,7 @@ export function MediaAttach({
             onChange();
           }}
         >
-          Medien lösen
+          {t("watch.detachStream")}
         </button>
       </div>
     );
@@ -72,7 +74,7 @@ export function MediaAttach({
   if (!open) {
     return (
       <button type="button" className="btn text-[12px]" onClick={() => setOpen(true)}>
-        Stream verbinden
+        {t("watch.connectStream")}
       </button>
     );
   }
@@ -80,7 +82,7 @@ export function MediaAttach({
   return (
     <div className="rounded-lg border border-[var(--rule)] p-3">
       <label className="block text-[11px] uppercase tracking-[0.12em] text-[var(--ink-faint)]">
-        YouTube-Link oder Audio-/Video-Adresse
+        {t("watch.attachLabel")}
       </label>
       <div className="mt-1.5 flex flex-wrap gap-2">
         <input
@@ -91,17 +93,17 @@ export function MediaAttach({
             if (event.key === "Enter") attachUrl();
             if (event.key === "Escape") setOpen(false);
           }}
-          placeholder="https://www.youtube.com/watch?v=… oder https://…/folge.mp3"
+          placeholder={t("watch.attachPlaceholder")}
           className="btn min-w-[240px] flex-1 justify-start font-normal"
         />
         <button type="button" className="btn btn-primary" onClick={attachUrl} disabled={!value.trim()}>
-          Verbinden
+          {t("watch.connect")}
         </button>
         <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
-          Datei wählen
+          {t("watch.chooseFile")}
         </button>
         <button type="button" className="btn" onClick={() => setOpen(false)}>
-          Abbrechen
+          {t("common.cancel")}
         </button>
       </div>
       <input
@@ -116,8 +118,7 @@ export function MediaAttach({
       />
       {error ? <p className="mt-2 text-[12px] text-rose-600">{error}</p> : null}
       <p className="mt-2 text-[11px] leading-relaxed text-[var(--ink-faint)]">
-        Der Stream läuft direkt vom Anbieter zu deinem Browser. Hörbar speichert nur die Adresse, und
-        zwar in diesem Browser. Lokale Dateien gelten nur für diese Sitzung.
+        {t("watch.attachHint")}
       </p>
     </div>
   );

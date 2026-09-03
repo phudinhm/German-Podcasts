@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlayerHandle } from "./player/types";
+import { useUi } from "@/lib/i18n";
 
 const RATES = [0.6, 0.75, 0.9, 1, 1.15, 1.3];
 
@@ -20,6 +21,9 @@ function formatTime(seconds: number): string {
  * catch. A-B markers do that from raw timestamps.
  */
 export function StreamControls({ handle }: { handle: PlayerHandle }) {
+  const { t, lang } = useUi();
+  // German and Vietnamese write 0,75 where English writes 0.75.
+  const locale = lang === "de" ? "de-DE" : lang === "vi" ? "vi-VN" : "en-GB";
   const [rate, setRate] = useState(1);
   const [pointA, setPointA] = useState<number | null>(null);
   const [pointB, setPointB] = useState<number | null>(null);
@@ -74,7 +78,7 @@ export function StreamControls({ handle }: { handle: PlayerHandle }) {
     <div className="card p-3.5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-faint)]">Tempo</span>
+          <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-faint)]">{t("player.speed")}</span>
           {RATES.map((option) => (
             <button
               key={option}
@@ -83,7 +87,7 @@ export function StreamControls({ handle }: { handle: PlayerHandle }) {
               data-active={Math.abs(rate - option) < 0.001}
               onClick={() => setRate(option)}
             >
-              {option.toFixed(2).replace(/0$/, "").replace(".", ",")}×
+              {option.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}×
             </button>
           ))}
         </div>
@@ -91,10 +95,10 @@ export function StreamControls({ handle }: { handle: PlayerHandle }) {
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-faint)]">A-B</span>
           <button type="button" className="btn px-2 py-0.5 text-[11px]" onClick={markA}>
-            A {pointA !== null ? formatTime(pointA) : "setzen"}
+            A {pointA !== null ? formatTime(pointA) : t("player.setPoint")}
           </button>
           <button type="button" className="btn px-2 py-0.5 text-[11px]" onClick={markB}>
-            B {pointB !== null ? formatTime(pointB) : "setzen"}
+            B {pointB !== null ? formatTime(pointB) : t("player.setPoint")}
           </button>
           <button
             type="button"
@@ -103,7 +107,7 @@ export function StreamControls({ handle }: { handle: PlayerHandle }) {
             disabled={!ready}
             onClick={() => setLooping((value) => !value)}
           >
-            {looping ? "Schleife läuft" : "Schleife"}
+            {looping ? t("player.looping") : t("player.loop")}
           </button>
           {pointA !== null || pointB !== null ? (
             <button
@@ -115,7 +119,7 @@ export function StreamControls({ handle }: { handle: PlayerHandle }) {
                 setLooping(false);
               }}
             >
-              zurücksetzen
+              {t("player.reset")}
             </button>
           ) : null}
         </div>
@@ -123,16 +127,16 @@ export function StreamControls({ handle }: { handle: PlayerHandle }) {
 
       <dl className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-[var(--rule)] pt-2 text-[11px] text-[var(--ink-faint)]">
         <span className="flex items-center gap-1.5">
-          <kbd>Space</kbd> Play/Pause
+          <kbd>Space</kbd> {t("player.hotkeyPlay")}
         </span>
         <span className="flex items-center gap-1.5">
-          <kbd>A</kbd> <kbd>B</kbd> Marken setzen
+          <kbd>A</kbd> <kbd>B</kbd> {t("player.hotkeyMarks")}
         </span>
         <span className="flex items-center gap-1.5">
-          <kbd>L</kbd> Schleife
+          <kbd>L</kbd> {t("player.hotkeyLoop")}
         </span>
         <span className="flex items-center gap-1.5">
-          <kbd>[ ]</kbd> 10 s zurück/vor
+          <kbd>[ ]</kbd> {t("player.hotkeySkip")}
         </span>
       </dl>
     </div>

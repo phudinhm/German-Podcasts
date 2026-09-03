@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlayerHandle } from "./types";
 import type { MediaElementState } from "./useMediaElement";
+import { useUi } from "@/lib/i18n";
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -40,6 +41,7 @@ export function Transport({
   const bufferRef = useRef<HTMLDivElement | null>(null);
   const timeRef = useRef<HTMLSpanElement | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
+  const { t } = useUi();
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
@@ -95,7 +97,7 @@ export function Transport({
           <span className="min-w-0 flex-1">{state.error}</span>
           {onRetry ? (
             <button type="button" className="btn px-2 py-0.5 text-[11px]" onClick={onRetry}>
-              Erneut versuchen
+              {t("common.retry")}
             </button>
           ) : null}
         </div>
@@ -106,7 +108,7 @@ export function Transport({
           type="button"
           className="btn btn-primary h-9 w-9 shrink-0 rounded-full p-0 text-[13px]"
           onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
-          aria-label={playing ? "Pause" : "Abspielen"}
+          aria-label={playing ? t("common.pause") : t("common.play")}
         >
           {playing ? "❚❚" : "▶"}
         </button>
@@ -114,7 +116,7 @@ export function Transport({
           type="button"
           className="btn shrink-0 px-2 py-1 text-[11px]"
           onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
-          title="10 Sekunden zurück"
+          title={t("player.back10")}
         >
           −10s
         </button>
@@ -127,7 +129,7 @@ export function Transport({
             ref={barRef}
             role="slider"
             tabIndex={0}
-            aria-label="Position im Stream"
+            aria-label={t("player.position")}
             aria-valuemin={0}
             aria-valuemax={Math.round(duration)}
             aria-valuenow={Math.round(handle.getTime())}
@@ -153,13 +155,13 @@ export function Transport({
           type="button"
           className="btn shrink-0 px-2 py-1 text-[11px]"
           onClick={() => handle.seekTo(handle.getTime() + 30, true)}
-          title="30 Sekunden vor"
+          title={t("player.forward30")}
         >
           +30s
         </button>
 
         {state.loading && !state.error ? (
-          <span className="shrink-0 text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">puffert</span>
+          <span className="shrink-0 text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">{t("player.buffering")}</span>
         ) : null}
       </div>
     </div>

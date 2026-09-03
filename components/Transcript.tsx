@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useRef } from "react";
 import type { Segment, TargetLang } from "@/lib/types";
 import { splitSentence, type RenderedWord } from "@/lib/german/render";
 import { WordSpan } from "./WordSpan";
+import { useUi } from "@/lib/i18n";
 
 interface Props {
   segments: Segment[];
@@ -84,6 +85,8 @@ const SegmentRow = memo(function SegmentRow({
   // karaoke highlight follows the same word the aligner timed.
   let wordCounter = -1;
 
+  const { t } = useUi();
+
   const handleWord = useCallback(
     (token: string, rendered: RenderedWord, anchor: HTMLElement) => {
       onWord(token, rendered, anchor, segment);
@@ -101,7 +104,7 @@ const SegmentRow = memo(function SegmentRow({
       <button
         type="button"
         onClick={() => onSeek(index)}
-        title={`Zu ${formatTime(segment.start)} springen`}
+        title={`Jump to ${formatTime(segment.start)}`}
         className="segment-index self-start pt-[3px] text-right font-mono text-[10px] leading-5 text-[var(--ink-faint)] hover:text-[var(--accent)]"
       >
         {formatTime(segment.start)}
@@ -145,17 +148,17 @@ const SegmentRow = memo(function SegmentRow({
             className="btn px-2 py-0.5 text-[11px]"
             data-active={focused}
             onClick={() => onLoop(index)}
-            title="Diesen Satz in Schleife üben"
+            title={t("controls.abLoop")}
           >
-            {focused ? "läuft" : "Schleife"}
+            {focused ? t("player.looping") : t("player.loop")}
           </button>
           <button
             type="button"
             className="btn px-2 py-0.5 text-[11px]"
             onClick={() => onBreakdown(segment)}
-            title="Satzbau erklären"
+            title={t("syntax.title")}
           >
-            Satzbau
+            {t("syntax.title")}
           </button>
         </div>
       </div>

@@ -4,9 +4,9 @@ import { countSyllablesInText } from "@/lib/german/orthography";
 import { DrillsClient, type DrillItem } from "@/components/DrillsClient";
 
 export const metadata: Metadata = {
-  title: "Fünf-Minuten-Drills",
+  title: "Five-minute drills",
   description:
-    "Die lernstärksten Sätze aus jeder Folge, als kurzer Shadowing-Sprint für die Mittagspause.",
+    "The highest-payload sentences from every episode, as a short shadowing sprint for a lunch break.",
 };
 
 export default async function DrillsPage() {

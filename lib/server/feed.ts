@@ -6,6 +6,13 @@
  * bugs live.
  */
 
+/**
+ * How many entries to return. The client pages through these locally, so this
+ * is a memory bound rather than a page size: a long-running weekly show has
+ * hundreds of episodes and cutting at 60 hides most of the back catalogue.
+ */
+const MAX_ITEMS = 300;
+
 export interface FeedEpisode {
   guid: string;
   title: string;
@@ -112,7 +119,7 @@ export function parseYouTubeFeed(xml: string, fallbackTitle: string): FeedResult
   const entries = xml.match(/<entry(?:\s[^>]*)?>[\s\S]*?<\/entry>/gi) ?? [];
   const episodes: FeedEpisode[] = [];
 
-  for (const entry of entries.slice(0, 60)) {
+  for (const entry of entries.slice(0, MAX_ITEMS)) {
     const videoId = tag(entry, "yt:videoId");
     if (!videoId || !/^[\w-]{11}$/.test(videoId)) continue;
     episodes.push({
@@ -152,7 +159,7 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
   const items = xml.match(/<item(?:\s[^>]*)?>[\s\S]*?<\/item>/gi) ?? [];
   const episodes: FeedEpisode[] = [];
 
-  for (const item of items.slice(0, 60)) {
+  for (const item of items.slice(0, MAX_ITEMS)) {
     const enclosureUrl = attr(item, "enclosure", "url");
     if (!enclosureUrl) continue;
     let safeUrl: string;

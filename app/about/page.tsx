@@ -6,69 +6,72 @@ import { LEITNER_INTERVALS } from "@/lib/srs";
 import { CEFR_LEVELS } from "@/lib/types";
 
 export const metadata: Metadata = {
-  title: "Wie es funktioniert",
+  title: "How it works",
   description:
-    "Wie Hörbar Inhalte einstuft, Transkripte ausrichtet, Aussprache markiert und Vokabeln plant.",
+    "How Hörbar finds sources, grades content by CEFR level, aligns transcripts, marks pronunciation and schedules vocabulary.",
 };
 
 export default function AboutPage() {
   return (
     <article className="mx-auto max-w-2xl">
-      <h1 className="text-[28px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-        Wie es funktioniert
-      </h1>
+      <h1 className="text-[28px] font-semibold">How it works</h1>
       <p className="mt-3 text-[15px] leading-relaxed text-[var(--ink-soft)]">
-        Hörbar ist bewusst schmal gebaut: die Medien liegen bei YouTube und den Podcast-CDNs, die
-        schwere Analyse läuft einmal beim Einlesen, und die App selbst ist nur die Schicht dazwischen,
-        die alles synchron hält. Das ist der Grund, warum eine Seite sofort da ist und warum die
-        Serverkosten nicht mit der Übungszeit wachsen.
+        Hörbar is deliberately narrow: the media lives with its publishers, the heavy analysis runs
+        once at ingest, and the app is only the layer in between that keeps everything in sync. That
+        is why a page appears instantly and why the server bill does not grow with practice time.
       </p>
 
-      <Section title="Woher der Ton kommt">
+      <Section title="Where the sound comes from">
         <p>
-          Hörbar hostet keine Medien. Was du hörst, kommt direkt vom Server des Anbieters in deinen
-          Browser: von YouTube, vom CDN eines Podcasts oder aus einer Datei auf deinem Rechner. Diese
-          App liest bei einem RSS-Feed nur die Liste der Folgen und gibt die echten Enclosure-Adressen
-          zurück; die Mediendaten laufen nie über unseren Server. Deshalb wächst die Rechnung nicht
-          mit, wenn du viel hörst.
+          Hörbar hosts nothing. What you hear travels from the publisher&apos;s own server to your
+          browser: from YouTube, from a podcast CDN, or from a file on your machine. For an RSS feed
+          this app reads only the list of episodes and returns the real enclosure addresses; the media
+          bytes never pass through our server. That is what keeps the bill flat however much you
+          listen.
         </p>
         <p>
-          Suchen musst du den Feed nicht selbst. Tippe den Namen einer Sendung ein oder füge einen
-          Link ein, egal von wo: Apple Podcasts, Spotify, ein YouTube-Kanal oder die Website eines
-          Podcasts. Apple betreibt eine Suche ohne Schlüssel, die den echten RSS-Feed zurückgibt;
-          YouTube veröffentlicht pro Kanal einen Atom-Feed, ebenfalls ohne Schlüssel. Bei Spotify
-          geht es nicht: fremde Apps dürfen dort keinen Ton abspielen. Deshalb identifiziert Hörbar
-          die Sendung und sucht denselben Podcast als öffentlichen RSS-Feed. Gibt es keinen, sagen
-          wir das, statt so zu tun, als ginge es doch.
+          You do not have to find a feed yourself. Type a show&apos;s name or paste a link from
+          anywhere. Apple Podcasts runs a search that needs no key and returns the show&apos;s real RSS
+          feed, which makes it the best front door by a distance. YouTube publishes a per-channel Atom
+          feed, also keyless, and videos play through its own player.
         </p>
         <p>
-          Drei Wege hinein: einen öffentlichen Podcast-Feed unter{" "}
-          <Link href="/listen" className="underline decoration-dotted underline-offset-4">
-            Direkt hören
-          </Link>{" "}
-          einfügen und sofort abspielen; auf einer Folgenseite über &bdquo;Stream verbinden&ldquo; einen
-          YouTube-Link, eine Audio- oder Videoadresse oder eine lokale Datei anhängen; oder eine Folge
-          nehmen, die der Ingest-Worker schon mit Transkript versehen hat.
-        </p>
-        <p>
-          Ohne Transkript funktionieren Tempo-Regelung und A-B-Schleife über reine Zeitmarken. Sobald
-          ein Transkript existiert, treten Satz-Synchronisierung, Wörterbuch und Echo-Pausen an ihre
-          Stelle. Die angehängte Adresse merkt sich dieser Browser; lokale Dateien gelten nur für die
-          laufende Sitzung, weil ihre Adresse nach einem Neuladen nichts mehr bedeutet.
+          Spotify is different, and the difference is not cosmetic: Spotify does not permit any other
+          app to stream its audio. So a Spotify link is treated as an identification problem. Hörbar
+          works out which show it is and looks for the same programme&apos;s public RSS feed, which most
+          podcasts also publish. Where a show is a Spotify exclusive there is no honest way to play it
+          here, and the interface says so rather than failing strangely.
         </p>
       </Section>
 
-      <Section title="Einstufung nach GER">
+      <Section title="Transcripts, and what happens without one">
         <p>
-          Jedes Transkript wird gegen die Goethe-Wortlisten gemessen. Wir zählen, wie viele Token in
-          A1, A2 und B1 liegen, wie viele außerhalb fallen und wie viele Komposita vorkommen. Ein
-          Kompositum ist dabei nur so schwer wie sein schwerstes Glied: <em>Straßenbahn</em> zerfällt in
-          Straße und Bahn, beides A1, also landet es nicht im Unbekannt-Topf. Eigennamen zählen gar
-          nicht mit, denn wer <em>Leipzig</em> nicht kennt, liest deswegen nicht über Niveau.
+          An episode that has been through the ingest worker carries a real transcript with word-level
+          timings. Open it from the player and every sentence is clickable, in German alone or beside
+          English or Vietnamese.
         </p>
         <p>
-          Der Wortschatz setzt das Grundniveau, das Sprechtempo darf es um genau eine Stufe verschieben.
-          Dieselben Wörter bei 6,5 Silben pro Sekunde sind eine andere Aufgabe als bei 4.
+          Most podcast audio has never been transcribed by anyone. For those, live captions run in the
+          browser using its own speech recognition. The mechanics are worth being plain about: browser
+          speech recognition listens to the microphone rather than to a media element, and a
+          cross-origin podcast stream cannot be captured for analysis because its CDN sends no CORS
+          headers. So the captions hear the audio the same way a person in the room does, through your
+          speakers. It sounds like a workaround and it is the only route that works on arbitrary
+          podcast audio without uploading the recording anywhere.
+        </p>
+      </Section>
+
+      <Section title="CEFR grading">
+        <p>
+          Every transcript is measured against the Goethe-Institut word lists. We count how many tokens
+          fall inside A1, A2 and B1, how many fall outside, and how many are compounds. A compound is
+          only as hard as its hardest member: <em>Straßenbahn</em> is Straße plus Bahn, both A1, so it
+          does not land in the unknown bucket. Proper nouns do not count at all, because not knowing{" "}
+          <em>Leipzig</em> is not reading above your level.
+        </p>
+        <p>
+          Vocabulary sets the base level and delivery speed may move it by exactly one band. The same
+          words at 6.5 syllables per second are a different task than at 4.
         </p>
         <dl className="mt-3 space-y-1.5">
           {CEFR_LEVELS.map((level) => (
@@ -79,91 +82,92 @@ export default function AboutPage() {
           ))}
         </dl>
         <p className="mt-3 text-[12.5px] text-[var(--ink-faint)]">
-          Die mitgelieferten Listen sind repräsentative Auszüge der offiziellen Wortlisten, groß genug
-          für eine stabile Einstufung. Wer die vollständigen Listen einsetzt, tauscht eine Datei aus und
-          justiert die Schwellen mit <code className="font-mono">npm run classify</code> nach.
+          The shipped lists are representative extracts of the published Zertifikat lists, large enough
+          for a stable grade. Swap in the full lists and the thresholds need re-fitting with{" "}
+          <code className="font-mono">npm run classify</code>.
         </p>
       </Section>
 
       <Section title="Shadowing Difficulty Metric">
         <p>
-          Zwei Folgen auf B2 können zwanzig Punkte auseinanderliegen, sobald man sie nachsprechen will.
-          Eine ruhige Dokumentation ist etwas anderes als ein Interview mit Zwischenrufen. Der SDM-Wert
-          fasst drei Größen zusammen:
+          Two B2 episodes can sit twenty points apart once you try to say them back. A calm documentary
+          is not the same task as an interview full of interruptions. The SDM score combines three
+          measurements:
         </p>
         <ul className="mt-2 space-y-1 text-[13.5px]">
           <li>
-            <strong>Artikulationstempo</strong> ({Math.round(SDM_WEIGHTS.rate * 100)} %) - Silben pro
-            Sekunde, ohne die Pausen zwischen den Sätzen.
+            <strong>Articulation rate</strong> ({Math.round(SDM_WEIGHTS.rate * 100)}%), syllables per
+            second with the pauses between sentences excluded.
           </li>
           <li>
-            <strong>Lexikalische Vielfalt</strong> ({Math.round(SDM_WEIGHTS.diversity * 100)} %) - als
-            gleitendes Type-Token-Verhältnis über 50-Wort-Fenster, damit ein Vier-Stunden-Interview
-            nicht allein wegen seiner Länge als leicht gilt.
+            <strong>Lexical diversity</strong> ({Math.round(SDM_WEIGHTS.diversity * 100)}%), as a mean
+            segmental type-token ratio over 50-word windows, so a four-hour interview is not counted as
+            easy purely because of its length.
           </li>
           <li>
-            <strong>Phonetische Last</strong> ({Math.round(SDM_WEIGHTS.phonetics * 100)} %) - Anteil der
-            Wörter mit Konsonantenclustern, ich-/ach-Laut-Wechseln und Auslautverhärtung.
+            <strong>Phonetic load</strong> ({Math.round(SDM_WEIGHTS.phonetics * 100)}%), the share of
+            words with consonant clusters, ich/ach alternations and final devoicing.
           </li>
         </ul>
         <p className="mt-2">
-          Das Tempo wiegt am schwersten, weil man ein schwieriges Cluster langsam üben kann, eine zu
-          schnelle Passage aber gar nicht erst mitspricht.
+          Rate weighs heaviest because a hard cluster can be practised slowly, whereas a passage that
+          is simply too fast cannot be shadowed at all.
         </p>
       </Section>
 
-      <Section title="Aussprache-Markierungen">
+      <Section title="Pronunciation markers">
         <p>
-          Die Markierungen im Transkript sind Regeln, keine Vermutungen: Auslautverhärtung (b, d, g
-          werden am Silbenende zu p, t, k), der Wechsel zwischen ich-Laut [ç] und ach-Laut [x] je nach
-          vorangehendem Vokal, Konsonantencluster ab drei Lauten, st- und sp- am Stammanfang als scht-
-          und schp-, sowie das vokalisierte End-r. Komposita werden zerlegt und der Hauptakzent auf dem
-          ersten Glied markiert, damit <span className="font-mono">WIRT-schafts-kri-se</span> nicht in der
-          Mitte betont wird.
+          The markers in a transcript are rules, not guesses: final devoicing (b, d, g harden to p, t,
+          k at the end of a syllable), the switch between the ich-Laut [ç] and the ach-Laut [x]
+          depending on the preceding vowel, consonant clusters from three sounds up, st- and sp- at the
+          start of a stem read as scht- and schp-, and the vocalised final -r. Compounds are split and
+          the primary stress marked on the first member, so{" "}
+          <span className="font-mono">WIRT-schafts-kri-se</span> is not stressed in the middle.
         </p>
       </Section>
 
-      <Section title="Wiederholung">
+      <Section title="Repetition">
         <p>
-          Gespeicherte Wörter laufen durch SM-2, denselben Algorithmus, den Anki benutzt. Angezeigt wird
-          das als Leitner-Kasten, weil fünf Kästen leichter zu lesen sind als ein Ease-Faktor. Die
-          Intervalle wachsen ungefähr entlang {LEITNER_INTERVALS.join(", ")} Tagen. Jede Karte trägt den
-          Satz mit, in dem das Wort vorkam, plus einen Link zurück an die exakte Stelle - das ist der
-          Unterschied zwischen einer Vokabelliste und einer Erinnerung.
+          Saved words run through SM-2, the same algorithm Anki uses, displayed as a five-box Leitner
+          ladder because five boxes read faster than an ease factor. Intervals grow roughly along{" "}
+          {LEITNER_INTERVALS.join(", ")} days. Every card carries the sentence the word appeared in
+          plus a link back to that exact moment, which is the difference between a word list and a
+          memory.
         </p>
       </Section>
 
-      <Section title="Was wo läuft">
+      <Section title="What runs where">
         <p>
-          Transkription, Wort-Ausrichtung und Übersetzung passieren im Ingest-Worker, außerhalb der
-          Serverless-Funktionen: Whisper auf einer halben Stunde Audio überschreitet jedes vernünftige
-          Ausführungslimit. Das Ergebnis ist ein JSON-Payload mit Satz- und Wortgrenzen, Übersetzungen
-          und einem Glossar, der fertig in der Datenbank liegt.
+          Transcription, word alignment and translation happen in the ingest worker, outside the
+          serverless functions: Whisper on half an hour of audio exceeds any sensible execution limit.
+          The result is a JSON payload of sentence and word boundaries, translations and a glossary,
+          sitting ready in the database.
         </p>
         <p>
-          Im Browser laufen dagegen alle Audio-Analysen: Tonhöhenverlauf, Lautstärke, Aussprachebewertung.
-          Mikrofonaufnahmen verlassen das Gerät nicht, die Latenz ist null und die Rechenkosten bleiben
-          bei null.
+          All audio analysis happens in the browser: pitch contour, loudness, pronunciation scoring.
+          Microphone recordings never leave the device, latency is zero, and the compute cost stays at
+          zero too.
         </p>
       </Section>
 
-      <Section title="Ohne Schlüssel, mit Schlüssel">
+      <Section title="Without keys, and with them">
         <p>
-          Ohne jede Konfiguration funktioniert schon: Katalog, Synchronisierung, Wort-Teleprompter,
-          Schleifen und Echo-Pausen, Aussprache-Markierungen, das mitgelieferte Wörterbuch, das
-          Vokabelheft samt Wiederholung und Export, die regelbasierte Satzbau-Erklärung und die
-          vorberechneten Verständnisfragen.
+          With no configuration at all you get: source discovery across Apple Podcasts, Spotify and
+          YouTube, streaming, the catalog, sentence synchronisation, the word teleprompter, loops and
+          echo gaps, pronunciation markers, the bundled dictionary, the vocabulary vault with review
+          and export, rule-based sentence analysis, live captions, and the precomputed comprehension
+          questions.
         </p>
         <p>
-          Mit DeepL- oder Anthropic-Schlüssel kommen dazu: Nachschlagen von Wörtern außerhalb des
-          Offline-Lexikons, Satzübersetzungen für frisch eingelesene Folgen, ausführlichere
-          Satzbau-Erklärungen und automatisch erzeugte Quizfragen.
+          A DeepL or Anthropic key adds lookups for words outside the offline lexicon, sentence
+          translations for freshly ingested episodes and for live captions, fuller sentence-structure
+          explanations, and generated quizzes.
         </p>
       </Section>
 
       <p className="mt-8 text-[13px]">
         <Link href="/" className="btn">
-          Zurück zum Katalog
+          Back to the catalog
         </Link>
       </p>
     </article>
@@ -173,9 +177,7 @@ export default function AboutPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-8">
-      <h2 className="text-[17px] font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-        {title}
-      </h2>
+      <h2 className="text-[17px] font-semibold">{title}</h2>
       <div className="mt-2 space-y-2.5 text-[14px] leading-relaxed text-[var(--ink-soft)] [&_code]:text-[12px] [&_strong]:text-[var(--ink)]">
         {children}
       </div>

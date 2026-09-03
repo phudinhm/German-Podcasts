@@ -22,6 +22,7 @@ import { Quiz } from "./Quiz";
 import { LevelBadge } from "./LevelBadge";
 import { ShadowingBadge } from "./ShadowingBadge";
 import { loadSettings, loadVault, saveSettings } from "@/lib/vault";
+import { useUi } from "@/lib/i18n";
 
 interface Props {
   episode: Episode;
@@ -34,6 +35,7 @@ interface Props {
 }
 
 export function WatchClient({ episode, initialTime = 0, initialSegmentId, initialMode }: Props) {
+  const { t } = useUi();
   // A stream the learner attached themselves wins over whatever the catalog
   // shipped, so a transcript-only episode becomes playable without a redeploy.
   const [attached, setAttached] = useState<StoredMedia | null>(null);
@@ -308,7 +310,6 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
               poster={source.poster}
               playsInline
               preload="metadata"
-              crossOrigin="anonymous"
               className="aspect-video w-full rounded-xl border border-[var(--rule)] bg-black"
             />
           ) : null}
@@ -351,9 +352,7 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
           <div className="mb-4">
             <StreamControls handle={handle} />
             <p className="mt-2 text-[12px] leading-relaxed text-[var(--ink-faint)]">
-              Diese Folge streamt schon, hat aber noch kein Transkript. Sobald der Ingest-Worker
-              gelaufen ist, treten Satz-Synchronisierung, Wörterbuch und Echo-Modus an die Stelle
-              dieser einfachen A-B-Schleife.
+              {t("watch.streamNoTranscript")}
             </p>
           </div>
         ) : null}
@@ -426,6 +425,7 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
 }
 
 function EpisodeHeader({ episode }: { episode: Episode }) {
+  const { t } = useUi();
   return (
     <header className="mb-4">
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -433,7 +433,7 @@ function EpisodeHeader({ episode }: { episode: Episode }) {
         <span className="text-[12px] text-[var(--ink-faint)]">{episode.publisher}</span>
         <ShadowingBadge sdm={episode.metrics.sdm} />
         {episode.transcriptStatus === "demo" ? (
-          <span className="chip border-dashed">Demo-Transkript</span>
+          <span className="chip chip-quiet">{t("watch.demoTranscript")}</span>
         ) : null}
       </div>
       <h1 className="text-[24px] font-semibold leading-tight sm:text-[28px]" style={{ fontFamily: "var(--font-display)" }}>
@@ -455,13 +455,10 @@ function TimelineNotice({
   slug: string;
   onChange: () => void;
 }) {
+  const { t } = useUi();
   return (
     <div className="card p-4">
-      <p className="text-[13px] leading-relaxed text-[var(--ink-soft)]">
-        Diese Folge läuft auf der Transkript-Zeitachse, ohne Ton. Alles andere funktioniert schon:
-        Satz-Synchronisierung, Wort-Teleprompter, Schleifen, Echo-Pausen, Wörterbuch und Vokabelheft.
-        Verbinde einen Stream, und genau dieselbe Ansicht spielt echtes Audio oder Video.
-      </p>
+      <p className="text-[13px] leading-relaxed text-[var(--ink-soft)]">{t("watch.timelineNotice")}</p>
       <div className="mt-3">
         <MediaAttach slug={slug} current={null} onChange={onChange} />
       </div>
@@ -479,16 +476,13 @@ function TimelineNotice({
 }
 
 function PendingNotice({ episode, onChange }: { episode: Episode; onChange: () => void }) {
+  const { t } = useUi();
   const hint = episode.source.kind === "pending" ? episode.source.ingestHint : undefined;
   const pageUrl = episode.source.kind === "pending" ? episode.source.pageUrl : undefined;
   return (
     <div className="card p-5">
-      <h2 className="text-[14px] font-semibold">Kuratiert, aber noch nicht eingelesen</h2>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--ink-soft)]">
-        Diese Sendung steht mit einer redaktionellen Niveau-Einstufung im Katalog. Transkript, Wort-Timing
-        und Übersetzungen entstehen im Ingest-Worker; danach erscheint hier derselbe Player wie bei den
-        fertigen Folgen.
-      </p>
+      <h2 className="text-[14px] font-semibold">{t("watch.pendingTitle")}</h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--ink-soft)]">{t("watch.pendingBody")}</p>
       {hint ? (
         <pre className="mt-3 overflow-x-auto rounded-lg border border-[var(--rule)] bg-[var(--paper)] p-2.5 font-mono text-[11px] text-[var(--ink-soft)]">
           {hint}
@@ -497,21 +491,18 @@ function PendingNotice({ episode, onChange }: { episode: Episode; onChange: () =
       <div className="mt-3 flex flex-wrap gap-2">
         {pageUrl ? (
           <a href={pageUrl} target="_blank" rel="noreferrer noopener" className="btn">
-            Zur Sendung
+            Open the show
           </a>
         ) : null}
         <Link href="/listen" className="btn">
-          Podcast-Feed streamen
+          {t("nav.listen")}
         </Link>
         <Link href="/about" className="btn">
-          Wie der Ingest läuft
+          {t("nav.about")}
         </Link>
       </div>
       <div className="mt-3 border-t border-[var(--rule)] pt-3">
-        <p className="mb-2 text-[12px] text-[var(--ink-soft)]">
-          Du kannst schon jetzt hören: verbinde einen Stream und nutze Tempo, Sprungmarken und
-          A-B-Schleife. Sätze und Wörterbuch kommen mit dem Transkript dazu.
-        </p>
+        <p className="mb-2 text-[12px] text-[var(--ink-soft)]">{t("watch.pendingStream")}</p>
         <MediaAttach slug={episode.slug} current={null} onChange={onChange} />
       </div>
     </div>
@@ -519,17 +510,18 @@ function PendingNotice({ episode, onChange }: { episode: Episode; onChange: () =
 }
 
 function MetricsPanel({ episode }: { episode: Episode }) {
+  const { t } = useUi();
   const rows: Array<[string, string]> = [
-    ["Silben pro Sekunde", episode.metrics.syllablesPerSecond ? episode.metrics.syllablesPerSecond.toFixed(2) : "-"],
-    ["Lexikalische Vielfalt", episode.metrics.lexicalDiversity ? episode.metrics.lexicalDiversity.toFixed(2) : "-"],
-    ["Phonetische Last", episode.metrics.phoneticComplexity ? episode.metrics.phoneticComplexity.toFixed(2) : "-"],
-    ["Wortschatz A1-B1", episode.metrics.goetheCoverage.B1 ? `${Math.round(episode.metrics.goetheCoverage.B1 * 100)}%` : "-"],
-    ["außerhalb der Listen", episode.metrics.outOfListRatio ? `${Math.round(episode.metrics.outOfListRatio * 100)}%` : "-"],
+    ["Syllables per second", episode.metrics.syllablesPerSecond ? episode.metrics.syllablesPerSecond.toFixed(2) : "-"],
+    ["Lexical diversity", episode.metrics.lexicalDiversity ? episode.metrics.lexicalDiversity.toFixed(2) : "-"],
+    ["Phonetic load", episode.metrics.phoneticComplexity ? episode.metrics.phoneticComplexity.toFixed(2) : "-"],
+    ["Vocabulary in A1-B1", episode.metrics.goetheCoverage.B1 ? `${Math.round(episode.metrics.goetheCoverage.B1 * 100)}%` : "-"],
+    ["Outside the lists", episode.metrics.outOfListRatio ? `${Math.round(episode.metrics.outOfListRatio * 100)}%` : "-"],
   ];
   return (
     <section className="card p-4">
       <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
-        Messwerte
+        {t("watch.metrics")}
       </h3>
       <dl className="mt-2.5 space-y-1.5">
         {rows.map(([label, value]) => (
@@ -550,29 +542,30 @@ function MetricsPanel({ episode }: { episode: Episode }) {
 }
 
 function HazardLegend() {
+  const { t } = useUi();
   return (
     <section className="card p-4">
       <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
-        Aussprache-Markierungen
+        {t("watch.hazards")}
       </h3>
       <ul className="mt-2.5 space-y-1.5 text-[12px] leading-snug text-[var(--ink-soft)]">
         <li>
-          <span className="hz hz-ich px-1">ch</span> Ich-Laut [ç]: vorne, weich, nach hellen Vokalen.
+          <span className="hz hz-ich px-1">ch</span> Ich-Laut [ç]: forward and soft, after front vowels.
         </li>
         <li>
-          <span className="hz hz-ach px-1">ch</span> Ach-Laut [x]: hinten im Rachen, nach a, o, u, au.
+          <span className="hz hz-ach px-1">ch</span> Ach-Laut [x]: back of the throat, after a, o, u, au.
         </li>
         <li>
-          <span className="hz hz-devoice px-1">d</span> Auslautverhärtung: b, d, g werden am Ende zu p, t, k.
+          <span className="hz hz-devoice px-1">d</span> Final devoicing: b, d, g harden to p, t, k.
         </li>
         <li>
-          <span className="hz hz-cluster px-1">rbst</span> Konsonantencluster: Zunge vorher in Position bringen.
+          <span className="hz hz-cluster px-1">rbst</span> Consonant cluster: set your tongue before you start.
         </li>
         <li>
-          <span className="hz hz-onset px-1">st</span> st- und sp- am Wortanfang klingen wie scht-, schp-.
+          <span className="hz hz-onset px-1">st</span> st- and sp- at the start of a stem sound like scht-, schp-.
         </li>
         <li>
-          <span className="hz hz-r px-1">er</span> Endungs-r wird zum dunklen Vokal [ɐ].
+          <span className="hz hz-r px-1">er</span> Final -r becomes the dark vowel [ɐ].
         </li>
       </ul>
     </section>

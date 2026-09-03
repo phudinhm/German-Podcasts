@@ -6,21 +6,23 @@
  * eye only ever has to learn one colour.
  */
 @theme {
-  --color-paper: #fbf9f4;
+  --color-paper: #ffffff;
   --color-paper-raised: #ffffff;
-  --color-ink: #1a1815;
-  --color-ink-soft: #56514a;
-  --color-ink-faint: #8b857c;
-  --color-rule: #e6e1d7;
+  --color-ink: #0f0f0f;
+  --color-ink-soft: #606060;
+  --color-ink-faint: #909090;
+  --color-rule: #e5e5e5;
   --color-accent: #b45309;
-  --color-accent-soft: #fef3c7;
+  --color-accent-soft: #fff4e0;
   --color-accent-ring: #f59e0b;
-  --color-de: #1a1815;
-  --color-gloss: #4b5563;
+  --color-de: #0f0f0f;
+  --color-gloss: #606060;
 
-  --font-display: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Roboto is the typeface YouTube uses; the stack degrades to the platform UI
+     font when the webfont has not arrived, which keeps metrics close. */
+  --font-display: Roboto, "Roboto Flex", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-body: Roboto, "Roboto Flex", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 :root {
@@ -35,22 +37,25 @@
   --accent-soft: var(--color-accent-soft);
   --accent-ring: var(--color-accent-ring);
   --gloss: var(--color-gloss);
-  --shadow-card: 0 1px 2px rgb(26 24 21 / 0.05), 0 8px 24px -12px rgb(26 24 21 / 0.18);
+  --surface: #f9f9f9;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 20px -12px rgb(0 0 0 / 0.16);
+  --radius: 12px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #14161a;
-    --paper-raised: #1c1f25;
-    --ink: #ecebe7;
-    --ink-soft: #a9a69f;
-    --ink-faint: #74716b;
-    --rule: #2b2f36;
+    --paper: #0f0f0f;
+    --paper-raised: #1c1c1c;
+    --ink: #f1f1f1;
+    --ink-soft: #aaaaaa;
+    --ink-faint: #7a7a7a;
+    --rule: #303030;
     --accent: #fbbf24;
     --accent-soft: #3a2f13;
     --accent-ring: #f59e0b;
-    --gloss: #9ca3af;
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+    --gloss: #aaaaaa;
+    --surface: #181818;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 20px -12px rgb(0 0 0 / 0.7);
   }
 }
 
@@ -62,8 +67,16 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-body);
+  font-synthesis-weight: none;
+  letter-spacing: -0.003em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
 }
 
 ::selection {
@@ -144,23 +157,37 @@ body {
 .card {
   background: var(--paper-raised);
   border: 1px solid var(--rule);
-  border-radius: 14px;
+  border-radius: var(--radius);
   box-shadow: var(--shadow-card);
+}
+
+/* A flat, borderless surface, the way modern video interfaces group content. */
+.surface {
+  background: var(--surface);
+  border-radius: var(--radius);
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid var(--rule);
+  border: 0;
   border-radius: 999px;
-  padding: 2px 9px;
-  font-size: 11px;
-  line-height: 1.6;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
+  background: var(--surface);
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
   white-space: nowrap;
+}
+
+.chip-quiet {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-soft);
 }
 
 .btn {
@@ -169,18 +196,23 @@ body {
   justify-content: center;
   gap: 6px;
   border: 1px solid var(--rule);
-  border-radius: 9px;
-  padding: 6px 12px;
+  border-radius: 999px;
+  padding: 7px 14px;
   font-size: 13px;
   font-weight: 500;
   background: var(--paper-raised);
   color: var(--ink);
   cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--accent-ring);
+  background: var(--surface);
+  border-color: var(--ink-faint);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn:disabled {
@@ -197,6 +229,11 @@ body {
 .btn-primary {
   background: var(--ink);
   color: var(--paper);
+  border-color: var(--ink);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--ink);
   border-color: var(--ink);
 }
 
@@ -227,4 +264,27 @@ input[type="range"] {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* --- discovery and episode rows ---------------------------------------- */
+
+.row-hover {
+  border-radius: 10px;
+  transition: background-color 120ms ease;
+}
+
+.row-hover:hover {
+  background: var(--surface);
+}
+
+.art {
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface);
+}
+
+/* Live caption line, kept large enough to read from across a desk. */
+.caption-line {
+  font-size: 17px;
+  line-height: 1.6;
 }

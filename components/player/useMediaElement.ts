@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlayerHandle } from "./types";
+import { upgradeToHttps } from "@/lib/media";
 
 export interface MediaElementState {
   ready: boolean;
@@ -21,12 +22,17 @@ export interface MediaElementState {
  * The rest is stream plumbing - buffering state, network errors, and a duration
  * that only becomes known once the server answers.
  */
-export function useMediaElement(src: string | null): {
+export function useMediaElement(rawSrc: string | null): {
   handle: PlayerHandle;
   mediaRef: React.RefObject<HTMLMediaElement | null>;
   state: MediaElementState;
   retry: () => void;
+  /** The URL actually handed to the element, after an https upgrade. */
+  src: string | null;
 } {
+  // Upgrade before the element ever sees it: an http URL on an https page is
+  // blocked outright, and the failure surfaces as an unhelpful "not supported".
+  const src = useMemo(() => (rawSrc ? upgradeToHttps(rawSrc) : null), [rawSrc]);
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const readyRef = useRef(false);
   const [state, setState] = useState<MediaElementState>({
@@ -80,14 +86,23 @@ export function useMediaElement(src: string | null): {
     }
     function onError() {
       const code = media?.error?.code;
-      const message =
-        code === MediaError.MEDIA_ERR_NETWORK
-          ? "Netzwerkfehler beim Streamen. Verbindung prüfen und erneut versuchen."
+      // Name the actual cause. "Not supported" covers four very different
+      // problems, and telling them apart is the difference between a user
+      // fixing it in one click and giving up.
+      const insecure =
+        typeof window !== "undefined" &&
+        window.location.protocol === "https:" &&
+        (src ?? "").startsWith("http://");
+
+      const message = insecure
+        ? "This episode is served over plain http, which a browser blocks on a secure page. Open the file directly, or ask the publisher for an https address."
+        : code === MediaError.MEDIA_ERR_NETWORK
+          ? "The stream dropped out. Check the connection and try again."
           : code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
-            ? "Dieser Stream lässt sich im Browser nicht abspielen. Die URL zeigt vielleicht auf eine Seite statt auf eine Mediendatei, oder das Format wird nicht unterstützt."
+            ? "This address could not be played. It may redirect to a web page rather than a media file, the host may refuse requests from a browser, or the format may be one this browser cannot decode."
             : code === MediaError.MEDIA_ERR_DECODE
-              ? "Der Stream ist beschädigt oder wird nicht unterstützt."
-              : "Der Stream konnte nicht geladen werden.";
+              ? "The stream is damaged or uses an unsupported codec."
+              : "The stream could not be loaded.";
       readyRef.current = false;
       setState((prev) => ({ ...prev, ready: false, loading: false, error: message }));
     }
@@ -154,5 +169,5 @@ export function useMediaElement(src: string | null): {
     isReady: () => readyRef.current,
   });
 
-  return { handle: handleRef.current, mediaRef, state, retry };
+  return { handle: handleRef.current, mediaRef, state, retry, src };
 }

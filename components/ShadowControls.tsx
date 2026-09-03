@@ -2,6 +2,7 @@
 
 import type { ShadowMode, ShadowState } from "./player/useShadowEngine";
 import type { TargetLang } from "@/lib/types";
+import { useUi } from "@/lib/i18n";
 
 export interface ControlValues {
   mode: ShadowMode;
@@ -25,23 +26,24 @@ interface Props {
 }
 
 const RAMPS: Array<{ label: string; value: number[] }> = [
-  { label: "konstant", value: [1] },
+  { label: "constant", value: [1] },
   { label: "0,75 → 1,0", value: [0.75, 0.85, 1] },
   { label: "0,75 → 1,1", value: [0.75, 0.85, 1, 1.1] },
   { label: "0,9 → 1,25", value: [0.9, 1, 1.15, 1.25] },
 ];
 
 export function ShadowControls({ values, state, onChange, onPlayPause, onStep }: Props) {
+  const { t } = useUi();
   return (
     <div className="card p-3.5">
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className="btn btn-primary w-[92px]" onClick={onPlayPause}>
-          {state.playing ? "Pause" : "Abspielen"}
+          {state.playing ? t("common.pause") : t("common.play")}
         </button>
-        <button type="button" className="btn px-2.5" onClick={() => onStep(-1)} title="Vorheriger Satz">
+        <button type="button" className="btn px-2.5" onClick={() => onStep(-1)} title="Previous sentence">
           ←
         </button>
-        <button type="button" className="btn px-2.5" onClick={() => onStep(1)} title="Nächster Satz">
+        <button type="button" className="btn px-2.5" onClick={() => onStep(1)} title="Next sentence">
           →
         </button>
 
@@ -54,7 +56,7 @@ export function ShadowControls({ values, state, onChange, onPlayPause, onStep }:
               data-active={values.mode === mode}
               className="btn rounded-none border-0 border-r border-[var(--rule)] px-3 py-1.5 text-[12px] last:border-r-0"
             >
-              {mode === "free" ? "durchlaufen" : mode === "loop" ? "A-B-Schleife" : "Echo"}
+              {mode === "free" ? t("controls.freeplay") : mode === "loop" ? t("controls.abLoop") : t("controls.echo")}
             </button>
           ))}
         </div>
@@ -63,7 +65,7 @@ export function ShadowControls({ values, state, onChange, onPlayPause, onStep }:
       </div>
 
       <div className="mt-3 grid gap-3 border-t border-[var(--rule)] pt-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Wiederholungen">
+        <Field label={t("controls.repetitions")}>
           <div className="flex gap-1">
             {[2, 3, 5, 0].map((count) => (
               <button
@@ -79,7 +81,7 @@ export function ShadowControls({ values, state, onChange, onPlayPause, onStep }:
           </div>
         </Field>
 
-        <Field label={`Sprechpause ${values.echoGapFactor.toFixed(1)}×`}>
+        <Field label={`${t("controls.speakingGap")} ${values.echoGapFactor.toFixed(1)}×`}>
           <input
             type="range"
             min={0.6}
@@ -92,7 +94,7 @@ export function ShadowControls({ values, state, onChange, onPlayPause, onStep }:
           />
         </Field>
 
-        <Field label="Tempo-Rampe">
+        <Field label={t("controls.tempoRamp")}>
           <select
             className="btn w-full py-1 text-[12px]"
             value={JSON.stringify(values.tempoRamp)}
@@ -107,7 +109,7 @@ export function ShadowControls({ values, state, onChange, onPlayPause, onStep }:
           </select>
         </Field>
 
-        <Field label={`Grundtempo ${values.baseRate.toFixed(2)}×`}>
+        <Field label={`${t("controls.baseSpeed")} ${values.baseRate.toFixed(2)}×`}>
           <input
             type="range"
             min={0.5}
@@ -124,7 +126,7 @@ export function ShadowControls({ values, state, onChange, onPlayPause, onStep }:
         <Toggle
           checked={values.showDual}
           onChange={(showDual) => onChange({ showDual })}
-          label="Übersetzung zeigen"
+          label={t("controls.showTranslation")}
         />
         <div className="flex overflow-hidden rounded-lg border border-[var(--rule)]">
           {(["en", "vi"] as const).map((lang) => (
@@ -142,38 +144,39 @@ export function ShadowControls({ values, state, onChange, onPlayPause, onStep }:
         <Toggle
           checked={values.karaoke}
           onChange={(karaoke) => onChange({ karaoke })}
-          label="Wort-Teleprompter"
+          label={t("controls.teleprompter")}
         />
         <Toggle
           checked={values.showHazards}
           onChange={(showHazards) => onChange({ showHazards })}
-          label="Aussprache-Warnungen"
+          label={t("controls.hazards")}
         />
         <Toggle
           checked={values.autoAdvance}
           onChange={(autoAdvance) => onChange({ autoAdvance })}
-          label="automatisch weiter"
+          label={t("controls.autoAdvance")}
         />
       </div>
 
       <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-[var(--rule)] pt-2.5 text-[11px] text-[var(--ink-faint)]">
-        <Hotkey keys="Space" label="Play/Pause" />
-        <Hotkey keys="[ ]" label="Satz zurück/vor" />
-        <Hotkey keys="L" label="Schleife an" />
-        <Hotkey keys="E" label="Echo-Modus" />
-        <Hotkey keys="S" label="Übersetzung" />
-        <Hotkey keys="R" label="Aufnahme" />
-        <Hotkey keys="1-4" label="Tempo" />
+        <Hotkey keys="Space" label={t("player.hotkeyPlay")} />
+        <Hotkey keys="[ ]" label="Prev/next sentence" />
+        <Hotkey keys="L" label={t("player.loop")} />
+        <Hotkey keys="E" label={t("controls.echo")} />
+        <Hotkey keys="S" label="Translation" />
+        <Hotkey keys="R" label="Record" />
+        <Hotkey keys="1-4" label={t("player.speed")} />
       </dl>
     </div>
   );
 }
 
 function StatusPill({ state, mode }: { state: ShadowState; mode: ShadowMode }) {
+  const { t } = useUi();
   if (mode === "free") {
     return (
       <span className="ml-auto text-[11px] text-[var(--ink-faint)]">
-        {state.currentRate.toFixed(2)}× · durchlaufend
+        {state.currentRate.toFixed(2)}× · {t("controls.freeplay")}
       </span>
     );
   }
@@ -181,13 +184,13 @@ function StatusPill({ state, mode }: { state: ShadowState; mode: ShadowMode }) {
     return (
       <span className="ml-auto flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent)]">
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--accent-ring)]" />
-        jetzt nachsprechen · {(state.gapRemaining / 1000).toFixed(1)} s
+        {t("controls.speakNow")} · {(state.gapRemaining / 1000).toFixed(1)} s
       </span>
     );
   }
   return (
     <span className="ml-auto text-[11px] text-[var(--ink-faint)]">
-      Durchgang {state.iteration + 1} · {state.currentRate.toFixed(2)}×
+      {t("controls.pass", { n: state.iteration + 1 })} · {state.currentRate.toFixed(2)}×
     </span>
   );
 }

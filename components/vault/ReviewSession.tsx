@@ -6,14 +6,15 @@ import { describeDue, leitnerBox, review, sortQueue, type Grade } from "@/lib/sr
 import { updateEntry, type VaultEntry } from "@/lib/vault";
 import { contextLink, makeCloze } from "@/lib/export";
 import type { TargetLang } from "@/lib/types";
+import { useUi } from "@/lib/i18n";
 
 type Mode = "recall" | "cloze";
 
-const GRADES: Array<{ grade: Grade; label: string; hint: string; tone: string }> = [
-  { grade: 1, label: "Nochmal", hint: "keine Ahnung", tone: "border-rose-500/50" },
-  { grade: 3, label: "Schwer", hint: "mit Mühe", tone: "border-amber-500/50" },
-  { grade: 4, label: "Gut", hint: "sicher", tone: "border-sky-500/50" },
-  { grade: 5, label: "Leicht", hint: "sofort", tone: "border-emerald-500/50" },
+const GRADES: Array<{ grade: Grade; labelKey: "review.again" | "review.hard" | "review.good" | "review.easy"; hintKey: "review.againHint" | "review.hardHint" | "review.goodHint" | "review.easyHint"; tone: string }> = [
+  { grade: 1, labelKey: "review.again", hintKey: "review.againHint", tone: "border-rose-500/50" },
+  { grade: 3, labelKey: "review.hard", hintKey: "review.hardHint", tone: "border-amber-500/50" },
+  { grade: 4, labelKey: "review.good", hintKey: "review.goodHint", tone: "border-sky-500/50" },
+  { grade: 5, labelKey: "review.easy", hintKey: "review.easyHint", tone: "border-emerald-500/50" },
 ];
 
 /**
@@ -30,6 +31,7 @@ export function ReviewSession({
   lang: TargetLang;
   onDone: () => void;
 }) {
+  const { t } = useUi();
   const [mode, setMode] = useState<Mode>("recall");
   const [queue, setQueue] = useState<VaultEntry[]>([]);
   const [index, setIndex] = useState(0);
@@ -83,12 +85,12 @@ export function ReviewSession({
   if (queue.length === 0) {
     return (
       <div className="card p-6 text-center">
-        <p className="text-[15px] font-medium">Nichts fällig.</p>
+        <p className="text-[15px] font-medium">{t("review.nothingDue")}</p>
         <p className="mt-1 text-[13px] text-[var(--ink-soft)]">
-          Genau darum geht es bei verteilter Wiederholung: die meisten Tage sind kurz.
+          {t("review.nothingDueBody")}
         </p>
         <button type="button" className="btn mt-3" onClick={onDone}>
-          Zurück zur Liste
+          {t("vault.toList")}
         </button>
       </div>
     );
@@ -98,10 +100,10 @@ export function ReviewSession({
     return (
       <div className="card p-6 text-center">
         <p className="text-[15px] font-medium">
-          {done === 1 ? "1 Karte geschafft." : `${done} Karten geschafft.`}
+          {done === 1 ? t("review.doneOne") : t("review.done", { n: done })}
         </p>
         <button type="button" className="btn mt-3" onClick={onDone}>
-          Zurück zur Liste
+          {t("vault.toList")}
         </button>
       </div>
     );
@@ -115,10 +117,10 @@ export function ReviewSession({
     <div className="card p-5">
       <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] text-[var(--ink-faint)]">
         <span>
-          Karte {index + 1} von {queue.length}
+          {t("review.card", { n: index + 1, total: queue.length })}
         </span>
         <span>·</span>
-        <span>Box {leitnerBox(card.srs)}</span>
+        <span>{t("review.box", { n: leitnerBox(card.srs) })}</span>
         <span>·</span>
         <span>{describeDue(card.srs)}</span>
         <div className="ml-auto flex overflow-hidden rounded-lg border border-[var(--rule)]">
@@ -133,7 +135,7 @@ export function ReviewSession({
               }}
               className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-0.5 text-[11px] last:border-r-0"
             >
-              {option === "recall" ? "Bedeutung → Wort" : "Lückensatz"}
+              {option === "recall" ? t("review.modeRecall") : t("review.modeCloze")}
             </button>
           ))}
         </div>
@@ -150,7 +152,7 @@ export function ReviewSession({
               {glosses.length > 0 ? (
                 glosses.join(", ")
               ) : (
-                <span className="text-[var(--ink-faint)]">ohne Übersetzung gespeichert</span>
+                <span className="text-[var(--ink-faint)]">{t("review.savedWithout")}</span>
               )}
             </p>
             <p className="mt-1 text-[12px] text-[var(--ink-faint)]">{card.pos}</p>
@@ -164,7 +166,7 @@ export function ReviewSession({
               {card.lemma}
               {card.plural ? (
                 <span className="ml-2 text-[13px] font-normal text-[var(--ink-faint)]">
-                  Pl. die {card.plural}
+                  {t("word.plural")} die {card.plural}
                 </span>
               ) : null}
             </p>
@@ -176,7 +178,7 @@ export function ReviewSession({
               href={contextLink(card)}
               className="mt-2 inline-block text-[11px] text-[var(--ink-faint)] underline decoration-dotted underline-offset-4 hover:text-[var(--accent)]"
             >
-              {card.context.episodeTitle} · an der Stelle anhören
+              {card.context.episodeTitle} · {t("review.listenAgain")}
             </Link>
           </div>
         ) : null}
@@ -192,16 +194,16 @@ export function ReviewSession({
                 onClick={() => answer(option.grade)}
                 className={`btn flex-col py-2 ${option.tone}`}
               >
-                <span className="text-[13px] font-medium">{option.label}</span>
+                <span className="text-[13px] font-medium">{t(option.labelKey)}</span>
                 <span className="text-[10px] text-[var(--ink-faint)]">
-                  {option.hint} · {option.grade}
+                  {t(option.hintKey)} · {option.grade}
                 </span>
               </button>
             ))}
           </div>
         ) : (
           <button type="button" className="btn btn-primary w-full" onClick={() => setRevealed(true)}>
-            Aufdecken <kbd className="ml-1">Space</kbd>
+            {t("review.reveal")} <kbd className="ml-1">Space</kbd>
           </button>
         )}
       </div>

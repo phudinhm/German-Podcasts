@@ -14,6 +14,28 @@ const AUDIO_EXTENSIONS = /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac)(\?|#|$)/i;
 /** HLS. Safari plays it natively; other browsers need hls.js, which we do not bundle. */
 const HLS_EXTENSION = /\.m3u8(\?|#|$)/i;
 
+/**
+ * Podcast feeds are full of `http://` enclosures, and a browser on an https
+ * page refuses to load them as mixed content, which surfaces as an unhelpful
+ * "format not supported". Most of those CDNs serve the same path over https, so
+ * upgrading is the fix.
+ *
+ * It only applies on a secure page. On plain http there is no mixed-content
+ * rule to satisfy, and rewriting the scheme there breaks hosts that genuinely
+ * have no TLS - a local file server during development, most obviously.
+ */
+export function upgradeToHttps(raw: string): string {
+  if (!raw.startsWith("http://")) return raw;
+  if (typeof window !== "undefined" && window.location.protocol !== "https:") return raw;
+  return `https://${raw.slice("http://".length)}`;
+}
+
+/** True when this URL would be blocked as mixed content on the current page. */
+export function isMixedContent(raw: string): boolean {
+  if (typeof window === "undefined") return false;
+  return window.location.protocol === "https:" && raw.startsWith("http://");
+}
+
 export function parseYouTubeId(raw: string): string | null {
   const value = raw.trim();
   // A bare 11-character id is the most common thing people paste.

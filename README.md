@@ -37,6 +37,10 @@ name or a link from anywhere, and works out what can actually be played:
 Only YouTube *keyword* search needs a key (`YOUTUBE_API_KEY`); everything in
 that table works with nothing configured.
 
+**Interface in English by default**, with German and Vietnamese available from
+the header. The app teaches German rather than assuming it, so the chrome should
+never be the first hurdle. Typography is Roboto, the face YouTube uses.
+
 **Streams real audio and video**, always straight from the source with nothing
 proxied through this app. Beyond discovery you can also **attach a stream to any
 episode**: a YouTube link, a direct audio or video URL, or a file from your own
@@ -49,6 +53,21 @@ playable. It stays pinned to the top while the transcript scrolls underneath, so
 "slower" and "back ten seconds" are always one click away. Streaming works before
 a transcript exists: you get speed control and A-B looping from raw timestamps
 until ingest fills in the sentences.
+
+**Suggested shows, follow, and a rolling episode list.** The Listen page opens
+with twelve German shows grouped by CEFR level, each resolved through the same
+search as anything you type, so a moved feed cannot silently rot. Follow a show
+and it stays on the page. An episode list shows 40 at a time and pages onward,
+because a weekly programme has hundreds of back episodes.
+
+**Transcripts on demand, live captions when there is none.** A streamed episode
+that has been ingested opens its transcript on a click, in German alone or
+beside English or Vietnamese, with every sentence clickable. Most podcast audio
+has never been transcribed by anyone; for those the browser's own speech
+recognition produces live captions. It listens through the microphone, because
+recognition cannot read a media element and a cross-origin podcast stream cannot
+be captured without CORS headers, so play the audio out loud. Nothing is
+uploaded.
 
 **Curated catalog, graded by measurement.** Episodes carry a CEFR label produced
 by measuring lexical coverage against Goethe-Institut reference vocabulary,
@@ -259,7 +278,7 @@ npm run typecheck      # tsc --noEmit
 npm run build-catalog  # rebuild data/catalog from data/sources
 ```
 
-The tests cover syllabification, compound splitting, phonetic hazard detection,
+The tests cover the https upgrade and mixed-content rules, syllabification, compound splitting, phonetic hazard detection,
 lemmatisation, separable-prefix reunification, sentence deconstruction, RSS and
 YouTube Atom feed parsing, source-link classification for every provider, iTunes
 result mapping, channel-id and feed-link extraction, media-URL routing and the
