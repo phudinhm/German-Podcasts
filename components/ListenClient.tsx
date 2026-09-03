@@ -17,7 +17,18 @@ import { QuickLookup, type QuickSelection } from "./QuickLookup";
 import { DiscoverPanel } from "./listen/DiscoverPanel";
 import { Art } from "./listen/Art";
 
-const RECENT_KEY = "hoerbar.discover.v1";
+const RECENT_KEY = "hoerbar.discover.v2";
+const LEGACY_RECENT_KEY = "hoerbar.discover.v1";
+
+/**
+ * A recent search remembers what to run again and what to call it. Storing only
+ * the query meant a pasted Apple or Spotify URL showed up as a URL, which tells
+ * you nothing about which show it was.
+ */
+interface RecentEntry {
+  q: string;
+  label: string;
+}
 const PAGE_SIZE = 40;
 
 const ORIGIN_LABEL: Record<DiscoverResult["origin"], string> = {
@@ -58,7 +69,7 @@ export function ListenClient() {
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [visible, setVisible] = useState(PAGE_SIZE);
 
-  const [recent, setRecent] = useState<string[]>([]);
+  const [recent, setRecent] = useState<RecentEntry[]>([]);
   const [follows, setFollows] = useState<Subscription[]>([]);
   const [following, setFollowing] = useState(false);
 
@@ -76,6 +87,8 @@ export function ListenClient() {
 
   const [selection, setSelection] = useState<QuickSelection | null>(null);
   const [savedWords, setSavedWords] = useState<Set<string>>(new Set());
+  /** Everything but the player recedes right after you press play. */
+  const [focusMode, setFocusMode] = useState(false);
 
   const playing = player.track;
   const isYouTubeEpisode = playing?.kind === "youtube";
@@ -96,7 +109,17 @@ export function ListenClient() {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(RECENT_KEY);
-      if (raw) setRecent(JSON.parse(raw) as string[]);
+      if (raw) {
+        setRecent(JSON.parse(raw) as RecentEntry[]);
+      } else {
+        // Carry over the old plain-string list, labelled with itself.
+        const legacy = window.localStorage.getItem(LEGACY_RECENT_KEY);
+        if (legacy) {
+          const migrated = (JSON.parse(legacy) as string[]).map((q) => ({ q, label: q }));
+          setRecent(migrated);
+          window.localStorage.setItem(RECENT_KEY, JSON.stringify(migrated));
+        }
+      }
     } catch {
       // A corrupt convenience list is not worth surfacing.
     }
@@ -134,6 +157,16 @@ export function ListenClient() {
       }
       setFeed(data);
       if (data.error) setError(data.error);
+      // The feed knows the show's real name; use it for the recent list.
+      if (data.title) {
+        setRecent((previous) => {
+          const next = previous.map((item, index) =>
+            index === 0 ? { ...item, label: data.title } : item,
+          );
+          window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+          return next;
+        });
+      }
     } catch {
       setError("That feed could not be loaded.");
     } finally {
@@ -161,8 +194,14 @@ export function ListenClient() {
         if (data.error) setError(data.error);
         else if (found.length === 0) setError(t("listen.noResults"));
 
+        // Label it with the show as soon as one is known, rather than the URL
+        // the user happened to paste.
+        const label = found[0]?.title ?? term.trim();
         setRecent((previous) => {
-          const next = [term.trim(), ...previous.filter((item) => item !== term.trim())].slice(0, 8);
+          const next = [
+            { q: term.trim(), label },
+            ...previous.filter((item) => item.q !== term.trim()),
+          ].slice(0, 8);
           window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
           return next;
         });
@@ -233,6 +272,28 @@ export function ListenClient() {
   // Changing gloss language invalidates the cached title translations.
   useEffect(() => setTitles({}), [targetLang]);
 
+  /**
+   * Scrolling is the signal that the player has been dealt with and the page is
+   * wanted back. A pointer press counts too, so a dimmed control is never a
+   * dead control.
+   */
+  useEffect(() => {
+    if (!focusMode) return;
+    const lift = () => setFocusMode(false);
+    window.addEventListener("wheel", lift, { passive: true });
+    window.addEventListener("touchmove", lift, { passive: true });
+    window.addEventListener("scroll", lift, { passive: true });
+    window.addEventListener("keydown", lift);
+    window.addEventListener("pointerdown", lift);
+    return () => {
+      window.removeEventListener("wheel", lift);
+      window.removeEventListener("touchmove", lift);
+      window.removeEventListener("scroll", lift);
+      window.removeEventListener("keydown", lift);
+      window.removeEventListener("pointerdown", lift);
+    };
+  }, [focusMode]);
+
   const playEpisode = useCallback(
     (episode: FeedEpisode) => {
       const track: Track = {
@@ -251,6 +312,7 @@ export function ListenClient() {
       player.play(track);
       setShowText(false);
       setExpandedDescription(false);
+      setFocusMode(true);
       void loadTranscript(episode);
       window.setTimeout(() => playerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
     },
@@ -364,7 +426,7 @@ export function ListenClient() {
   return (
     <div className={sidePanel && playing && showText ? "lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6" : ""}>
       <div className="min-w-0">
-        <header className="mb-5 max-w-2xl">
+        <header className="mb-5 max-w-2xl" data-dim={playing ? focusMode : false}>
           <h1 className="text-[27px] font-semibold">{t("listen.title")}</h1>
           <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">{t("listen.lede")}</p>
         </header>
@@ -394,15 +456,16 @@ export function ListenClient() {
             <span>{t("listen.recent")}</span>
             {recent.map((item) => (
               <button
-                key={item}
+                key={item.q}
                 type="button"
                 className="max-w-[220px] truncate hover:text-[var(--accent)]"
+                title={item.q}
                 onClick={() => {
-                  setQuery(item);
-                  void search(item);
+                  setQuery(item.q);
+                  void search(item.q);
                 }}
               >
-                {item.replace(/^https?:\/\//, "")}
+                {item.label.replace(/^https?:\/\//, "")}
               </button>
             ))}
           </div>
@@ -501,6 +564,12 @@ export function ListenClient() {
               <StreamControls handle={player.handle} />
             </div>
 
+            {focusMode ? (
+              <p className="border-t border-[var(--rule)] px-4 py-1.5 text-[11px] text-[var(--ink-faint)]">
+                {t("listen.focusHint")}
+              </p>
+            ) : null}
+
             <div className="border-t border-[var(--rule)] px-4 py-3">
               {textControls}
               {showText && !sidePanel ? <div className="mt-3">{textPanel}</div> : null}
@@ -508,6 +577,7 @@ export function ListenClient() {
           </section>
         ) : null}
 
+        <div data-dim={playing ? focusMode : false}>
         {/* ---------------- results ---------------- */}
         {results && results.length > 0 && !feed ? (
           <section className="mt-6">
@@ -708,6 +778,7 @@ export function ListenClient() {
             }}
           />
         ) : null}
+        </div>
       </div>
 
       {/* ---------------- side panel, Spotify-lyrics style ---------------- */}

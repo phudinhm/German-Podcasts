@@ -288,3 +288,30 @@ input[type="range"] {
   font-size: 17px;
   line-height: 1.6;
 }
+
+/* --- focus mode --------------------------------------------------------- */
+
+/*
+ * While an episode is starting, everything that is not the player recedes.
+ * The dimming lifts on the first scroll, because scrolling is the signal that
+ * you have finished with the player and want the page back.
+ */
+[data-dim="true"] {
+  opacity: 0.28;
+  filter: saturate(0.6);
+  transition: opacity 420ms ease, filter 420ms ease;
+  pointer-events: none;
+}
+
+[data-dim="false"] {
+  opacity: 1;
+  filter: none;
+  transition: opacity 260ms ease, filter 260ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-dim="true"] {
+    opacity: 0.6;
+    filter: none;
+  }
+}

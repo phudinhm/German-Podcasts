@@ -36,6 +36,7 @@
     "data/lexicon/stems.extra.ts",
     "lib/server/feed.ts",
     "lib/media.ts",
-    "lib/server/discover.ts"
+    "lib/server/discover.ts",
+    "lib/audio/captions.ts"
   ]
 }
