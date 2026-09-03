@@ -37,6 +37,9 @@
     "lib/server/feed.ts",
     "lib/media.ts",
     "lib/server/discover.ts",
-    "lib/audio/captions.ts"
+    "lib/audio/captions.ts",
+    "lib/audio/segment.ts",
+    "lib/audio/proxy.ts",
+    "lib/audio/capture.ts"
   ]
 }

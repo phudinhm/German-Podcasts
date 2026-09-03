@@ -12,6 +12,7 @@ import {
 import { useMediaElement, type MediaElementState } from "./useMediaElement";
 import { useYouTube } from "./useYouTube";
 import { NOOP_PLAYER, type PlayerHandle } from "./types";
+import { proxied } from "@/lib/audio/proxy";
 
 export interface Track {
   /** Stable id, used to tell "same episode" from "new episode". */
@@ -43,6 +44,21 @@ interface PlayerContextValue {
    * Pass null when the page unmounts and the video docks into the mini bar.
    */
   setStage: (element: HTMLElement | null) => void;
+  /** The live media element, for taking an audio tap off it. */
+  mediaElement: () => HTMLMediaElement | null;
+  /**
+   * Routes the stream through this origin so Web Audio can read it. Costs us
+   * the bandwidth, so it is only switched on for in-browser transcription.
+   */
+  captureMode: boolean;
+  setCaptureMode: (on: boolean) => void;
+  /** True once a proxied source has failed, so captions can say why. */
+  captureFailed: boolean;
+  /**
+   * The persistent video layer, once mounted. Pages portal subtitles into it
+   * so they travel with the picture instead of with the page.
+   */
+  videoLayer: HTMLDivElement | null;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -70,14 +86,30 @@ export function usePlayer(): PlayerContextValue {
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [track, setTrack] = useState<Track | null>(null);
   const [stage, setStageElement] = useState<HTMLElement | null>(null);
+  const [captureMode, setCaptureModeState] = useState(false);
 
   const isYouTube = track?.kind === "youtube";
-  const media = useMediaElement(isYouTube ? null : (track?.url ?? null));
+  // In capture mode the very same audio is fetched through this origin, which
+  // is the only way a browser will let the audio graph read it.
+  const rawUrl = isYouTube ? null : (track?.url ?? null);
+  const media = useMediaElement(rawUrl && captureMode ? proxied(rawUrl) : rawUrl);
   const youtube = useYouTube(track?.youtubeId ?? null);
 
   const handle = isYouTube ? youtube.handle : track ? media.handle : NOOP_PLAYER;
 
+  /** Last position seen while the element was playing without error. */
+  const lastTimeRef = useRef(0);
+  const rememberTime = useCallback((event: React.SyntheticEvent<HTMLMediaElement>) => {
+    const element = event.currentTarget;
+    if (!element.error && element.currentTime > 0) lastTimeRef.current = element.currentTime;
+  }, []);
+
   const layerRef = useRef<HTMLDivElement | null>(null);
+  const [videoLayer, setVideoLayer] = useState<HTMLDivElement | null>(null);
+  const attachLayer = useCallback((element: HTMLDivElement | null) => {
+    layerRef.current = element;
+    setVideoLayer(element);
+  }, []);
 
   const play = useCallback(
     (next: Track) => {
@@ -101,6 +133,72 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const setStage = useCallback((element: HTMLElement | null) => {
     setStageElement(element);
   }, []);
+
+  /**
+   * Switching the source swaps the element's URL, which resets it. Position and
+   * play state are restored so turning captions on does not feel like starting
+   * the episode again.
+   */
+  const setCaptureMode = useCallback(
+    (on: boolean) => {
+      const element = media.mediaRef.current;
+      // An element that has already failed reports 0, so the last position seen
+      // while it was healthy is the one worth restoring.
+      const live = element?.currentTime ?? 0;
+      const at = element?.error || live === 0 ? Math.max(live, lastTimeRef.current) : live;
+      const wasPlaying = Boolean(element && !element.paused);
+      setCaptureModeState(on);
+      window.setTimeout(() => {
+        const next = media.mediaRef.current;
+        if (!next) return;
+        try {
+          next.currentTime = at;
+        } catch {
+          // Metadata may not have arrived yet; the seek is retried below.
+        }
+        const restore = () => {
+          try {
+            next.currentTime = at;
+          } catch {
+            // Nothing more to do; playback simply starts from the beginning.
+          }
+          if (wasPlaying) void next.play().catch(() => undefined);
+          next.removeEventListener("loadedmetadata", restore);
+        };
+        next.addEventListener("loadedmetadata", restore);
+      }, 60);
+    },
+    [media.mediaRef],
+  );
+
+  // A new episode always starts on the cheap path.
+  useEffect(() => {
+    setCaptureModeState(false);
+    setCaptureFailed(false);
+    lastTimeRef.current = 0;
+  }, [track?.id]);
+
+  /**
+   * Playback matters more than captions. If the proxied source will not load -
+   * a CDN that refuses our server, a redirect we cannot follow, a timeout - the
+   * element falls straight back to the publisher's URL. The user keeps the
+   * episode and loses only the in-page transcription, which is the right way
+   * round.
+   */
+  const captureFailedRef = useRef(false);
+  const [captureFailed, setCaptureFailed] = useState(false);
+  useEffect(() => {
+    if (!captureMode) {
+      captureFailedRef.current = false;
+      return;
+    }
+    if (!media.state.error || captureFailedRef.current) return;
+    captureFailedRef.current = true;
+    setCaptureFailed(true);
+    setCaptureMode(false);
+    // The proxied element never played, so nothing above knows it should.
+    window.setTimeout(() => void media.mediaRef.current?.play().catch(() => undefined), 300);
+  }, [captureMode, media.state.error, setCaptureMode, media.mediaRef]);
 
   /**
    * Keeps the video layer glued to the stage rectangle. A rAF loop rather than
@@ -160,8 +258,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       src: media.src,
       youtubeUnavailable: youtube.unavailable,
       setStage,
+      mediaElement: () => media.mediaRef.current,
+      captureMode,
+      setCaptureMode,
+      captureFailed,
+      videoLayer,
     }),
-    [track, play, stop, handle, media.state, media.retry, media.src, youtube.unavailable, setStage],
+    [
+      track,
+      play,
+      stop,
+      handle,
+      media.state,
+      media.retry,
+      media.src,
+      media.mediaRef,
+      youtube.unavailable,
+      setStage,
+      captureMode,
+      setCaptureMode,
+      captureFailed,
+      videoLayer,
+    ],
   );
 
   return (
@@ -174,13 +292,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           ref={media.mediaRef as React.RefObject<HTMLAudioElement>}
           src={media.src ?? undefined}
           preload="metadata"
+          onTimeUpdate={rememberTime}
+          // Only meaningful in capture mode, where the source is same-origin;
+          // setting it on a cross-origin CDN stream is what broke playback once.
+          crossOrigin={captureMode ? "anonymous" : undefined}
           className="hidden"
         />
       ) : null}
 
       {track && track.kind === "video" ? (
         <div
-          ref={layerRef}
+          ref={attachLayer}
           className="fixed z-[60] overflow-hidden bg-black shadow-lg transition-[opacity] duration-150"
           style={{ top: 0, left: 0, width: 0, height: 0 }}
         >
@@ -190,6 +312,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             poster={track.artwork ?? undefined}
             playsInline
             preload="metadata"
+            onTimeUpdate={rememberTime}
+            crossOrigin={captureMode ? "anonymous" : undefined}
             className="h-full w-full object-contain"
           />
         </div>
@@ -197,7 +321,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       {track && track.kind === "youtube" ? (
         <div
-          ref={layerRef}
+          ref={attachLayer}
           className="fixed z-[60] overflow-hidden bg-black shadow-lg"
           style={{ top: 0, left: 0, width: 0, height: 0 }}
         >

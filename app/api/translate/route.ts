@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { translate, hasTranslationProvider } from "@/lib/server/translate";
+import { translate } from "@/lib/server/translate";
 import type { TargetLang } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -29,20 +29,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "text or texts is required" }, { status: 400 });
   }
 
-  if (!hasTranslationProvider()) {
-    return NextResponse.json(
-      {
-        text: null,
-        texts: texts ? texts.map(() => null) : undefined,
-        source: "none",
-        note: "No translation provider configured.",
-      },
-      { status: 200 },
-    );
-  }
-
   if (texts?.length) {
-    const results = await Promise.all(texts.map((item) => translate(item, lang)));
+    // Sequential rather than parallel: the keyless fallback is rate limited,
+    // and forty simultaneous requests is the fastest way to be cut off.
+    const results = [];
+    for (const item of texts) results.push(await translate(item, lang));
     return NextResponse.json({
       texts: results.map((result) => result.text),
       source: results[0]?.source ?? "none",

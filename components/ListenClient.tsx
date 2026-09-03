@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { FeedEpisode, FeedResult } from "@/lib/server/feed";
 import type { DiscoverResult } from "@/lib/server/discover";
 import type { Segment, TargetLang } from "@/lib/types";
@@ -12,7 +13,9 @@ import { usePlayer, useVideoStage, type Track } from "./player/PlayerProvider";
 import { Transport } from "./player/Transport";
 import { StreamControls } from "./StreamControls";
 import { EpisodeTranscript } from "./EpisodeTranscript";
-import { LiveCaption } from "./LiveCaption";
+import { useCaptions, type CaptionLine, type CaptionMode } from "./captions/useCaptions";
+import { CaptionPanel } from "./captions/CaptionPanel";
+import { SubtitleButton, SubtitleOverlay, type SubtitleMode } from "./captions/SubtitleOverlay";
 import { QuickLookup, type QuickSelection } from "./QuickLookup";
 import { DiscoverPanel } from "./listen/DiscoverPanel";
 import { Art } from "./listen/Art";
@@ -85,6 +88,9 @@ export function ListenClient() {
   const [titles, setTitles] = useState<Record<string, string>>({});
   const [translateTitles, setTranslateTitles] = useState(false);
 
+  const [captionMode, setCaptionMode] = useState<CaptionMode>("internal");
+  const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>("off");
+
   const [selection, setSelection] = useState<QuickSelection | null>(null);
   const [savedWords, setSavedWords] = useState<Set<string>>(new Set());
   /** Everything but the player recedes right after you press play. */
@@ -95,6 +101,51 @@ export function ListenClient() {
   const isVideo = playing?.kind === "video";
   const stageRef = useVideoStage(Boolean(playing) && (isYouTubeEpisode || isVideo));
   const playerRef = useRef<HTMLDivElement | null>(null);
+
+  const captions = useCaptions({
+    handle: player.handle,
+    mediaElement: player.mediaElement,
+    targetLang,
+    translate: dual,
+    onNeedCapture: player.setCaptureMode,
+    captureFailed: player.captureFailed,
+  });
+
+  /**
+   * Subtitles read from the finished transcript when there is one, and from the
+   * live recogniser when there is not. Same shape either way, so the overlay
+   * does not care which produced them.
+   */
+  const subtitleLines: CaptionLine[] = useMemo(() => {
+    if (transcript && transcript.length > 0) {
+      return transcript.map((segment) => ({
+        id: segment.id,
+        at: segment.start,
+        until: segment.end,
+        de: segment.de,
+        translation: targetLang === "vi" ? segment.vi : segment.en,
+      }));
+    }
+    return captions.state.lines;
+  }, [transcript, targetLang, captions.state.lines]);
+
+  // Subtitles over a video with no transcript need the recogniser running.
+  const startCaptions = captions.start;
+  useEffect(() => {
+    if (subtitleMode === "off") return;
+    if (transcript === null || transcript.length > 0) return;
+    if (captions.state.running) return;
+    startCaptions(captionMode);
+  }, [subtitleMode, transcript, captions.state.running, startCaptions, captionMode]);
+
+  // A new episode is new ground: drop the old lines and release the tap.
+  const stopCaptions = captions.stop;
+  const clearCaptions = captions.clear;
+  const trackId = playing?.id ?? null;
+  useEffect(() => {
+    stopCaptions();
+    clearCaptions();
+  }, [trackId, stopCaptions, clearCaptions]);
 
   const refreshFollows = useCallback(() => setFollows(listSubscriptions()), []);
   const refreshSaved = useCallback(() => {
@@ -357,17 +408,34 @@ export function ListenClient() {
     return (
       <div>
         <p className="mb-3 text-[12.5px] text-[var(--ink-faint)]">{t("listen.noTranscriptYet")}</p>
-        <LiveCaption
-          handle={player.handle}
-          targetLang={targetLang}
-          showTranslation={dual}
+        <CaptionPanel
+          state={captions.state}
+          mode={captionMode}
+          onMode={setCaptionMode}
+          onStart={() => captions.start(captionMode)}
+          onStop={captions.stop}
+          onClear={captions.clear}
           onSeek={(seconds) => player.handle.seekTo(seconds, true)}
+          showTranslation={dual}
           onWord={onWord}
           savedWords={savedWords}
         />
       </div>
     );
-  }, [playing, transcript, player.handle, targetLang, dual, columns, sidePanel, onWord, savedWords, t]);
+  }, [
+    playing,
+    transcript,
+    player.handle,
+    targetLang,
+    dual,
+    columns,
+    sidePanel,
+    onWord,
+    savedWords,
+    t,
+    captions,
+    captionMode,
+  ]);
 
   const textControls = (
     <div className="flex flex-wrap items-center gap-2">
@@ -512,6 +580,16 @@ export function ListenClient() {
                     {/* The video itself lives in the persistent layer and is
                         positioned over this box, so it survives navigation. */}
                     <div ref={stageRef} className="aspect-video w-full rounded-xl bg-black" />
+                    {player.videoLayer
+                      ? createPortal(
+                          <SubtitleOverlay
+                            handle={player.handle}
+                            lines={subtitleLines}
+                            mode={subtitleMode}
+                          />,
+                          player.videoLayer,
+                        )
+                      : null}
                     {isYouTubeEpisode && player.youtubeUnavailable ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-[var(--paper-raised)] p-4 text-center">
                         <p className="text-[13px] text-[var(--ink-soft)]">{t("listen.playerBlocked")}</p>
@@ -524,6 +602,18 @@ export function ListenClient() {
                           {t("listen.openOnYouTube")}
                         </a>
                       </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {playing.kind !== "audio" ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SubtitleButton mode={subtitleMode} onChange={setSubtitleMode} />
+                    {subtitleMode !== "off" && captions.state.whisper.state === "loading" ? (
+                      <span className="text-[11.5px] text-[var(--ink-faint)]">
+                        {t("caption.loadingModel")}{" "}
+                        {Math.round((captions.state.whisper.progress ?? 0) * 100)}%
+                      </span>
                     ) : null}
                   </div>
                 ) : null}

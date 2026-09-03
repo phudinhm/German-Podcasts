@@ -9,14 +9,23 @@ import type { TargetLang } from "../types";
 
 const DEEPL_TARGET: Record<TargetLang, string> = { en: "EN-GB", vi: "VI" };
 
-export type TranslationSource = "deepl" | "google" | "anthropic" | "none";
+export type TranslationSource = "deepl" | "google" | "anthropic" | "mymemory" | "none";
 
 export interface TranslationResult {
   text: string | null;
   source: TranslationSource;
 }
 
+/**
+ * There is always a provider now: MyMemory needs no key. The configured ones
+ * are better and are tried first, but translation is never simply unavailable,
+ * which matters because captions are useless to a learner without it.
+ */
 export function hasTranslationProvider(): boolean {
+  return true;
+}
+
+export function hasKeyedProvider(): boolean {
   return Boolean(
     process.env.DEEPL_API_KEY ||
       process.env.GOOGLE_TRANSLATE_API_KEY ||
@@ -36,7 +45,75 @@ export async function translate(text: string, lang: TargetLang): Promise<Transla
   const anthropic = await translateWithAnthropic(text, lang);
   if (anthropic) return { text: anthropic, source: "anthropic" };
 
+  const free = await translateWithMyMemory(text, lang);
+  if (free) return { text: free, source: "mymemory" };
+
   return { text: null, source: "none" };
+}
+
+/** Longest string MyMemory accepts in one request. */
+const MYMEMORY_LIMIT = 500;
+
+/**
+ * MyMemory: a public translation API with no key and a daily quota.
+ *
+ * It is the fallback rather than the default because quality is well below
+ * DeepL, and because an anonymous quota is shared across everyone deploying
+ * this. But it means a fresh clone translates captions out of the box, which
+ * is the difference between the feature existing and not.
+ */
+async function translateWithMyMemory(text: string, lang: TargetLang): Promise<string | null> {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  // Long input is split on sentence boundaries and reassembled.
+  const parts: string[] = [];
+  if (trimmed.length <= MYMEMORY_LIMIT) {
+    parts.push(trimmed);
+  } else {
+    let buffer = "";
+    for (const sentence of trimmed.split(/(?<=[.!?])\s+/)) {
+      if ((buffer + " " + sentence).trim().length > MYMEMORY_LIMIT) {
+        if (buffer) parts.push(buffer.trim());
+        buffer = sentence.slice(0, MYMEMORY_LIMIT);
+      } else {
+        buffer = `${buffer} ${sentence}`.trim();
+      }
+    }
+    if (buffer) parts.push(buffer.trim());
+  }
+
+  const out: string[] = [];
+  for (const part of parts) {
+    try {
+      const params = new URLSearchParams({ q: part, langpair: `de|${lang}` });
+      const email = process.env.MYMEMORY_EMAIL;
+      // Supplying a contact address raises the anonymous quota.
+      if (email) params.set("de", email);
+      const response = await fetch(`https://api.mymemory.translated.net/get?${params}`, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(9000),
+        next: { revalidate: 86_400 },
+      });
+      if (!response.ok) return null;
+      const data = (await response.json()) as {
+        responseStatus?: number | string;
+        responseData?: { translatedText?: string };
+      };
+      const status = Number(data.responseStatus);
+      const translated = data.responseData?.translatedText;
+      // The service reports quota and error conditions in the payload text.
+      if (status !== 200 || !translated || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(translated)) {
+        return null;
+      }
+      out.push(translated);
+    } catch (error) {
+      console.error("[translate] MyMemory request failed:", error);
+      return null;
+    }
+  }
+
+  return out.join(" ") || null;
 }
 
 async function translateWithDeepL(text: string, lang: TargetLang): Promise<string | null> {
