@@ -52,7 +52,9 @@ export type MediaSource =
   /** Streamed from YouTube through the IFrame Player API. */
   | { kind: "youtube"; youtubeId: string; pageUrl?: string }
   /** Streamed straight from a podcast CDN as an <audio> element. */
-  | { kind: "audio"; audioUrl: string; pageUrl?: string }
+  | { kind: "audio"; audioUrl: string; pageUrl?: string; poster?: string }
+  /** A direct video stream (mp4, webm, or an HLS playlist where supported). */
+  | { kind: "video"; videoUrl: string; pageUrl?: string; poster?: string }
   /**
    * No media attached yet. The player runs a virtual clock over the transcript
    * timeline, so every sync, loop and drill feature still works while the

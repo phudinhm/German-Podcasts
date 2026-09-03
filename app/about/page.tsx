@@ -24,6 +24,31 @@ export default function AboutPage() {
         Serverkosten nicht mit der Übungszeit wachsen.
       </p>
 
+      <Section title="Woher der Ton kommt">
+        <p>
+          Hörbar hostet keine Medien. Was du hörst, kommt direkt vom Server des Anbieters in deinen
+          Browser: von YouTube, vom CDN eines Podcasts oder aus einer Datei auf deinem Rechner. Diese
+          App liest bei einem RSS-Feed nur die Liste der Folgen und gibt die echten Enclosure-Adressen
+          zurück; die Mediendaten laufen nie über unseren Server. Deshalb wächst die Rechnung nicht
+          mit, wenn du viel hörst.
+        </p>
+        <p>
+          Drei Wege hinein: einen öffentlichen Podcast-Feed unter{" "}
+          <Link href="/listen" className="underline decoration-dotted underline-offset-4">
+            Direkt hören
+          </Link>{" "}
+          einfügen und sofort abspielen; auf einer Folgenseite über &bdquo;Stream verbinden&ldquo; einen
+          YouTube-Link, eine Audio- oder Videoadresse oder eine lokale Datei anhängen; oder eine Folge
+          nehmen, die der Ingest-Worker schon mit Transkript versehen hat.
+        </p>
+        <p>
+          Ohne Transkript funktionieren Tempo-Regelung und A-B-Schleife über reine Zeitmarken. Sobald
+          ein Transkript existiert, treten Satz-Synchronisierung, Wörterbuch und Echo-Pausen an ihre
+          Stelle. Die angehängte Adresse merkt sich dieser Browser; lokale Dateien gelten nur für die
+          laufende Sitzung, weil ihre Adresse nach einem Neuladen nichts mehr bedeutet.
+        </p>
+      </Section>
+
       <Section title="Einstufung nach GER">
         <p>
           Jedes Transkript wird gegen die Goethe-Wortlisten gemessen. Wir zählen, wie viele Token in

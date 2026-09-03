@@ -5,8 +5,12 @@ import Link from "next/link";
 import type { Episode, Segment, TargetLang } from "@/lib/types";
 import type { RenderedWord } from "@/lib/german/render";
 import { useYouTube } from "./player/useYouTube";
-import { useAudio } from "./player/useAudio";
+import { useMediaElement } from "./player/useMediaElement";
 import { useTimeline } from "./player/useTimeline";
+import { Transport } from "./player/Transport";
+import { MediaAttach } from "./MediaAttach";
+import { StreamControls } from "./StreamControls";
+import { resolveMedia, type StoredMedia } from "@/lib/mediaStore";
 import { useShadowEngine, type ShadowMode } from "./player/useShadowEngine";
 import { NOOP_PLAYER } from "./player/types";
 import { Transcript } from "./Transcript";
@@ -30,20 +34,32 @@ interface Props {
 }
 
 export function WatchClient({ episode, initialTime = 0, initialSegmentId, initialMode }: Props) {
-  const source = episode.source;
+  // A stream the learner attached themselves wins over whatever the catalog
+  // shipped, so a transcript-only episode becomes playable without a redeploy.
+  const [attached, setAttached] = useState<StoredMedia | null>(null);
+  const refreshMedia = useCallback(() => setAttached(resolveMedia(episode.slug)), [episode.slug]);
+
+  useEffect(() => {
+    refreshMedia();
+    window.addEventListener("hoerbar:media-changed", refreshMedia);
+    return () => window.removeEventListener("hoerbar:media-changed", refreshMedia);
+  }, [refreshMedia]);
+
+  const source = attached?.source ?? episode.source;
   const youtubeId = source.kind === "youtube" ? source.youtubeId : null;
-  const audioUrl = source.kind === "audio" ? source.audioUrl : null;
+  const streamUrl =
+    source.kind === "audio" ? source.audioUrl : source.kind === "video" ? source.videoUrl : null;
 
   const youtube = useYouTube(youtubeId);
-  const audio = useAudio(audioUrl);
+  const media = useMediaElement(streamUrl);
   const timeline = useTimeline(episode.durationSec);
 
   const handle = useMemo(() => {
     if (source.kind === "youtube") return youtube.handle;
-    if (source.kind === "audio") return audio.handle;
+    if (source.kind === "audio" || source.kind === "video") return media.handle;
     if (source.kind === "timeline") return timeline.handle;
     return NOOP_PLAYER;
-  }, [source.kind, youtube.handle, audio.handle, timeline.handle]);
+  }, [source.kind, youtube.handle, media.handle, timeline.handle]);
 
   const [values, setValues] = useState<ControlValues>({
     mode: initialMode ?? "free",
@@ -285,14 +301,62 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
               className="aspect-video w-full overflow-hidden rounded-xl border border-[var(--rule)] bg-black [&_iframe]:h-full [&_iframe]:w-full"
             />
           ) : null}
+          {source.kind === "video" ? (
+            <video
+              ref={media.mediaRef as React.RefObject<HTMLVideoElement>}
+              src={streamUrl ?? undefined}
+              poster={source.poster}
+              playsInline
+              preload="metadata"
+              crossOrigin="anonymous"
+              className="aspect-video w-full rounded-xl border border-[var(--rule)] bg-black"
+            />
+          ) : null}
           {source.kind === "audio" ? (
-            <audio ref={audio.audioRef} src={audioUrl ?? undefined} controls className="w-full" preload="metadata" />
+            <audio
+              ref={media.mediaRef as React.RefObject<HTMLAudioElement>}
+              src={streamUrl ?? undefined}
+              preload="metadata"
+              className="hidden"
+            />
           ) : null}
           {source.kind === "timeline" ? (
-            <TimelineNotice progressRef={engine.progressRef} />
+            <TimelineNotice progressRef={engine.progressRef} slug={episode.slug} onChange={refreshMedia} />
           ) : null}
-          {source.kind === "pending" ? <PendingNotice episode={episode} /> : null}
+          {source.kind === "pending" ? (
+            <PendingNotice episode={episode} onChange={refreshMedia} />
+          ) : null}
+
+          {source.kind !== "timeline" && source.kind !== "pending" ? (
+            <div className="mt-2">
+              <MediaAttach slug={episode.slug} current={attached} onChange={refreshMedia} />
+            </div>
+          ) : null}
         </div>
+
+        {/*
+          The transport sits directly in the column, not inside the media block:
+          a sticky element can only stick within its own parent, and the media
+          block is only a few hundred pixels tall. The transcript scrolls itself
+          to follow playback, so without this the transport is far up the page
+          by the second sentence - exactly when you reach for slower or back.
+        */}
+        {source.kind === "audio" || source.kind === "video" ? (
+          <div className="sticky top-[50px] z-30 -mx-1 mb-4 rounded-xl bg-[color-mix(in_oklab,var(--paper)_90%,transparent)] px-1 py-1 backdrop-blur">
+            <Transport handle={handle} state={media.state} onRetry={media.retry} />
+          </div>
+        ) : null}
+
+        {episode.transcript.length === 0 && (source.kind === "audio" || source.kind === "video" || source.kind === "youtube") ? (
+          <div className="mb-4">
+            <StreamControls handle={handle} />
+            <p className="mt-2 text-[12px] leading-relaxed text-[var(--ink-faint)]">
+              Diese Folge streamt schon, hat aber noch kein Transkript. Sobald der Ingest-Worker
+              gelaufen ist, treten Satz-Synchronisierung, Wörterbuch und Echo-Modus an die Stelle
+              dieser einfachen A-B-Schleife.
+            </p>
+          </div>
+        ) : null}
 
         {episode.transcript.length > 0 ? (
           <>
@@ -382,14 +446,25 @@ function EpisodeHeader({ episode }: { episode: Episode }) {
   );
 }
 
-function TimelineNotice({ progressRef }: { progressRef: React.RefObject<HTMLElement | null> }) {
+function TimelineNotice({
+  progressRef,
+  slug,
+  onChange,
+}: {
+  progressRef: React.RefObject<HTMLElement | null>;
+  slug: string;
+  onChange: () => void;
+}) {
   return (
     <div className="card p-4">
       <p className="text-[13px] leading-relaxed text-[var(--ink-soft)]">
         Diese Folge läuft auf der Transkript-Zeitachse, ohne Ton. Alles andere funktioniert schon:
         Satz-Synchronisierung, Wort-Teleprompter, Schleifen, Echo-Pausen, Wörterbuch und Vokabelheft.
-        Sobald der Ingest-Worker eine Aufnahme anhängt, spielt genau dieselbe Ansicht das echte Audio.
+        Verbinde einen Stream, und genau dieselbe Ansicht spielt echtes Audio oder Video.
       </p>
+      <div className="mt-3">
+        <MediaAttach slug={slug} current={null} onChange={onChange} />
+      </div>
       <div
         ref={progressRef as React.RefObject<HTMLDivElement>}
         className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--rule)]"
@@ -403,7 +478,7 @@ function TimelineNotice({ progressRef }: { progressRef: React.RefObject<HTMLElem
   );
 }
 
-function PendingNotice({ episode }: { episode: Episode }) {
+function PendingNotice({ episode, onChange }: { episode: Episode; onChange: () => void }) {
   const hint = episode.source.kind === "pending" ? episode.source.ingestHint : undefined;
   const pageUrl = episode.source.kind === "pending" ? episode.source.pageUrl : undefined;
   return (
@@ -419,15 +494,25 @@ function PendingNotice({ episode }: { episode: Episode }) {
           {hint}
         </pre>
       ) : null}
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         {pageUrl ? (
           <a href={pageUrl} target="_blank" rel="noreferrer noopener" className="btn">
             Zur Sendung
           </a>
         ) : null}
+        <Link href="/listen" className="btn">
+          Podcast-Feed streamen
+        </Link>
         <Link href="/about" className="btn">
           Wie der Ingest läuft
         </Link>
+      </div>
+      <div className="mt-3 border-t border-[var(--rule)] pt-3">
+        <p className="mb-2 text-[12px] text-[var(--ink-soft)]">
+          Du kannst schon jetzt hören: verbinde einen Stream und nutze Tempo, Sprungmarken und
+          A-B-Schleife. Sätze und Wörterbuch kommen mit dem Transkript dazu.
+        </p>
+        <MediaAttach slug={episode.slug} current={null} onChange={onChange} />
       </div>
     </div>
   );

@@ -21,6 +21,24 @@ No API keys, no database, no accounts required to run it.
 
 ## What it does
 
+**Streams real audio and video.** Three ways in, all of them playing straight
+from the source with nothing proxied through this app:
+
+- **Paste a podcast RSS feed** on the Direkt hören page and play any episode
+  immediately. The server reads the feed and hands back the real enclosure URLs;
+  the browser streams them from the publisher's CDN.
+- **Attach a stream to any episode**: a YouTube link, a direct audio or video
+  URL, or a file from your own machine. The attachment is remembered per
+  episode in your browser, and the same synchronised transcript view plays it.
+- **YouTube** through the IFrame Player API, for video podcasts.
+
+The transport shows what a stream actually needs: how far it has buffered ahead,
+whether it is stalled, and a readable message when a URL turns out not to be
+playable. It stays pinned to the top while the transcript scrolls underneath, so
+"slower" and "back ten seconds" are always one click away. Streaming works before
+a transcript exists: you get speed control and A-B looping from raw timestamps
+until ingest fills in the sentences.
+
 **Curated catalog, graded by measurement.** Episodes carry a CEFR label produced
 by measuring lexical coverage against Goethe-Institut reference vocabulary,
 not by guesswork. Compounds are scored by their members (*Straßenbahn* is
@@ -131,11 +149,12 @@ Everything is optional. Copy `.env.example` to `.env.local` for the extras.
 
 ### Without any keys
 
-Working: the catalog, sentence and word synchronisation, looping, echo gaps,
-tempo ramps, hotkeys, phonetic hazard marking, compound stress, the 333-entry
-offline dictionary, the vocabulary vault with SM-2 review and export, the
-rule-based grammar deconstructor, precomputed quizzes, recording with pitch
-contour and on-device word scoring.
+Working: streaming from RSS feeds, YouTube, direct media URLs and local files;
+the catalog; sentence and word synchronisation; looping, echo gaps, tempo ramps
+and hotkeys; phonetic hazard marking and compound stress; the 333-entry offline
+dictionary; the vocabulary vault with SM-2 review and export; the rule-based
+grammar deconstructor; precomputed quizzes; recording with pitch contour and
+on-device word scoring.
 
 Degraded: clicking a word outside the bundled lexicon returns a phonetic
 breakdown and says so rather than a translation; sentence translations for
@@ -164,7 +183,17 @@ the transcript payloads and the occasional API route.
 no transcript yet. They render as cards that link out and print the ingest
 command. Edit that file to change the shelf.
 
-### A real episode
+### Just listen to something now
+
+Open **Direkt hören**, paste a public podcast RSS URL, and play. No ingest, no
+transcript, no waiting. You get tempo control and an A-B loop straight away.
+
+Some publishers only serve their feed to podcast apps and will answer 403. In
+that case copy a single episode's media URL and attach it on the episode page
+with **Stream verbinden**; the browser fetches it directly, so the publisher's
+feed policy does not apply.
+
+### A real episode, with a transcript
 
 ```bash
 python worker/ingest.py --url 'https://www.youtube.com/watch?v=...' --level B1
@@ -189,7 +218,8 @@ ratio, all three SDM inputs and the hardest words to articulate.
 The three demo episodes are **original German scripts written for this project**
 (CC BY 4.0), laid out on a transcript timeline with no audio attached. They
 exist so every feature is visible on a fresh clone without waiting on a
-transcription run. Their word timings are synthesised from syllable counts at a
+transcription run; attach any stream to one with **Stream verbinden** and the
+same view plays real media against the same transcript. Their word timings are synthesised from syllable counts at a
 level-appropriate rate; they are not measurements of a recording. Run the ingest
 worker to replace them with real forced alignment.
 
@@ -213,5 +243,12 @@ npm run build-catalog  # rebuild data/catalog from data/sources
 ```
 
 The tests cover syllabification, compound splitting, phonetic hazard detection,
-lemmatisation, separable-prefix reunification and sentence deconstruction. That
-is where the correctness risk lives; the UI is comparatively forgiving.
+lemmatisation, separable-prefix reunification, sentence deconstruction, RSS feed
+parsing, media-URL routing and the SSRF guard on the feed endpoint. That is where
+the correctness risk lives; the UI is comparatively forgiving.
+
+Streaming is verified in a real browser against a range-serving HTTP endpoint:
+metadata load, playback, seeking from the transport and from a transcript
+sentence, buffered reporting, `preservesPitch` under a tempo ramp, the echo
+protocol muting and gapping, attachment persistence across a reload, and the
+error path for a URL that is not playable.

@@ -32,6 +32,8 @@
     "data/lexicon/goethe.ts",
     "data/lexicon/irregular-verbs.ts",
     "data/lexicon/proper-nouns.ts",
-    "data/lexicon/stems.extra.ts"
+    "data/lexicon/stems.extra.ts",
+    "lib/server/feed.ts",
+    "lib/media.ts"
   ]
 }
