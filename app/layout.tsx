@@ -3,6 +3,8 @@ import "./globals.css";
 import { UiLangProvider } from "@/components/UiLangProvider";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
+import { PlayerProvider } from "@/components/player/PlayerProvider";
+import { MiniPlayer } from "@/components/player/MiniPlayer";
 
 export const metadata: Metadata = {
   title: {
@@ -34,17 +36,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen antialiased">
+      <body className="flex min-h-screen flex-col antialiased">
         <UiLangProvider>
+          <PlayerProvider>
           <header className="sticky top-0 z-40 border-b border-[var(--rule)] bg-[color-mix(in_oklab,var(--paper)_92%,transparent)] backdrop-blur">
             <Nav />
           </header>
 
-          <main className="mx-auto max-w-6xl px-4 py-7 sm:px-5">{children}</main>
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-7 sm:px-5">{children}</main>
 
-          <footer className="mt-16 border-t border-[var(--rule)]">
+          <footer className="mt-16 border-t border-[var(--rule)] pb-24">
             <Footer />
           </footer>
+
+          <MiniPlayer />
+          </PlayerProvider>
         </UiLangProvider>
       </body>
     </html>

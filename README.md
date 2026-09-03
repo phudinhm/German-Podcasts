@@ -54,15 +54,31 @@ playable. It stays pinned to the top while the transcript scrolls underneath, so
 a transcript exists: you get speed control and A-B looping from raw timestamps
 until ingest fills in the sentences.
 
+**Playback survives navigation.** The media elements are mounted once, above
+the page tree, so moving between Listen, Catalog and Vocabulary does not stop
+the audio. A mini bar at the bottom keeps the controls reachable. Video is
+harder, because a YouTube iframe cannot be moved in the DOM without reloading,
+so it lives in one fixed layer that is positioned over whatever "stage" the
+current page registers, and shrinks into the mini bar when there is none.
+
 **Suggested shows, follow, and a rolling episode list.** The Listen page opens
-with twelve German shows grouped by CEFR level, each resolved through the same
-search as anything you type, so a moved feed cannot silently rot. Follow a show
-and it stays on the page. An episode list shows 40 at a time and pages onward,
-because a weekly programme has hundreds of back episodes.
+with 45 German shows grouped by CEFR level and browsable by topic, each resolved
+through the same search as anything you type, so a moved feed cannot silently
+rot. Alongside them the live Apple Podcasts chart for Germany, which updates
+itself. Fifteen of the curated entries are broadcasters rather than podcast
+studios: tagesschau, heute journal, Deutschlandfunk, the regional stations, so
+news audio and video sit next to the podcasts. Follow a show and it stays on the
+page. An episode list shows 40 at a time and pages onward, because a weekly
+programme has hundreds of back episodes.
 
 **Transcripts on demand, live captions when there is none.** A streamed episode
-that has been ingested opens its transcript on a click, in German alone or
-beside English or Vietnamese, with every sentence clickable. Most podcast audio
+that has been ingested opens its transcript on a click, in German alone, stacked
+with a translation, or in two columns side by side. The translation is
+deliberately smaller and dimmer than the German so the eye lands on the original
+first. Either view can move into a side panel, the way lyrics sit beside a track.
+Every word is clickable for a dictionary entry and one-click saving, and
+selecting a run of words looks up the phrase instead. Episode titles can be
+translated in a batch. Most podcast audio
 has never been transcribed by anyone; for those the browser's own speech
 recognition produces live captions. It listens through the microphone, because
 recognition cannot read a media element and a cross-origin podcast stream cannot

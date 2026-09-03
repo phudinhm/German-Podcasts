@@ -23,6 +23,7 @@ import { LevelBadge } from "./LevelBadge";
 import { ShadowingBadge } from "./ShadowingBadge";
 import { loadSettings, loadVault, saveSettings } from "@/lib/vault";
 import { useUi } from "@/lib/i18n";
+import { FindSourceButton } from "./FindSourceButton";
 
 interface Props {
   episode: Episode;
@@ -322,7 +323,13 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
             />
           ) : null}
           {source.kind === "timeline" ? (
-            <TimelineNotice progressRef={engine.progressRef} slug={episode.slug} onChange={refreshMedia} />
+            <TimelineNotice
+              progressRef={engine.progressRef}
+              slug={episode.slug}
+              title={episode.title}
+              publisher={episode.publisher}
+              onChange={refreshMedia}
+            />
           ) : null}
           {source.kind === "pending" ? (
             <PendingNotice episode={episode} onChange={refreshMedia} />
@@ -449,17 +456,22 @@ function EpisodeHeader({ episode }: { episode: Episode }) {
 function TimelineNotice({
   progressRef,
   slug,
+  title,
+  publisher,
   onChange,
 }: {
   progressRef: React.RefObject<HTMLElement | null>;
   slug: string;
+  title: string;
+  publisher: string;
   onChange: () => void;
 }) {
   const { t } = useUi();
   return (
     <div className="card p-4">
       <p className="text-[13px] leading-relaxed text-[var(--ink-soft)]">{t("watch.timelineNotice")}</p>
-      <div className="mt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <FindSourceButton title={title} publisher={publisher} slug={slug} onAttached={onChange} />
         <MediaAttach slug={slug} current={null} onChange={onChange} />
       </div>
       <div
@@ -502,8 +514,16 @@ function PendingNotice({ episode, onChange }: { episode: Episode; onChange: () =
         </Link>
       </div>
       <div className="mt-3 border-t border-[var(--rule)] pt-3">
-        <p className="mb-2 text-[12px] text-[var(--ink-soft)]">{t("watch.pendingStream")}</p>
-        <MediaAttach slug={episode.slug} current={null} onChange={onChange} />
+        <p className="mb-2 text-[12px] text-[var(--ink-soft)]">{t("catalog.attachHint")}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <FindSourceButton
+            title={episode.title}
+            publisher={episode.publisher}
+            slug={episode.slug}
+            onAttached={onChange}
+          />
+          <MediaAttach slug={episode.slug} current={null} onChange={onChange} />
+        </div>
       </div>
     </div>
   );

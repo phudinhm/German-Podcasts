@@ -71,8 +71,9 @@ export function DrillsClient({ drills }: { drills: DrillItem[] }) {
         <h1 className="text-[26px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
           {t("drills.title")}
         </h1>
-        <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-soft)]">
-          {t("drills.lede")}
+        <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-soft)]">{t("drills.lede")}</p>
+        <p className="mt-3 rounded-xl bg-[var(--surface)] px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-soft)]">
+          {t("drills.what")}
         </p>
       </header>
 

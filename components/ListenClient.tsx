@@ -1,21 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import type { FeedEpisode, FeedResult } from "@/lib/server/feed";
 import type { DiscoverResult } from "@/lib/server/discover";
 import type { Segment, TargetLang } from "@/lib/types";
 import { useUi } from "@/lib/i18n";
-import { SUGGESTIONS, suggestionsByLevel } from "@/lib/suggestions";
 import { isFollowing, listSubscriptions, toggleFollow, type Subscription } from "@/lib/subscriptions";
 import { isMixedContent } from "@/lib/media";
-import { useMediaElement } from "./player/useMediaElement";
-import { useYouTube } from "./player/useYouTube";
+import { loadVault } from "@/lib/vault";
+import { usePlayer, useVideoStage, type Track } from "./player/PlayerProvider";
 import { Transport } from "./player/Transport";
 import { StreamControls } from "./StreamControls";
 import { EpisodeTranscript } from "./EpisodeTranscript";
 import { LiveCaption } from "./LiveCaption";
-import { LevelBadge } from "./LevelBadge";
+import { QuickLookup, type QuickSelection } from "./QuickLookup";
+import { DiscoverPanel } from "./listen/DiscoverPanel";
+import { Art } from "./listen/Art";
 
 const RECENT_KEY = "hoerbar.discover.v1";
 const PAGE_SIZE = 40;
@@ -35,7 +35,7 @@ function formatDuration(seconds: number | null, unit: string): string {
   return `${Math.floor(minutes / 60)} h ${minutes % 60} ${unit}`;
 }
 
-function formatDate(value: string | null, locale: string): string {
+function formatDate(value: string | null | undefined, locale: string): string {
   if (!value) return "";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
@@ -43,40 +43,10 @@ function formatDate(value: string | null, locale: string): string {
     : date.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** Artwork with a graceful placeholder, since podcast CDNs 404 often enough. */
-function Art({ src, alt, size }: { src: string | null; alt: string; size: number }) {
-  const [failed, setFailed] = useState(false);
-  if (!src || failed) {
-    return (
-      <span
-        className="art flex shrink-0 items-center justify-center text-[var(--ink-faint)]"
-        style={{ width: size, height: size, fontSize: size / 3.2 }}
-        aria-hidden
-      >
-        ♪
-      </span>
-    );
-  }
-  return (
-    // Artwork comes from hundreds of podcast CDNs; a plain img avoids having to
-    // allowlist each host for next/image.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      width={size}
-      height={size}
-      loading="lazy"
-      onError={() => setFailed(true)}
-      className="art shrink-0"
-      style={{ width: size, height: size }}
-    />
-  );
-}
-
 export function ListenClient() {
   const { t, lang } = useUi();
   const locale = lang === "de" ? "de-DE" : lang === "vi" ? "vi-VN" : "en-GB";
+  const player = usePlayer();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DiscoverResult[] | null>(null);
@@ -88,23 +58,40 @@ export function ListenClient() {
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [visible, setVisible] = useState(PAGE_SIZE);
 
-  const [playing, setPlaying] = useState<FeedEpisode | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [follows, setFollows] = useState<Subscription[]>([]);
   const [following, setFollowing] = useState(false);
 
   const [transcript, setTranscript] = useState<Segment[] | null>(null);
-  const [showTranscript, setShowTranscript] = useState(false);
+  const [showText, setShowText] = useState(false);
   const [dual, setDual] = useState(true);
+  const [columns, setColumns] = useState(false);
+  const [sidePanel, setSidePanel] = useState(false);
   const [targetLang, setTargetLang] = useState<TargetLang>("en");
+  const [expandedDescription, setExpandedDescription] = useState(false);
 
-  const isYouTubeEpisode = Boolean(playing?.youtubeId);
-  const media = useMediaElement(isYouTubeEpisode ? null : (playing?.url ?? null));
-  const youtube = useYouTube(playing?.youtubeId ?? null);
-  const handle = isYouTubeEpisode ? youtube.handle : media.handle;
+  /** Title translations, keyed by the German title. */
+  const [titles, setTitles] = useState<Record<string, string>>({});
+  const [translateTitles, setTranslateTitles] = useState(false);
+
+  const [selection, setSelection] = useState<QuickSelection | null>(null);
+  const [savedWords, setSavedWords] = useState<Set<string>>(new Set());
+
+  const playing = player.track;
+  const isYouTubeEpisode = playing?.kind === "youtube";
+  const isVideo = playing?.kind === "video";
+  const stageRef = useVideoStage(Boolean(playing) && (isYouTubeEpisode || isVideo));
   const playerRef = useRef<HTMLDivElement | null>(null);
 
   const refreshFollows = useCallback(() => setFollows(listSubscriptions()), []);
+  const refreshSaved = useCallback(() => {
+    const set = new Set<string>();
+    for (const entry of loadVault()) {
+      set.add(entry.surface.toLowerCase());
+      set.add(entry.lemma.toLowerCase());
+    }
+    setSavedWords(set);
+  }, []);
 
   useEffect(() => {
     try {
@@ -114,18 +101,18 @@ export function ListenClient() {
       // A corrupt convenience list is not worth surfacing.
     }
     refreshFollows();
+    refreshSaved();
     window.addEventListener("hoerbar:follows-changed", refreshFollows);
-    return () => window.removeEventListener("hoerbar:follows-changed", refreshFollows);
-  }, [refreshFollows]);
+    window.addEventListener("hoerbar:vault-changed", refreshSaved);
+    return () => {
+      window.removeEventListener("hoerbar:follows-changed", refreshFollows);
+      window.removeEventListener("hoerbar:vault-changed", refreshSaved);
+    };
+  }, [refreshFollows, refreshSaved]);
 
   useEffect(() => {
     setFollowing(show?.feedUrl ? isFollowing(show.feedUrl) : false);
   }, [show, follows]);
-
-  const isVideo = useMemo(
-    () => Boolean(playing?.type?.startsWith("video/")) && !isYouTubeEpisode,
-    [playing, isYouTubeEpisode],
-  );
 
   const openShow = useCallback(async (result: DiscoverResult) => {
     if (!result.feedUrl) return;
@@ -191,7 +178,7 @@ export function ListenClient() {
     [openShow, t],
   );
 
-  /** Looks for an ingested transcript that belongs to this episode. */
+  /** Looks for an ingested transcript belonging to this episode. */
   const loadTranscript = useCallback(async (episode: FeedEpisode) => {
     setTranscript(null);
     try {
@@ -207,464 +194,549 @@ export function ListenClient() {
     }
   }, []);
 
-  function playEpisode(episode: FeedEpisode) {
-    setPlaying(episode);
-    setShowTranscript(false);
-    void loadTranscript(episode);
-    window.setTimeout(() => {
-      if (!episode.youtubeId) handle.play();
-      playerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }, 80);
-  }
+  /**
+   * Translates the visible episode titles in one batch. German feed titles are
+   * often the only clue to what an episode is about, and forty of them is a
+   * wall of text to a learner who cannot yet skim German.
+   */
+  useEffect(() => {
+    if (!translateTitles || !feed) return;
+    const pending = feed.episodes.slice(0, visible).map((e) => e.title).filter((title) => !titles[title]);
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texts: pending, lang: targetLang }),
+        });
+        const data = (await response.json()) as { texts?: Array<string | null> };
+        if (cancelled || !data.texts) return;
+        setTitles((previous) => {
+          const next = { ...previous };
+          pending.forEach((title, index) => {
+            const translated = data.texts?.[index];
+            if (translated) next[title] = translated;
+          });
+          return next;
+        });
+      } catch {
+        // Titles simply stay untranslated.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [translateTitles, feed, visible, targetLang, titles]);
 
-  const mixed = Boolean(playing && !isYouTubeEpisode && isMixedContent(playing.url));
-  const artwork = playing?.image ?? show?.artwork ?? feed?.image ?? null;
+  // Changing gloss language invalidates the cached title translations.
+  useEffect(() => setTitles({}), [targetLang]);
 
-  return (
-    <div>
-      <header className="mb-5 max-w-2xl">
-        <h1 className="text-[27px] font-semibold">{t("listen.title")}</h1>
-        <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">{t("listen.lede")}</p>
-      </header>
+  const playEpisode = useCallback(
+    (episode: FeedEpisode) => {
+      const track: Track = {
+        id: episode.guid,
+        title: episode.title,
+        showTitle: feed?.title ?? show?.title ?? "",
+        artwork: episode.image ?? show?.artwork ?? feed?.image ?? null,
+        description: episode.description,
+        kind: episode.youtubeId ? "youtube" : episode.type.startsWith("video/") ? "video" : "audio",
+        url: episode.url || undefined,
+        youtubeId: episode.youtubeId,
+        pageUrl: episode.pageUrl,
+        durationSec: episode.durationSec,
+        publishedAt: episode.publishedAt,
+      };
+      player.play(track);
+      setShowText(false);
+      setExpandedDescription(false);
+      void loadTranscript(episode);
+      window.setTimeout(() => playerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
+    },
+    [feed, show, player, loadTranscript],
+  );
 
-      <div className="flex flex-wrap gap-2">
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void search(query);
-          }}
-          placeholder={t("listen.placeholder")}
-          className="btn min-w-[260px] flex-1 justify-start font-normal"
+  const onWord = useCallback(
+    (word: string, sentence: string, anchor: HTMLElement) => {
+      const rect = anchor.getBoundingClientRect();
+      setSelection({
+        word,
+        sentence,
+        at: player.handle.getTime(),
+        anchor: { top: rect.top + window.scrollY, left: rect.left + window.scrollX, width: rect.width },
+      });
+    },
+    [player.handle],
+  );
+
+  const mixed = Boolean(playing && playing.kind === "audio" && playing.url && isMixedContent(playing.url));
+  const artwork = playing?.artwork ?? show?.artwork ?? feed?.image ?? null;
+
+  const textPanel = useMemo(() => {
+    if (!playing) return null;
+    if (transcript === null) {
+      return <p className="text-[12.5px] text-[var(--ink-faint)]">{t("common.loading")}</p>;
+    }
+    if (transcript.length > 0) {
+      return (
+        <EpisodeTranscript
+          segments={transcript}
+          handle={player.handle}
+          targetLang={targetLang}
+          showTranslation={dual}
+          layout={columns ? "columns" : "stacked"}
+          maxHeight={sidePanel ? "calc(100vh - 210px)" : 420}
+          onWord={onWord}
+          savedWords={savedWords}
         />
+      );
+    }
+    return (
+      <div>
+        <p className="mb-3 text-[12.5px] text-[var(--ink-faint)]">{t("listen.noTranscriptYet")}</p>
+        <LiveCaption
+          handle={player.handle}
+          targetLang={targetLang}
+          showTranslation={dual}
+          onSeek={(seconds) => player.handle.seekTo(seconds, true)}
+          onWord={onWord}
+          savedWords={savedWords}
+        />
+      </div>
+    );
+  }, [playing, transcript, player.handle, targetLang, dual, columns, sidePanel, onWord, savedWords, t]);
+
+  const textControls = (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        className="btn text-[12.5px]"
+        data-active={showText}
+        onClick={() => setShowText((value) => !value)}
+      >
+        {showText ? t("listen.hideTranscript") : t("listen.showTranscript")}
+      </button>
+      <label className="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-[var(--ink-soft)]">
+        <input
+          type="checkbox"
+          checked={dual}
+          onChange={(event) => setDual(event.target.checked)}
+          className="accent-[var(--accent-ring)]"
+        />
+        {t("listen.dual")}
+      </label>
+      <div className="flex overflow-hidden rounded-full border border-[var(--rule)]">
+        {(["en", "vi"] as const).map((code) => (
+          <button
+            key={code}
+            type="button"
+            data-active={targetLang === code}
+            onClick={() => setTargetLang(code)}
+            className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-0.5 text-[11.5px] last:border-r-0"
+          >
+            {code === "en" ? "English" : "Tiếng Việt"}
+          </button>
+        ))}
+      </div>
+      {dual ? (
         <button
           type="button"
-          className="btn btn-primary"
-          disabled={!query.trim() || searching}
-          onClick={() => void search(query)}
+          className="btn px-2.5 py-1 text-[11.5px]"
+          data-active={columns}
+          onClick={() => setColumns((value) => !value)}
         >
-          {searching ? t("common.searching") : t("common.search")}
+          {columns ? t("listen.sideBySide") : t("listen.stacked")}
         </button>
-      </div>
-
-      {recent.length > 0 ? (
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--ink-faint)]">
-          <span>{t("listen.recent")}</span>
-          {recent.map((item) => (
-            <button
-              key={item}
-              type="button"
-              className="max-w-[220px] truncate hover:text-[var(--accent)]"
-              onClick={() => {
-                setQuery(item);
-                void search(item);
-              }}
-            >
-              {item.replace(/^https?:\/\//, "")}
-            </button>
-          ))}
-        </div>
       ) : null}
+      <button
+        type="button"
+        className="btn px-2.5 py-1 text-[11.5px]"
+        data-active={sidePanel}
+        onClick={() => setSidePanel((value) => !value)}
+        title={t("listen.layout")}
+      >
+        {sidePanel ? t("listen.sidePanel") : t("listen.inline")}
+      </button>
+    </div>
+  );
 
-      {error ? (
-        <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12.5px] text-amber-800 dark:text-amber-300">
-          <p>{error}</p>
-          <p className="mt-1 opacity-80">{t("listen.feedHint")}</p>
+  return (
+    <div className={sidePanel && playing && showText ? "lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6" : ""}>
+      <div className="min-w-0">
+        <header className="mb-5 max-w-2xl">
+          <h1 className="text-[27px] font-semibold">{t("listen.title")}</h1>
+          <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">{t("listen.lede")}</p>
+        </header>
+
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void search(query);
+            }}
+            placeholder={t("listen.placeholder")}
+            className="btn min-w-[240px] flex-1 justify-start font-normal"
+          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!query.trim() || searching}
+            onClick={() => void search(query)}
+          >
+            {searching ? t("common.searching") : t("common.search")}
+          </button>
         </div>
-      ) : null}
 
-      {/* ---------------- player ---------------- */}
-      {playing ? (
-        <section ref={playerRef} className="card mt-5 overflow-hidden">
-          <div className="flex flex-col gap-4 p-4 sm:flex-row">
-            {!isVideo && !isYouTubeEpisode ? (
-              <Art src={artwork} alt="" size={132} />
+        {recent.length > 0 ? (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--ink-faint)]">
+            <span>{t("listen.recent")}</span>
+            {recent.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className="max-w-[220px] truncate hover:text-[var(--accent)]"
+                onClick={() => {
+                  setQuery(item);
+                  void search(item);
+                }}
+              >
+                {item.replace(/^https?:\/\//, "")}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12.5px] text-amber-800 dark:text-amber-300">
+            <p>{error}</p>
+            <p className="mt-1 opacity-80">{t("listen.feedHint")}</p>
+          </div>
+        ) : null}
+
+        {/* ---------------- player ---------------- */}
+        {playing ? (
+          <section ref={playerRef} className="card mt-5 overflow-hidden">
+            <div className="flex flex-col gap-4 p-4 sm:flex-row">
+              {playing.kind === "audio" ? <Art src={artwork} alt="" size={132} /> : null}
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-[16px] font-medium leading-snug">{playing.title}</h2>
+                    {translateTitles && titles[playing.title] ? (
+                      <p className="mt-0.5 text-[13px] leading-snug text-[var(--ink-faint)]">
+                        {titles[playing.title]}
+                      </p>
+                    ) : null}
+                    <p className="mt-0.5 text-[12.5px] text-[var(--ink-faint)]">
+                      {playing.showTitle}
+                      {playing.publishedAt ? ` · ${formatDate(playing.publishedAt, locale)}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-[12px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                    onClick={() => player.stop()}
+                  >
+                    {t("common.close")}
+                  </button>
+                </div>
+
+                {playing.kind !== "audio" ? (
+                  <div className="relative mt-3">
+                    {/* The video itself lives in the persistent layer and is
+                        positioned over this box, so it survives navigation. */}
+                    <div ref={stageRef} className="aspect-video w-full rounded-xl bg-black" />
+                    {isYouTubeEpisode && player.youtubeUnavailable ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-[var(--paper-raised)] p-4 text-center">
+                        <p className="text-[13px] text-[var(--ink-soft)]">{t("listen.playerBlocked")}</p>
+                        <a
+                          href={playing.pageUrl ?? `https://www.youtube.com/watch?v=${playing.youtubeId}`}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="btn"
+                        >
+                          {t("listen.openOnYouTube")}
+                        </a>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {mixed ? (
+                  <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12.5px] text-amber-800 dark:text-amber-300">
+                    <p>{t("listen.mixedContent")}</p>
+                    <a href={playing.url} target="_blank" rel="noreferrer noopener" className="btn mt-2 text-[12px]">
+                      {t("listen.openDirect")}
+                    </a>
+                  </div>
+                ) : null}
+
+                {!isYouTubeEpisode ? (
+                  <div className="mt-3">
+                    <Transport handle={player.handle} state={player.mediaState} onRetry={player.retry} compact />
+                  </div>
+                ) : null}
+
+                {playing.description ? (
+                  <div className="mt-3 text-[12.5px] leading-relaxed text-[var(--ink-soft)]">
+                    <p className={expandedDescription ? "" : "line-clamp-3"}>{playing.description}</p>
+                    {playing.description.length > 200 ? (
+                      <button
+                        type="button"
+                        className="mt-1 text-[12px] text-[var(--ink-faint)] hover:text-[var(--accent)]"
+                        onClick={() => setExpandedDescription((value) => !value)}
+                      >
+                        {expandedDescription ? t("listen.showLessText") : t("listen.showMoreText")}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="border-t border-[var(--rule)] px-4 py-3">
+              <StreamControls handle={player.handle} />
+            </div>
+
+            <div className="border-t border-[var(--rule)] px-4 py-3">
+              {textControls}
+              {showText && !sidePanel ? <div className="mt-3">{textPanel}</div> : null}
+            </div>
+          </section>
+        ) : null}
+
+        {/* ---------------- results ---------------- */}
+        {results && results.length > 0 && !feed ? (
+          <section className="mt-6">
+            <h2 className="mb-3 text-[13px] font-medium text-[var(--ink-soft)]">
+              {t("listen.results", { count: results.length })}
+            </h2>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {results.map((result) => (
+                <li key={result.id}>
+                  <button
+                    type="button"
+                    onClick={() => (result.feedUrl ? void openShow(result) : undefined)}
+                    disabled={!result.feedUrl}
+                    className="row-hover flex w-full gap-3 p-2.5 text-left disabled:opacity-60"
+                  >
+                    <Art src={result.artwork} alt="" size={64} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate text-[14.5px] font-medium">{result.title}</span>
+                        <span className="chip shrink-0 text-[11px]">{ORIGIN_LABEL[result.origin]}</span>
+                      </span>
+                      {result.publisher ? (
+                        <span className="mt-0.5 block truncate text-[12.5px] text-[var(--ink-soft)]">
+                          {result.publisher}
+                        </span>
+                      ) : null}
+                      {result.note ? (
+                        <span className="mt-1 block text-[11.5px] leading-snug text-[var(--accent)]">
+                          {result.note}
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {loadingFeed ? (
+          <p className="mt-6 text-[13px] text-[var(--ink-faint)]">{t("listen.loadingEpisodes")}</p>
+        ) : null}
+
+        {/* ---------------- episode list ---------------- */}
+        {feed && feed.episodes.length > 0 ? (
+          <section className="mt-6">
+            {show?.note ? (
+              <p className="mb-3 rounded-xl bg-[var(--accent-soft)] px-3 py-2 text-[12.5px] leading-relaxed">
+                {show.note}
+              </p>
             ) : null}
 
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-[16px] font-medium leading-snug">{playing.title}</h2>
-                  <p className="mt-0.5 text-[12.5px] text-[var(--ink-faint)]">
-                    {feed?.title ?? show?.title}
-                    {playing.publishedAt ? ` · ${formatDate(playing.publishedAt, locale)}` : ""}
-                  </p>
-                </div>
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--rule)] pb-3">
+              <Art src={show?.artwork ?? feed.image} alt="" size={56} />
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-[18px] font-semibold">{feed.title}</h2>
+                <p className="text-[12.5px] text-[var(--ink-faint)]">
+                  {feed.episodes.length}{" "}
+                  {feed.format === "youtube" ? t("common.videos") : t("common.episodes")}
+                  {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-[var(--ink-soft)]">
+                <input
+                  type="checkbox"
+                  checked={translateTitles}
+                  onChange={(event) => setTranslateTitles(event.target.checked)}
+                  className="accent-[var(--accent-ring)]"
+                />
+                {t("listen.translateTitles")}
+              </label>
+              {show?.feedUrl ? (
+                <button
+                  type="button"
+                  className="btn text-[12.5px]"
+                  data-active={following}
+                  onClick={() => {
+                    const next = toggleFollow({
+                      id: show.id,
+                      title: show.title,
+                      publisher: show.publisher,
+                      artwork: show.artwork,
+                      feedUrl: show.feedUrl!,
+                      origin: show.origin,
+                      pageUrl: show.pageUrl,
+                    });
+                    setFollowing(next);
+                    refreshFollows();
+                  }}
+                >
+                  {following ? `✓ ${t("listen.following")}` : t("listen.follow")}
+                </button>
+              ) : null}
+              {results && results.length > 1 ? (
                 <button
                   type="button"
                   className="text-[12px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
                   onClick={() => {
-                    handle.pause();
-                    setPlaying(null);
+                    setFeed(null);
+                    setShow(null);
                   }}
                 >
-                  {t("common.close")}
+                  {t("listen.backToResults")}
                 </button>
-              </div>
-
-              {isYouTubeEpisode ? (
-                <div className="relative mt-3">
-                  <div
-                    ref={youtube.containerRef}
-                    className="aspect-video w-full overflow-hidden rounded-xl bg-black [&_iframe]:h-full [&_iframe]:w-full"
-                  />
-                  {youtube.unavailable ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-[var(--paper-raised)] p-4 text-center">
-                      <p className="text-[13px] text-[var(--ink-soft)]">{t("listen.playerBlocked")}</p>
-                      <a
-                        href={playing.pageUrl ?? `https://www.youtube.com/watch?v=${playing.youtubeId}`}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="btn"
-                      >
-                        {t("listen.openOnYouTube")}
-                      </a>
-                    </div>
-                  ) : null}
-                </div>
-              ) : isVideo ? (
-                <video
-                  ref={media.mediaRef as React.RefObject<HTMLVideoElement>}
-                  src={media.src ?? undefined}
-                  poster={artwork ?? undefined}
-                  playsInline
-                  preload="metadata"
-                  className="mt-3 aspect-video w-full rounded-xl bg-black"
-                />
-              ) : (
-                <audio
-                  ref={media.mediaRef as React.RefObject<HTMLAudioElement>}
-                  src={media.src ?? undefined}
-                  preload="metadata"
-                  className="hidden"
-                />
-              )}
-
-              {mixed ? (
-                <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12.5px] text-amber-800 dark:text-amber-300">
-                  <p>{t("listen.mixedContent")}</p>
-                  <a
-                    href={playing.url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="btn mt-2 text-[12px]"
-                  >
-                    {t("listen.openDirect")}
-                  </a>
-                </div>
-              ) : null}
-
-              {!isYouTubeEpisode ? (
-                <div className="mt-3">
-                  <Transport handle={handle} state={media.state} onRetry={media.retry} compact />
-                </div>
               ) : null}
             </div>
-          </div>
 
-          <div className="border-t border-[var(--rule)] px-4 py-3">
-            <StreamControls handle={handle} />
-          </div>
-
-          {/* transcript / captions */}
-          <div className="border-t border-[var(--rule)] px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="btn text-[12.5px]"
-                data-active={showTranscript}
-                onClick={() => setShowTranscript((value) => !value)}
-              >
-                {showTranscript ? t("listen.hideTranscript") : t("listen.showTranscript")}
-              </button>
-              <label className="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-[var(--ink-soft)]">
-                <input
-                  type="checkbox"
-                  checked={dual}
-                  onChange={(event) => setDual(event.target.checked)}
-                  className="accent-[var(--accent-ring)]"
-                />
-                {t("listen.dual")}
-              </label>
-              <div className="flex overflow-hidden rounded-full border border-[var(--rule)]">
-                {(["en", "vi"] as const).map((code) => (
+            <ul>
+              {feed.episodes.slice(0, visible).map((episode) => (
+                <li key={episode.guid}>
                   <button
-                    key={code}
                     type="button"
-                    data-active={targetLang === code}
-                    onClick={() => setTargetLang(code)}
-                    className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-0.5 text-[11.5px] last:border-r-0"
+                    onClick={() => playEpisode(episode)}
+                    className="row-hover flex w-full items-start gap-3 p-2.5 text-left"
+                    data-active={playing?.id === episode.guid}
                   >
-                    {code === "en" ? "English" : "Tiếng Việt"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {showTranscript ? (
-              <div className="mt-3">
-                {transcript === null ? (
-                  <p className="text-[12.5px] text-[var(--ink-faint)]">{t("common.loading")}</p>
-                ) : transcript.length > 0 ? (
-                  <EpisodeTranscript
-                    segments={transcript}
-                    handle={handle}
-                    targetLang={targetLang}
-                    showTranslation={dual}
-                  />
-                ) : (
-                  <div>
-                    <p className="mb-3 text-[12.5px] text-[var(--ink-faint)]">
-                      {t("listen.noTranscriptYet")}
-                    </p>
-                    <LiveCaption
-                      handle={handle}
-                      targetLang={targetLang}
-                      showTranslation={dual}
-                      onSeek={(seconds) => handle.seekTo(seconds, true)}
-                    />
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
-      {/* ---------------- results ---------------- */}
-      {results && results.length > 0 && !feed ? (
-        <section className="mt-6">
-          <h2 className="mb-3 text-[13px] font-medium text-[var(--ink-soft)]">
-            {t("listen.results", { count: results.length })}
-          </h2>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {results.map((result) => (
-              <li key={result.id}>
-                <button
-                  type="button"
-                  onClick={() => (result.feedUrl ? void openShow(result) : undefined)}
-                  disabled={!result.feedUrl}
-                  className="row-hover flex w-full gap-3 p-2.5 text-left disabled:opacity-60"
-                >
-                  <Art src={result.artwork} alt="" size={64} />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate text-[14.5px] font-medium">{result.title}</span>
-                      <span className="chip shrink-0 text-[11px]">{ORIGIN_LABEL[result.origin]}</span>
-                    </span>
-                    {result.publisher ? (
-                      <span className="mt-0.5 block truncate text-[12.5px] text-[var(--ink-soft)]">
-                        {result.publisher}
-                      </span>
-                    ) : null}
-                    {result.description ? (
-                      <span className="mt-0.5 block truncate text-[12px] text-[var(--ink-faint)]">
-                        {result.description}
-                      </span>
-                    ) : null}
-                    {result.note ? (
-                      <span className="mt-1 block text-[11.5px] leading-snug text-[var(--accent)]">
-                        {result.note}
-                      </span>
-                    ) : null}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {loadingFeed ? (
-        <p className="mt-6 text-[13px] text-[var(--ink-faint)]">{t("listen.loadingEpisodes")}</p>
-      ) : null}
-
-      {/* ---------------- episode list ---------------- */}
-      {feed && feed.episodes.length > 0 ? (
-        <section className="mt-6">
-          {show?.note ? (
-            <p className="mb-3 rounded-xl bg-[var(--accent-soft)] px-3 py-2 text-[12.5px] leading-relaxed">
-              {show.note}
-            </p>
-          ) : null}
-
-          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--rule)] pb-3">
-            <Art src={show?.artwork ?? feed.image} alt="" size={56} />
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate text-[18px] font-semibold">{feed.title}</h2>
-              <p className="text-[12.5px] text-[var(--ink-faint)]">
-                {feed.episodes.length}{" "}
-                {feed.format === "youtube" ? t("common.videos") : t("common.episodes")}
-                {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
-              </p>
-            </div>
-            {show?.feedUrl ? (
-              <button
-                type="button"
-                className="btn text-[12.5px]"
-                data-active={following}
-                onClick={() => {
-                  const next = toggleFollow({
-                    id: show.id,
-                    title: show.title,
-                    publisher: show.publisher,
-                    artwork: show.artwork,
-                    feedUrl: show.feedUrl!,
-                    origin: show.origin,
-                    pageUrl: show.pageUrl,
-                  });
-                  setFollowing(next);
-                  refreshFollows();
-                }}
-              >
-                {following ? `✓ ${t("listen.following")}` : t("listen.follow")}
-              </button>
-            ) : null}
-            {results && results.length > 1 ? (
-              <button
-                type="button"
-                className="text-[12px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
-                onClick={() => {
-                  setFeed(null);
-                  setShow(null);
-                }}
-              >
-                {t("listen.backToResults")}
-              </button>
-            ) : null}
-          </div>
-
-          <ul>
-            {feed.episodes.slice(0, visible).map((episode) => (
-              <li key={episode.guid}>
-                <button
-                  type="button"
-                  onClick={() => playEpisode(episode)}
-                  className="row-hover flex w-full items-start gap-3 p-2.5 text-left"
-                  data-active={playing?.guid === episode.guid}
-                >
-                  <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={56} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[14.5px] font-medium leading-snug">{episode.title}</span>
-                    {episode.description ? (
-                      <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-relaxed text-[var(--ink-faint)]">
-                        {episode.description}
-                      </span>
-                    ) : null}
-                    <span className="mt-1 flex flex-wrap gap-x-3 text-[11.5px] text-[var(--ink-faint)]">
-                      {formatDate(episode.publishedAt, locale) ? (
-                        <span>{formatDate(episode.publishedAt, locale)}</span>
-                      ) : null}
-                      {formatDuration(episode.durationSec, t("common.min")) ? (
-                        <span>{formatDuration(episode.durationSec, t("common.min"))}</span>
-                      ) : null}
-                      <span>{episode.youtubeId ? "YouTube" : episode.type}</span>
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          {visible < feed.episodes.length ? (
-            <div className="mt-3 flex justify-center">
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setVisible((value) => value + PAGE_SIZE)}
-              >
-                {t("common.more")} ({feed.episodes.length - visible})
-              </button>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      {/* ---------------- following ---------------- */}
-      {!feed && follows.length > 0 ? (
-        <section className="mt-8">
-          <h2 className="mb-3 text-[13px] font-medium text-[var(--ink-soft)]">
-            {t("listen.following")}
-          </h2>
-          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {follows.map((item) => (
-              <li key={item.feedUrl}>
-                <button
-                  type="button"
-                  className="row-hover flex w-full items-center gap-3 p-2.5 text-left"
-                  onClick={() =>
-                    void openShow({
-                      id: item.id,
-                      title: item.title,
-                      publisher: item.publisher,
-                      description: "",
-                      artwork: item.artwork,
-                      feedUrl: item.feedUrl,
-                      origin: item.origin as DiscoverResult["origin"],
-                      pageUrl: item.pageUrl,
-                    })
-                  }
-                >
-                  <Art src={item.artwork} alt="" size={48} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-[14px] font-medium">{item.title}</span>
-                    <span className="block truncate text-[12px] text-[var(--ink-faint)]">
-                      {item.publisher}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {/* ---------------- suggestions ---------------- */}
-      {!feed && !results ? (
-        <section className="mt-8">
-          <h2 className="mb-3 text-[13px] font-medium text-[var(--ink-soft)]">
-            {t("listen.suggested")}
-          </h2>
-          <div className="space-y-5">
-            {suggestionsByLevel().map((group) => (
-              <div key={group.cefr}>
-                <div className="mb-2 flex items-center gap-2">
-                  <LevelBadge level={group.cefr} />
-                  <span className="text-[12px] text-[var(--ink-faint)]">
-                    {group.items.length} {group.items.length === 1 ? "show" : "shows"}
-                  </span>
-                </div>
-                <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {group.items.map((item) => (
-                    <li key={item.query}>
-                      <button
-                        type="button"
-                        className="row-hover w-full p-2.5 text-left"
-                        onClick={() => {
-                          setQuery(item.query);
-                          void search(item.query);
-                        }}
-                      >
-                        <span className="block text-[14px] font-medium">{item.label}</span>
-                        <span className="block text-[12px] text-[var(--ink-soft)]">{item.publisher}</span>
-                        <span className="mt-1 block text-[12px] leading-snug text-[var(--ink-faint)]">
-                          {item.why}
+                    <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={56} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14.5px] font-medium leading-snug">{episode.title}</span>
+                      {translateTitles && titles[episode.title] ? (
+                        <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-faint)]">
+                          {titles[episode.title]}
                         </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                      ) : null}
+                      {episode.description ? (
+                        <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-relaxed text-[var(--ink-faint)]">
+                          {episode.description}
+                        </span>
+                      ) : null}
+                      <span className="mt-1 flex flex-wrap gap-x-3 text-[11.5px] text-[var(--ink-faint)]">
+                        {formatDate(episode.publishedAt, locale) ? (
+                          <span>{formatDate(episode.publishedAt, locale)}</span>
+                        ) : null}
+                        {formatDuration(episode.durationSec, t("common.min")) ? (
+                          <span>{formatDuration(episode.durationSec, t("common.min"))}</span>
+                        ) : null}
+                        <span>{episode.youtubeId ? "YouTube" : episode.type}</span>
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {visible < feed.episodes.length ? (
+              <div className="mt-3 flex justify-center">
+                <button type="button" className="btn" onClick={() => setVisible((value) => value + PAGE_SIZE)}>
+                  {t("common.more")} ({feed.episodes.length - visible})
+                </button>
               </div>
-            ))}
+            ) : null}
+          </section>
+        ) : null}
+
+        {/* ---------------- following ---------------- */}
+        {!feed && follows.length > 0 ? (
+          <section className="mt-8">
+            <h2 className="mb-3 text-[13px] font-medium text-[var(--ink-soft)]">{t("listen.following")}</h2>
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {follows.map((item) => (
+                <li key={item.feedUrl}>
+                  <button
+                    type="button"
+                    className="row-hover flex w-full items-center gap-3 p-2.5 text-left"
+                    onClick={() =>
+                      void openShow({
+                        id: item.id,
+                        title: item.title,
+                        publisher: item.publisher,
+                        description: "",
+                        artwork: item.artwork,
+                        feedUrl: item.feedUrl,
+                        origin: item.origin as DiscoverResult["origin"],
+                        pageUrl: item.pageUrl,
+                      })
+                    }
+                  >
+                    <Art src={item.artwork} alt="" size={48} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[14px] font-medium">{item.title}</span>
+                      <span className="block truncate text-[12px] text-[var(--ink-faint)]">
+                        {item.publisher}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {/* ---------------- discovery ---------------- */}
+        {!feed && !results ? (
+          <DiscoverPanel
+            onPick={(term) => {
+              setQuery(term);
+              void search(term);
+            }}
+          />
+        ) : null}
+      </div>
+
+      {/* ---------------- side panel, Spotify-lyrics style ---------------- */}
+      {sidePanel && playing && showText ? (
+        <aside className="mt-6 lg:sticky lg:top-[64px] lg:mt-0 lg:h-[calc(100vh-96px)] lg:self-start">
+          <div className="card flex h-full flex-col overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-[var(--rule)] px-3 py-2">
+              <h3 className="truncate text-[13px] font-medium">{t("listen.transcript")}</h3>
+              <button
+                type="button"
+                className="ml-auto text-[12px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                onClick={() => setSidePanel(false)}
+              >
+                {t("listen.inline")}
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden px-2 py-2">{textPanel}</div>
           </div>
-          <p className="mt-4 text-[12px] text-[var(--ink-faint)]">
-            {SUGGESTIONS.length} suggestions, all resolved through the same search as anything you
-            type.{" "}
-            <Link href="/about" className="underline decoration-dotted underline-offset-4">
-              How sources are found
-            </Link>
-          </p>
-        </section>
+        </aside>
+      ) : null}
+
+      {selection && playing ? (
+        <QuickLookup
+          selection={selection}
+          lang={targetLang}
+          context={{ episodeSlug: `stream:${playing.id}`, episodeTitle: playing.title }}
+          onClose={() => setSelection(null)}
+          onSaved={refreshSaved}
+        />
       ) : null}
     </div>
   );

@@ -5,6 +5,7 @@ import { useUi } from "@/lib/i18n";
 import type { TargetLang } from "@/lib/types";
 import type { PlayerHandle } from "./player/types";
 import { getSpeechRecognition, type SpeechRecognitionLike } from "@/lib/audio/speech";
+import { CaptionWord, splitLine } from "./CaptionWord";
 
 export interface CaptionLine {
   id: string;
@@ -31,11 +32,16 @@ export function LiveCaption({
   targetLang,
   showTranslation,
   onSeek,
+  onWord,
+  savedWords,
 }: {
   handle: PlayerHandle;
   targetLang: TargetLang;
   showTranslation: boolean;
   onSeek: (seconds: number) => void;
+  /** Opens the dictionary for a clicked word or a selected phrase. */
+  onWord?: (word: string, sentence: string, anchor: HTMLElement) => void;
+  savedWords?: Set<string>;
 }) {
   const { t } = useUi();
   const [running, setRunning] = useState(false);
@@ -186,6 +192,7 @@ export function LiveCaption({
       <p className="mt-2 text-[11.5px] leading-relaxed text-[var(--ink-faint)]">
         Captions are heard through your microphone, so play the audio out loud rather than through
         headphones. Nothing is uploaded by this app; recognition happens in the browser.
+        {onWord ? ` ${t("caption.saveWord")} ${t("caption.selectHint")}` : ""}
       </p>
 
       {error ? <p className="mt-2 text-[12px] text-rose-600">{error}</p> : null}
@@ -196,7 +203,7 @@ export function LiveCaption({
           className="surface mt-3 max-h-[280px] overflow-y-auto p-3"
         >
           {lines.map((line) => (
-            <p key={line.id} className="mb-2 last:mb-0">
+            <p key={line.id} className="mb-2.5 last:mb-0">
               <button
                 type="button"
                 onClick={() => onSeek(Math.max(0, line.at - 1))}
@@ -204,9 +211,29 @@ export function LiveCaption({
               >
                 {Math.floor(line.at / 60)}:{String(Math.floor(line.at % 60)).padStart(2, "0")}
               </button>
-              <span className="caption-line">{line.de}</span>
+              <span className="caption-line">
+                {onWord
+                  ? splitLine(line.de).map((piece, index) =>
+                      /^\s+$/.test(piece) ? (
+                        <span key={index}>{piece}</span>
+                      ) : (
+                        <CaptionWord
+                          key={index}
+                          word={piece}
+                          saved={Boolean(savedWords?.has(piece.replace(/[^\p{L}]/gu, "").toLowerCase()))}
+                          onSelect={(word, anchor) => {
+                            const selected = window.getSelection()?.toString().trim() ?? "";
+                            onWord(selected.length > word.length ? selected : word, line.de, anchor);
+                          }}
+                        />
+                      ),
+                    )
+                  : line.de}
+              </span>
               {showTranslation && line.translation ? (
-                <span className="mt-0.5 block pl-[38px] text-[13.5px] text-[var(--gloss)]">
+                // Deliberately smaller and dimmer than the German: the eye
+                // should land on the original first and use this as a check.
+                <span className="mt-0.5 block pl-[38px] text-[13px] leading-snug text-[var(--ink-faint)]">
                   {line.translation}
                 </span>
               ) : null}

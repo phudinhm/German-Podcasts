@@ -14,6 +14,12 @@ export function CatalogIntro({ ready, total }: { ready: number; total: number })
           {t("catalog.title")}
         </h1>
         <p className="mt-3 text-[15px] leading-relaxed text-[var(--ink-soft)]">{t("catalog.lede")}</p>
+        <p className="mt-3 rounded-xl bg-[var(--surface)] px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-soft)]">
+          {t("catalog.what")}{" "}
+          <Link href="/listen" className="underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
+            {t("nav.listen")}
+          </Link>
+        </p>
         <p className="mt-3 text-[13px] text-[var(--ink-faint)]">
           {t("catalog.ready", { ready, total })}{" "}
           <Link href="/about" className="underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
