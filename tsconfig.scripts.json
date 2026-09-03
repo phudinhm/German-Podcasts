@@ -34,6 +34,7 @@
     "data/lexicon/proper-nouns.ts",
     "data/lexicon/stems.extra.ts",
     "lib/server/feed.ts",
-    "lib/media.ts"
+    "lib/media.ts",
+    "lib/server/discover.ts"
   ]
 }

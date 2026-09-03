@@ -33,6 +33,15 @@ export default function AboutPage() {
           mit, wenn du viel hörst.
         </p>
         <p>
+          Suchen musst du den Feed nicht selbst. Tippe den Namen einer Sendung ein oder füge einen
+          Link ein, egal von wo: Apple Podcasts, Spotify, ein YouTube-Kanal oder die Website eines
+          Podcasts. Apple betreibt eine Suche ohne Schlüssel, die den echten RSS-Feed zurückgibt;
+          YouTube veröffentlicht pro Kanal einen Atom-Feed, ebenfalls ohne Schlüssel. Bei Spotify
+          geht es nicht: fremde Apps dürfen dort keinen Ton abspielen. Deshalb identifiziert Hörbar
+          die Sendung und sucht denselben Podcast als öffentlichen RSS-Feed. Gibt es keinen, sagen
+          wir das, statt so zu tun, als ginge es doch.
+        </p>
+        <p>
           Drei Wege hinein: einen öffentlichen Podcast-Feed unter{" "}
           <Link href="/listen" className="underline decoration-dotted underline-offset-4">
             Direkt hören

@@ -10,12 +10,16 @@ export interface FeedEpisode {
   guid: string;
   title: string;
   description: string;
-  /** The enclosure - what actually gets streamed. */
+  /** The enclosure - what actually gets streamed. Empty for a YouTube entry. */
   url: string;
   type: string;
   durationSec: number | null;
   publishedAt: string | null;
   image: string | null;
+  /** Set when the entry is a YouTube video rather than a media enclosure. */
+  youtubeId?: string;
+  /** The episode's own page, for linking out. */
+  pageUrl?: string;
 }
 
 export interface FeedResult {
@@ -23,6 +27,8 @@ export interface FeedResult {
   description: string;
   image: string | null;
   link: string | null;
+  /** "rss" for a podcast feed, "youtube" for a channel or playlist feed. */
+  format: "rss" | "youtube";
   episodes: FeedEpisode[];
 }
 
@@ -95,7 +101,50 @@ export function parseDuration(value: string | null): number | null {
   return trimmed.split(":").map(Number).reduce((total, part) => total * 60 + part, 0);
 }
 
+/**
+ * YouTube publishes channel and playlist feeds as Atom, with the video id in a
+ * yt: namespace and no enclosure at all - the "media" is a page the IFrame
+ * player loads. Parsing it here means a channel behaves exactly like a podcast
+ * everywhere downstream.
+ */
+export function parseYouTubeFeed(xml: string, fallbackTitle: string): FeedResult {
+  const header = xml.split(/<entry[\s>]/i)[0];
+  const entries = xml.match(/<entry(?:\s[^>]*)?>[\s\S]*?<\/entry>/gi) ?? [];
+  const episodes: FeedEpisode[] = [];
+
+  for (const entry of entries.slice(0, 60)) {
+    const videoId = tag(entry, "yt:videoId");
+    if (!videoId || !/^[\w-]{11}$/.test(videoId)) continue;
+    episodes.push({
+      guid: `yt:${videoId}`,
+      title: tag(entry, "title") ?? "Ohne Titel",
+      description: (tag(entry, "media:description") ?? "").slice(0, 600),
+      url: "",
+      type: "video/youtube",
+      durationSec: null,
+      publishedAt: tag(entry, "published"),
+      image: attr(entry, "media:thumbnail", "url"),
+      youtubeId: videoId,
+      pageUrl: `https://www.youtube.com/watch?v=${videoId}`,
+    });
+  }
+
+  return {
+    title: tag(header, "title") ?? fallbackTitle,
+    description: "",
+    image: null,
+    link: attr(header, "link", "href"),
+    format: "youtube",
+    episodes,
+  };
+}
+
 export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
+  // A YouTube channel feed is Atom with a yt: namespace, not RSS.
+  if (/<yt:videoId>/i.test(xml) || /xmlns:yt=/i.test(xml)) {
+    return parseYouTubeFeed(xml, fallbackTitle);
+  }
+
   const channelMatch = xml.match(/<channel[\s\S]*?>([\s\S]*)<\/channel>/i);
   const channel = channelMatch ? channelMatch[1] : xml;
   const header = channel.split(/<item[\s>]/i)[0];
@@ -118,6 +167,7 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
     }
     episodes.push({
       guid: tag(item, "guid") ?? safeUrl,
+      pageUrl: tag(item, "link") ?? undefined,
       title: tag(item, "title") ?? "Ohne Titel",
       description: (tag(item, "description") ?? tag(item, "itunes:summary") ?? "").slice(0, 600),
       url: safeUrl,
@@ -133,6 +183,7 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
     description: (tag(header, "description") ?? "").slice(0, 600),
     image: attr(header, "itunes:image", "href"),
     link: tag(header, "link"),
+    format: "rss",
     episodes,
   };
 }

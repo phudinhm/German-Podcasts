@@ -55,23 +55,40 @@ function loadApi(): Promise<void> {
  * Wraps the YouTube IFrame Player API. The handle is stable across renders, so
  * the synchronisation loop can hold on to it without re-subscribing.
  */
+/** How long to wait for YouTube's script before admitting it is not coming. */
+const API_TIMEOUT_MS = 8000;
+
 export function useYouTube(videoId: string | null): {
   handle: PlayerHandle;
   containerRef: React.RefObject<HTMLDivElement | null>;
   ready: boolean;
+  /** True once the IFrame API has clearly failed to load. */
+  unavailable: boolean;
 } {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     if (!videoId || !containerRef.current) return;
     let cancelled = false;
     const mount = containerRef.current;
+    setUnavailable(false);
+
+    // A blocked network, a corporate proxy or an ad blocker all end the same
+    // way: the script never arrives. Say so rather than showing a black box.
+    const timer = window.setTimeout(() => {
+      if (!cancelled && !readyRef.current) setUnavailable(true);
+    }, API_TIMEOUT_MS);
 
     loadApi().then(() => {
-      if (cancelled || !window.YT?.Player) return;
+      if (cancelled) return;
+      if (!window.YT?.Player) {
+        setUnavailable(true);
+        return;
+      }
       const host = document.createElement("div");
       mount.replaceChildren(host);
 
@@ -88,6 +105,7 @@ export function useYouTube(videoId: string | null): {
             if (cancelled) return;
             readyRef.current = true;
             setReady(true);
+            setUnavailable(false);
           },
         },
       });
@@ -95,8 +113,10 @@ export function useYouTube(videoId: string | null): {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
       readyRef.current = false;
       setReady(false);
+      setUnavailable(false);
       try {
         playerRef.current?.destroy();
       } catch {
@@ -118,5 +138,5 @@ export function useYouTube(videoId: string | null): {
     isReady: () => readyRef.current,
   });
 
-  return { handle: handleRef.current, containerRef, ready };
+  return { handle: handleRef.current, containerRef, ready, unavailable };
 }

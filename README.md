@@ -21,16 +21,27 @@ No API keys, no database, no accounts required to run it.
 
 ## What it does
 
-**Streams real audio and video.** Three ways in, all of them playing straight
-from the source with nothing proxied through this app:
+**Finds the source for you.** One box on the Direkt hören page takes a show's
+name or a link from anywhere, and works out what can actually be played:
 
-- **Paste a podcast RSS feed** on the Direkt hören page and play any episode
-  immediately. The server reads the feed and hands back the real enclosure URLs;
-  the browser streams them from the publisher's CDN.
-- **Attach a stream to any episode**: a YouTube link, a direct audio or video
-  URL, or a file from your own machine. The attachment is remembered per
-  episode in your browser, and the same synchronised transcript view plays it.
-- **YouTube** through the IFrame Player API, for video podcasts.
+| You give it | What happens |
+| --- | --- |
+| A show's name | Apple Podcasts search returns matching shows and their real RSS feeds. No API key. |
+| An Apple Podcasts link | Looked up by id; the feed comes straight back. |
+| A Spotify show link | The show is identified, then bridged to its public RSS. Spotify never permits third-party streaming of its own audio, so this is the only honest route, and the UI says so. |
+| A YouTube channel, `@handle` or playlist | Resolved to the channel id and read from YouTube's keyless Atom feed; videos play through the IFrame player. |
+| A YouTube video link | Plays directly. |
+| A podcast's homepage | The page is fetched and its advertised `<link rel="alternate">` feed is used. |
+| An RSS URL | Used as-is. |
+
+Only YouTube *keyword* search needs a key (`YOUTUBE_API_KEY`); everything in
+that table works with nothing configured.
+
+**Streams real audio and video**, always straight from the source with nothing
+proxied through this app. Beyond discovery you can also **attach a stream to any
+episode**: a YouTube link, a direct audio or video URL, or a file from your own
+machine. The attachment is remembered per episode in your browser, and the same
+synchronised transcript view plays it.
 
 The transport shows what a stream actually needs: how far it has buffered ahead,
 whether it is stalled, and a readable message when a URL turns out not to be
@@ -142,6 +153,8 @@ Everything is optional. Copy `.env.example` to `.env.local` for the extras.
 | Variable | What it unlocks |
 | --- | --- |
 | `ANTHROPIC_API_KEY` | Dictionary lookups for words outside the bundled lexicon, richer sentence-structure notes, generated quizzes. |
+| `YOUTUBE_API_KEY` | Keyword search across YouTube channels. Channel, handle and playlist links work without it. |
+| `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` | Exact show metadata for Spotify links. Without them the public page's Open Graph tags are used instead. |
 | `DEEPL_API_KEY` | Sentence translation for freshly ingested episodes. Preferred over Google for German. |
 | `GOOGLE_TRANSLATE_API_KEY` | Alternative translation provider. |
 | `NEXT_PUBLIC_SUPABASE_URL` + keys | Serves the catalog from Postgres so curators can publish without a redeploy. |
@@ -149,7 +162,9 @@ Everything is optional. Copy `.env.example` to `.env.local` for the extras.
 
 ### Without any keys
 
-Working: streaming from RSS feeds, YouTube, direct media URLs and local files;
+Working: source discovery across Apple Podcasts, Spotify (bridged), YouTube and
+any podcast website; streaming from RSS feeds, YouTube, direct media URLs and
+local files;
 the catalog; sentence and word synchronisation; looping, echo gaps, tempo ramps
 and hotkeys; phonetic hazard marking and compound stress; the 333-entry offline
 dictionary; the vocabulary vault with SM-2 review and export; the rule-based
@@ -185,8 +200,10 @@ command. Edit that file to change the shelf.
 
 ### Just listen to something now
 
-Open **Direkt hören**, paste a public podcast RSS URL, and play. No ingest, no
-transcript, no waiting. You get tempo control and an A-B loop straight away.
+Open **Direkt hören** and type the name of a show, or paste a link from Apple
+Podcasts, Spotify, YouTube, or the podcast's own site. Pick an episode and play.
+No ingest, no transcript, no waiting; you get tempo control and an A-B loop
+straight away.
 
 Some publishers only serve their feed to podcast apps and will answer 403. In
 that case copy a single episode's media URL and attach it on the episode page
@@ -243,8 +260,10 @@ npm run build-catalog  # rebuild data/catalog from data/sources
 ```
 
 The tests cover syllabification, compound splitting, phonetic hazard detection,
-lemmatisation, separable-prefix reunification, sentence deconstruction, RSS feed
-parsing, media-URL routing and the SSRF guard on the feed endpoint. That is where
+lemmatisation, separable-prefix reunification, sentence deconstruction, RSS and
+YouTube Atom feed parsing, source-link classification for every provider, iTunes
+result mapping, channel-id and feed-link extraction, media-URL routing and the
+SSRF guard on the outbound endpoints. That is where
 the correctness risk lives; the UI is comparatively forgiving.
 
 Streaming is verified in a real browser against a range-serving HTTP endpoint:
