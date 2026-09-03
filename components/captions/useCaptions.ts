@@ -4,9 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TargetLang } from "@/lib/types";
 import type { PlayerHandle } from "../player/types";
 import { getSpeechRecognition, type SpeechRecognitionLike } from "@/lib/audio/speech";
-import { covers, coveredSeconds, mergeInterval, utteranceStart, type Interval } from "@/lib/audio/captions";
+import {
+  covers,
+  coveredSeconds,
+  isFullyCovered,
+  mergeInterval,
+  utteranceStart,
+  type Interval,
+} from "@/lib/audio/captions";
 import { splitUtterance } from "@/lib/audio/segment";
 import { captureFromElement, rms, SILENCE_THRESHOLD, type CaptureHandle } from "@/lib/audio/capture";
+import { useCaptureElement, type CaptureRoute } from "./useCaptureElement";
 import { WhisperEngine, hasWebGpu, type WhisperStatus } from "@/lib/audio/whisper";
 
 export type CaptionMode = "internal" | "mic";
@@ -30,16 +38,20 @@ export interface CaptionState {
   whisper: WhisperStatus;
   micSupported: boolean;
   webGpu: boolean;
+  /** Where the transcriber is reading the audio from, once it is reading. */
+  route: CaptureRoute | null;
+  /** Seconds from starting the engine to the first line of text. */
+  firstResultMs: number | null;
 }
 
 /**
  * Caption capture, in two flavours.
  *
- * **internal** taps the audio inside the page and transcribes it with Whisper
- * in a worker. Headphones are fine, a noisy carriage is fine, and nothing
- * leaves the device. It costs a model download once, and needs the stream
- * routed through this origin, because a browser will not let Web Audio read
- * cross-origin media.
+ * **internal** transcribes the episode's own audio with Whisper in a worker.
+ * Headphones are fine, a noisy carriage is fine, and nothing leaves the
+ * device. It costs a model download once, and it reads from a silent shadow
+ * copy of the episode rather than from the element the listener is hearing, so
+ * that a problem on the transcription side can never interrupt playback.
  *
  * **mic** uses the browser's own recogniser, which listens to the microphone.
  * It starts instantly and downloads nothing, and it requires the audio to be
@@ -51,20 +63,15 @@ export interface CaptionState {
  */
 export function useCaptions({
   handle,
-  mediaElement,
+  mediaUrl,
   targetLang,
   translate,
-  onNeedCapture,
-  captureFailed,
 }: {
   handle: PlayerHandle;
-  mediaElement: () => HTMLMediaElement | null;
+  /** The episode's media URL, or null when there is nothing tappable. */
+  mediaUrl: string | null;
   targetLang: TargetLang;
   translate: boolean;
-  /** Asks the player to route audio through this origin, or to stop. */
-  onNeedCapture: (on: boolean) => void;
-  /** The player could not load the proxied stream, so this path is closed. */
-  captureFailed?: boolean;
 }) {
   const [lines, setLines] = useState<CaptionLine[]>([]);
   const [interim, setInterim] = useState("");
@@ -74,6 +81,13 @@ export function useCaptions({
   const [error, setError] = useState<string | null>(null);
   const [whisper, setWhisper] = useState<WhisperStatus>({ state: "idle" });
   const [micSupported, setMicSupported] = useState(false);
+  const [firstResultMs, setFirstResultMs] = useState<number | null>(null);
+  const startedAtRef = useRef(0);
+  // Destructured deliberately. Depending on the hook's returned object would
+  // make every consumer's callbacks change identity on each render, and one of
+  // those callbacks is the teardown that runs when the episode changes - which
+  // then ran constantly and stopped captions the moment they started.
+  const { acquire, release, route } = useCaptureElement(handle);
 
   const coverageRef = useRef<Interval[]>([]);
   const linesRef = useRef<CaptionLine[]>([]);
@@ -90,9 +104,14 @@ export function useCaptions({
   /** Adds a recognised block, split into readable lines. */
   const addUtterance = useCallback((text: string, at: number, until: number) => {
     if (!text.trim()) return;
-    if (covers(coverageRef.current, at)) return;
 
-    const chunks = splitUtterance(text, at, Math.max(until, at + 1));
+    const all = splitUtterance(text, at, Math.max(until, at + 1));
+    // Only lines that lie wholly inside ground already transcribed are
+    // dropped. That covers the real cases - replaying a passage, and the
+    // opening of a window repeating the close of the one before - while a line
+    // that straddles the seam is kept, because losing a sentence is a worse
+    // failure for someone reading along than repeating a few words.
+    const chunks = all.filter((chunk) => !isFullyCovered(coverageRef.current, chunk.at, chunk.until));
     if (chunks.length === 0) return;
 
     coverageRef.current = mergeInterval(coverageRef.current, {
@@ -214,72 +233,105 @@ export function useCaptions({
 
   // ---- internal audio engine --------------------------------------------
 
-  const startInternal = useCallback(() => {
+  const stopInternal = useCallback(() => {
+    captureRef.current?.stop();
+    captureRef.current = null;
+    whisperRef.current?.stop();
+    whisperRef.current = null;
+    release();
+  }, [release]);
+
+  const startInternal = useCallback(async () => {
+    if (!mediaUrl) {
+      setError("This episode has no audio stream this browser can read. Microphone captions still work.");
+      wantRunningRef.current = false;
+      setRunning(false);
+      return;
+    }
+
+    startedAtRef.current = performance.now();
+    setFirstResultMs(null);
+
     const engine = new WhisperEngine(
       (status) => {
         setWhisper(status);
-        // A model that will not load is a dead end, not a slow start. Say so and
-        // release the tap rather than sitting on "listening" forever.
+        // A model that will not load is a dead end, not a slow start. Say so
+        // and release everything rather than sitting on "listening" forever.
         if (status.state === "error") {
           setError(
-            "The speech model could not be loaded. Check the connection, or switch to microphone captions.",
+            `The speech model could not be loaded${status.error ? `: ${status.error}` : "."} Microphone captions still work.`,
           );
           wantRunningRef.current = false;
           setRunning(false);
-          captureRef.current?.stop();
-          captureRef.current = null;
-          onNeedCapture(false);
+          stopInternal();
         }
       },
       (result) => {
+        if (startedAtRef.current) {
+          setFirstResultMs((previous) => previous ?? Math.round(performance.now() - startedAtRef.current));
+        }
         addUtterance(result.text, result.at, result.until);
       },
     );
     whisperRef.current = engine;
     engine.start();
 
-    // The element only becomes readable once its source is same-origin, so the
-    // tap waits a moment for the player to swap it.
-    window.setTimeout(() => {
-      const element = mediaElement();
-      if (!element) {
-        setError("No audio is playing.");
-        return;
-      }
-      // A cross-origin element that the browser refuses to expose does not
-      // throw: it hands back silence. Counting the silent windows is the only
-      // way to tell that apart from an actual pause, and after four of them in
-      // a row while the clock is running it is not a pause.
-      let silentWindows = 0;
-      const capture = captureFromElement(element, {
-        windowSeconds: 6,
-        overlapSeconds: 0.8,
-        currentTime: () => handle.getTime(),
-        onWindow: ({ samples, at, until }) => {
-          if (rms(samples) < SILENCE_THRESHOLD) {
-            const playing = !element.paused && !element.ended;
-            silentWindows = playing ? silentWindows + 1 : 0;
-            if (silentWindows === 4) {
-              setError(
-                "The page is playing sound, but the browser will not let it be read. Microphone captions still work.",
-              );
-            }
-            return;
+    const acquired = await acquire(mediaUrl);
+    if (!wantRunningRef.current) {
+      stopInternal();
+      return;
+    }
+    if (!acquired) {
+      setError("The audio could not be opened for reading. Microphone captions still work.");
+      wantRunningRef.current = false;
+      setRunning(false);
+      stopInternal();
+      return;
+    }
+
+    // A cross-origin element the browser refuses to expose does not throw: it
+    // hands back silence. Counting silent windows is the only way to tell that
+    // apart from a pause, and four in a row while the clock runs is not a pause.
+    let silentWindows = 0;
+    const tap = captureFromElement(acquired.element, {
+      // Five seconds is the shortest window that still gives Whisper enough
+      // context to punctuate and to get compounds right, and it is what the
+      // caption lag is: text arrives about a window behind the speech. The
+      // second of overlap is what stops a word being cut in half at the seam.
+      windowSeconds: 5,
+      overlapSeconds: 1,
+      // The shadow element is muted and never reaches the speakers.
+      passthrough: false,
+      currentTime: () => handle.getTime(),
+      onWindow: ({ samples, at, until }) => {
+        if (rms(samples) < SILENCE_THRESHOLD) {
+          const playing = !acquired.element.paused && !acquired.element.ended;
+          silentWindows = playing ? silentWindows + 1 : 0;
+          if (silentWindows === 4) {
+            setError(
+              "The audio is playing but reads as silence, which means the browser will not expose it. Microphone captions still work.",
+            );
           }
-          silentWindows = 0;
-          if (covers(coverageRef.current, at)) return;
-          whisperRef.current?.transcribe(samples, at, until);
-        },
-      });
-      if (!capture) {
-        setError(
-          "This browser would not let the page read the audio. Switch to microphone captions, or try Chrome.",
-        );
-        return;
-      }
-      captureRef.current = capture;
-    }, 400);
-  }, [addUtterance, handle, mediaElement, onNeedCapture]);
+          return;
+        }
+        silentWindows = 0;
+        // Only skip ground that is wholly transcribed already: a window whose
+        // far end is new is worth the inference even though it starts inside
+        // the previous one.
+        if (isFullyCovered(coverageRef.current, at, until)) return;
+        whisperRef.current?.transcribe(samples, at, until);
+      },
+    });
+
+    if (!tap) {
+      setError("This browser would not let the page read the audio. Try Chrome, or use microphone captions.");
+      wantRunningRef.current = false;
+      setRunning(false);
+      stopInternal();
+      return;
+    }
+    captureRef.current = tap;
+  }, [acquire, addUtterance, handle, mediaUrl, stopInternal]);
 
   // ---- control -----------------------------------------------------------
 
@@ -289,14 +341,12 @@ export function useCaptions({
       wantRunningRef.current = true;
       setRunning(true);
       if (mode === "mic") {
-        onNeedCapture(false);
         startMic();
       } else {
-        onNeedCapture(true);
-        startInternal();
+        void startInternal();
       }
     },
-    [onNeedCapture, startMic, startInternal],
+    [startMic, startInternal],
   );
 
   const stop = useCallback(() => {
@@ -309,12 +359,8 @@ export function useCaptions({
       // Already stopped.
     }
     recognitionRef.current = null;
-    captureRef.current?.stop();
-    captureRef.current = null;
-    whisperRef.current?.stop();
-    whisperRef.current = null;
-    onNeedCapture(false);
-  }, [onNeedCapture]);
+    stopInternal();
+  }, [stopInternal]);
 
   useEffect(
     () => () => {
@@ -353,18 +399,6 @@ export function useCaptions({
     return () => cancelAnimationFrame(frame);
   }, [handle]);
 
-  /** The proxy failed, so playback reverted and internal capture is impossible. */
-  useEffect(() => {
-    if (!captureFailed) return;
-    wantRunningRef.current = false;
-    setRunning(false);
-    captureRef.current?.stop();
-    captureRef.current = null;
-    whisperRef.current?.stop();
-    whisperRef.current = null;
-    setError("This stream cannot be read inside the page. Microphone captions still work.");
-  }, [captureFailed]);
-
   const clear = useCallback(() => {
     setLines([]);
     coverageRef.current = [];
@@ -381,6 +415,8 @@ export function useCaptions({
     whisper,
     micSupported,
     webGpu: hasWebGpu(),
+    route,
+    firstResultMs,
   };
 
   return { state, start, stop, clear };

@@ -309,3 +309,91 @@ export function cleanSpotifyTitle(raw: string): string {
     .replace(/\s*[|·-]\s*Podcast auf Spotify\s*$/i, "")
     .trim();
 }
+
+/**
+ * Channels found in a YouTube search results page.
+ *
+ * There is no keyless API for this, but the results page carries its data as a
+ * JSON blob in the markup, and every channel in it appears as a
+ * `channelRenderer`. Reading that is the same technique already used to turn a
+ * handle into a channel id, and it removes the need to hard-code handles -
+ * which is worth doing, because a hard-coded handle that is even slightly wrong
+ * fails as a flat 404 with nothing to suggest what the right one was.
+ */
+export interface YouTubeChannel {
+  channelId: string;
+  title: string;
+  description: string;
+  artwork: string | null;
+}
+
+export function youtubeSearchUrl(term: string): string {
+  // sp=EgIQAg%3D%3D is the "Channels" filter, so videos do not crowd out the
+  // one thing we are looking for.
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(term)}&sp=EgIQAg%3D%3D`;
+}
+
+/** Decodes the \u-escapes and entities YouTube leaves in its embedded JSON. */
+function decodeJsonText(value: string): string {
+  return value
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, "\\")
+    .replace(/&amp;/g, "&")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"');
+}
+
+export function extractSearchChannels(html: string, limit = 6): YouTubeChannel[] {
+  const found: YouTubeChannel[] = [];
+  const seen = new Set<string>();
+
+  // Each block starts at a channelRenderer and is read only as far as the next
+  // one, so a title can never be picked up from the neighbouring channel.
+  const blocks = html.split('"channelRenderer"');
+  for (const block of blocks.slice(1)) {
+    if (found.length >= limit) break;
+    const window = block.slice(0, 4000);
+
+    const id = window.match(/"channelId"\s*:\s*"(UC[\w-]{22})"/);
+    if (!id || seen.has(id[1])) continue;
+
+    const title =
+      window.match(/"title"\s*:\s*\{\s*"simpleText"\s*:\s*"((?:[^"\\]|\\.)*)"/) ??
+      window.match(/"title"\s*:\s*\{[^}]*"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    const description = window.match(/"descriptionSnippet"[\s\S]{0,200}?"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    const artwork = window.match(/"url"\s*:\s*"(\/\/yt3\.[^"]+?)"/);
+
+    seen.add(id[1]);
+    found.push({
+      channelId: id[1],
+      title: title ? decodeJsonText(title[1]) : "YouTube-Kanal",
+      description: description ? decodeJsonText(description[1]).slice(0, 300) : "",
+      artwork: artwork ? `https:${artwork[1].replace(/\\\//g, "/")}` : null,
+    });
+  }
+
+  return found;
+}
+
+/**
+ * The addresses a channel might answer on, in the order worth trying.
+ *
+ * Handles are the modern form, but plenty of older channels still live at /c/
+ * or /user/, and a name typed by a person is not a URL at all. Trying each in
+ * turn costs one request that usually is not needed and saves a dead end that
+ * always is.
+ */
+export function channelPageCandidates(name: string): string[] {
+  const trimmed = name.trim().replace(/^@/, "");
+  const compact = trimmed.replace(/[^\p{L}\p{N}]/gu, "");
+  const candidates = [
+    `https://www.youtube.com/@${encodeURIComponent(trimmed)}`,
+    `https://www.youtube.com/c/${encodeURIComponent(trimmed)}`,
+    `https://www.youtube.com/user/${encodeURIComponent(trimmed)}`,
+  ];
+  if (compact && compact !== trimmed) {
+    candidates.unshift(`https://www.youtube.com/@${encodeURIComponent(compact)}`);
+  }
+  return [...new Set(candidates)];
+}

@@ -108,11 +108,11 @@ export function ListenClient() {
 
   const captions = useCaptions({
     handle: player.handle,
-    mediaElement: player.mediaElement,
+    // YouTube plays inside an iframe whose audio the page cannot reach, so
+    // there is nothing to tap there; the microphone path still is.
+    mediaUrl: playing && playing.kind !== "youtube" ? (playing.url ?? null) : null,
     targetLang,
     translate: dual,
-    onNeedCapture: player.setCaptureMode,
-    captureFailed: player.captureFailed,
   });
 
   /**

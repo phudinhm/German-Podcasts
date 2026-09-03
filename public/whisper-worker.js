@@ -17,14 +17,34 @@ let transcriber = null;
 let loading = null;
 let currentModel = null;
 
-const CDN = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
+// Two mirrors of the same package. One CDN being unreachable - a corporate
+// proxy, a regional block, a bad afternoon - should not be the end of the
+// feature, and the second attempt costs nothing when the first works.
+const CDNS = [
+  "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/dist/transformers.min.js",
+  "https://unpkg.com/@huggingface/transformers@3.0.2/dist/transformers.min.js",
+];
+
+async function loadLibrary() {
+  let last = null;
+  for (const url of CDNS) {
+    try {
+      return await import(url);
+    } catch (error) {
+      last = error;
+    }
+  }
+  throw new Error(
+    `The speech library could not be downloaded (${last && last.message ? last.message : last}).`,
+  );
+}
 
 async function load(preferWebGpu) {
   if (transcriber) return transcriber;
   if (loading) return loading;
 
   loading = (async () => {
-    const { pipeline, env } = await import(`${CDN}/dist/transformers.min.js`);
+    const { pipeline, env } = await loadLibrary();
     // Models come from the Hugging Face CDN; nothing is served from our origin.
     env.allowLocalModels = false;
 

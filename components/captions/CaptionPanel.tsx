@@ -94,7 +94,25 @@ export function CaptionPanel({
         ) : null}
 
         {state.whisper.device ? (
-          <span className="chip text-[10px]">{state.whisper.device === "webgpu" ? "WebGPU" : "WASM"}</span>
+          <span className="chip text-[10px]" title={state.whisper.model}>
+            {state.whisper.device === "webgpu" ? "WebGPU" : "WASM"}
+          </span>
+        ) : mode === "internal" && !state.webGpu && state.running ? (
+          // Worth saying up front rather than leaving someone to wonder why it
+          // is slow: without a GPU the model runs on the CPU and lags.
+          <span className="chip text-[10px]">{t("caption.noWebGpu")}</span>
+        ) : null}
+
+        {state.route ? (
+          <span className="chip text-[10px]">
+            {state.route === "direct" ? t("caption.routeDirect") : t("caption.routeProxy")}
+          </span>
+        ) : null}
+
+        {state.firstResultMs !== null ? (
+          <span className="text-[11px] text-[var(--ink-faint)]">
+            {(state.firstResultMs / 1000).toFixed(1)}s {t("caption.toFirstLine")}
+          </span>
         ) : null}
 
         {state.covered > 0 ? (

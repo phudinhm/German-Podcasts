@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 const {
-  mergeInterval, covers, coveredSeconds, utteranceStart,
+  mergeInterval, covers, coveredSeconds, utteranceStart, isFullyCovered,
   INTERIM_LEAD_SECONDS, COVERAGE_SLACK,
 } = await import("../.scripts-out/lib/audio/captions.js");
 
@@ -75,4 +75,20 @@ test("replaying a captured passage is recognised as covered", () => {
   const list = mergeInterval([], { from: 30, to: 35 });
   assert.equal(covers(list, 32), true, "must not transcribe this stretch again");
   assert.equal(covers(list, 60), false, "unheard audio is still fair game");
+});
+
+test("a window that overlaps the last one but reaches new ground is not skipped", () => {
+  const covered = [{ from: 2, to: 8 }];
+  // The next capture window starts inside the previous one on purpose, so a
+  // word on the seam is heard whole.
+  assert.equal(isFullyCovered(covered, 7.2, 13.2), false);
+});
+
+test("replayed ground is skipped", () => {
+  const covered = [{ from: 2, to: 40 }];
+  assert.equal(isFullyCovered(covered, 10, 16), true);
+});
+
+test("a window straddling the end of covered ground still counts as new", () => {
+  assert.equal(isFullyCovered([{ from: 0, to: 20 }], 18, 24), false);
 });

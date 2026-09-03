@@ -6,8 +6,10 @@
  * transcribed, which is why captions no longer need the microphone: the audio
  * is read from inside the page rather than heard from outside it.
  *
- * The element must be same-origin, or Web Audio hands back silence. Callers
- * are expected to have routed the URL through the passthrough first.
+ * The element must be readable, which means either same-origin or served with
+ * CORS headers. A cross-origin element without them does not throw: it hands
+ * back silence, which is why callers check the level as well as the return
+ * value.
  */
 
 /** Whisper and most speech models expect 16 kHz mono. */
@@ -149,12 +151,54 @@ export class WindowBuffer {
  * throws nothing: a failed capture should degrade to the microphone path
  * rather than break playback.
  */
+export interface CaptureOptionsFull extends CaptureOptions {
+  /**
+   * Whether this element's sound should reach the speakers. False for a hidden
+   * capture element that shadows the real player: connecting it would play the
+   * episode twice, a fraction of a second apart.
+   */
+  passthrough?: boolean;
+}
+
+/**
+ * Asks whether a media URL can be read directly.
+ *
+ * A one-byte range request is enough: if the CDN sends CORS headers the fetch
+ * resolves, and if it does not the browser rejects it before any body arrives.
+ * Cheap enough to do on every start, and it decides whether the passthrough is
+ * needed at all - which for a cooperative CDN means no server bandwidth and no
+ * second download.
+ */
+export async function canReadDirectly(url: string): Promise<boolean> {
+  if (typeof fetch === "undefined") return false;
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      mode: "cors",
+      headers: { Range: "bytes=0-1" },
+      signal: AbortSignal.timeout(6_000),
+    });
+    // Reading the body proves the response is genuinely readable, not opaque.
+    await response.arrayBuffer();
+    return response.ok || response.status === 206;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Taps a media element. Returns null when the browser has no Web Audio or the
+ * element cannot be tapped, and throws nothing: a failed capture degrades to
+ * the microphone path rather than breaking playback.
+ */
 export function captureFromElement(
   element: HTMLMediaElement,
-  options: CaptureOptions,
+  options: CaptureOptionsFull,
 ): CaptureHandle | null {
   if (typeof window === "undefined") return null;
-  const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  const Ctor =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctor) return null;
 
   const context = new Ctor();
@@ -162,12 +206,18 @@ export function captureFromElement(
   try {
     source = context.createMediaElementSource(element);
   } catch {
-    // An element can only be tapped once; a second attempt throws. It also
-    // throws for cross-origin media without CORS, which is exactly the case
-    // the same-origin passthrough exists to avoid.
+    // An element can only be tapped once; a second attempt throws.
     void context.close();
     return null;
   }
+
+  // Once an element feeds the graph, its audio no longer reaches the speakers
+  // by itself: what keeps a shadow copy silent is not connecting it to the
+  // destination, not muting it. Muting mutes the graph as well, so a muted
+  // element yields nothing but zeroes to transcribe - which looks exactly like
+  // a browser refusing to expose the audio, and is not.
+  element.muted = false;
+  element.volume = 1;
 
   const windowBuffer = new WindowBuffer(
     TARGET_SAMPLE_RATE,
@@ -176,30 +226,53 @@ export function captureFromElement(
     options.onWindow,
   );
 
-  // ScriptProcessor is deprecated but is the only node available everywhere
-  // without shipping a worklet file; the work done per callback is a copy and
-  // a resample, which is far below the budget even on a phone.
-  const processor = context.createScriptProcessor(4096, 1, 1);
   let running = true;
+  const nodes: AudioNode[] = [];
 
-  processor.onaudioprocess = (event) => {
+  function accept(mono: Float32Array, sampleRate: number) {
     if (!running) return;
-    const input = event.inputBuffer;
-    const channels: Float32Array[] = [];
-    for (let i = 0; i < input.numberOfChannels; i += 1) channels.push(input.getChannelData(i));
-    const mono = toMono(channels);
-    const resampled = resample(mono, input.sampleRate, TARGET_SAMPLE_RATE);
-    windowBuffer.push(resampled, options.currentTime());
-  };
+    windowBuffer.push(resample(mono, sampleRate, TARGET_SAMPLE_RATE), options.currentTime());
+  }
 
-  // Pass the audio through to the speakers, and give the processor a
-  // destination so it actually runs; a muted gain keeps it silent.
+  // The worklet runs on the audio thread, so a busy main thread cannot make it
+  // drop frames. It needs an async module load, so the graph is wired up when
+  // it arrives; until then no frames are lost, because the element has barely
+  // started playing.
   const silent = context.createGain();
   silent.gain.value = 0;
-  source.connect(context.destination);
-  source.connect(processor);
-  processor.connect(silent);
   silent.connect(context.destination);
+  nodes.push(silent);
+
+  if (options.passthrough !== false) source.connect(context.destination);
+
+  void context.audioWorklet
+    ?.addModule("/capture-worklet.js")
+    .then(() => {
+      if (!running) return;
+      const node = new AudioWorkletNode(context, "capture-processor");
+      node.port.onmessage = (event: MessageEvent) => {
+        const data = event.data as { samples: Float32Array; sampleRate: number };
+        accept(data.samples, data.sampleRate);
+      };
+      source.connect(node);
+      node.connect(silent);
+      nodes.push(node);
+    })
+    .catch(() => {
+      if (!running) return;
+      // Older Safari has no worklet. ScriptProcessor is deprecated and runs on
+      // the main thread, but a missing tap is worse than a deprecated one.
+      const processor = context.createScriptProcessor(4096, 1, 1);
+      processor.onaudioprocess = (event) => {
+        const input = event.inputBuffer;
+        const channels: Float32Array[] = [];
+        for (let i = 0; i < input.numberOfChannels; i += 1) channels.push(input.getChannelData(i));
+        accept(toMono(channels), input.sampleRate);
+      };
+      source.connect(processor);
+      processor.connect(silent);
+      nodes.push(processor);
+    });
 
   void context.resume().catch(() => undefined);
 
@@ -208,10 +281,8 @@ export function captureFromElement(
       running = false;
       windowBuffer.flush();
       try {
-        processor.disconnect();
-        silent.disconnect();
+        for (const node of nodes) node.disconnect();
         source.disconnect();
-        source.connect(context.destination);
       } catch {
         // Already torn down.
       }

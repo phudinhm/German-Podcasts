@@ -51,6 +51,20 @@ export function covers(list: Interval[], time: number): boolean {
   return list.some((item) => time >= item.from - COVERAGE_SLACK && time <= item.to + COVERAGE_SLACK);
 }
 
+/**
+ * Whether a stretch is entirely old ground.
+ *
+ * The distinction from `covers` matters because consecutive capture windows
+ * deliberately overlap: a window's start is meant to fall inside the previous
+ * one so a word split across the seam is still heard whole. Asking only about
+ * the start would therefore reject every second window and lose exactly the
+ * speech the overlap exists to protect. What makes a window worth transcribing
+ * is whether its far end reaches new ground.
+ */
+export function isFullyCovered(list: Interval[], from: number, to: number): boolean {
+  return covers(list, from) && covers(list, to);
+}
+
 export function coveredSeconds(list: Interval[]): number {
   return list.reduce((total, item) => total + (item.to - item.from), 0);
 }

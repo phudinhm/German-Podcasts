@@ -6,6 +6,7 @@ const {
   extractFeedLinks, extractOpenGraph, cleanSpotifyTitle,
   youtubeChannelFeed, itunesSearchUrl,
 } = await import("../.scripts-out/lib/server/discover.js");
+const discover = await import("../.scripts-out/lib/server/discover.js");
 const { parseFeed, parseYouTubeFeed } = await import("../.scripts-out/lib/server/feed.js");
 
 test("routes Apple Podcasts links to a lookup by id", () => {
@@ -151,4 +152,67 @@ test("parseFeed still reports rss for a podcast feed", () => {
   const feed = parseFeed(rss, "fallback");
   assert.equal(feed.format, "rss");
   assert.equal(feed.episodes[0].youtubeId, undefined);
+});
+
+// --- YouTube channel search --------------------------------------------------
+
+const { extractSearchChannels, channelPageCandidates, youtubeSearchUrl } = discover;
+
+// Shaped like the ytInitialData blob a results page actually carries: escaped
+// unicode in titles, protocol-relative thumbnails, and video renderers mixed in.
+const SEARCH_HTML = `<!DOCTYPE html><html><script>var ytInitialData = {"contents":{"items":[
+{"channelRenderer":{"channelId":"UCbxb2fqe9oNgglAoYqsYOtQ","title":{"simpleText":"Easy German"},
+"thumbnail":{"thumbnails":[{"url":"//yt3.ggpht.com/ytc/easy=s88","width":88}]},
+"descriptionSnippet":{"runs":[{"text":"Deutsch lernen mit Stra\\u00dfeninterviews"}]}}},
+{"videoRenderer":{"videoId":"abcdefghijk","title":{"runs":[{"text":"Nicht ein Kanal"}]}}},
+{"channelRenderer":{"channelId":"UCMM7ZQ5nRQAOFEJgJvpaMbA","title":{"simpleText":"Dinge Erkl\\u00e4rt \\u2013 Kurzgesagt"},
+"thumbnail":{"thumbnails":[{"url":"//yt3.ggpht.com/ytc/kurz=s88"}]},
+"descriptionSnippet":{"runs":[{"text":"Gro\\u00dfe Fragen, kurz erkl\\u00e4rt"}]}}}
+]}};</script></html>`;
+
+test("reads channels out of a search results page", () => {
+  const channels = extractSearchChannels(SEARCH_HTML);
+  assert.equal(channels.length, 2, "the video renderer must not be counted as a channel");
+  assert.equal(channels[0].channelId, "UCbxb2fqe9oNgglAoYqsYOtQ");
+  assert.equal(channels[0].title, "Easy German");
+  assert.equal(channels[0].artwork, "https://yt3.ggpht.com/ytc/easy=s88");
+  assert.match(channels[0].description, /Straßeninterviews/);
+});
+
+test("decodes the escaped unicode YouTube leaves in titles", () => {
+  const channels = extractSearchChannels(SEARCH_HTML);
+  assert.equal(channels[1].title, "Dinge Erklärt – Kurzgesagt");
+});
+
+test("a title is never taken from the next channel's block", () => {
+  // Second channel carries no title of its own; it must fall back, not borrow.
+  const html = `{"channelRenderer":{"channelId":"UCaaaaaaaaaaaaaaaaaaaaaa"}}` +
+    `{"channelRenderer":{"channelId":"UCbbbbbbbbbbbbbbbbbbbbbb","title":{"simpleText":"Zweiter"}}}`;
+  const channels = extractSearchChannels(html);
+  assert.equal(channels.length, 2);
+  assert.equal(channels[1].title, "Zweiter");
+});
+
+test("a page with no channels yields nothing rather than throwing", () => {
+  assert.deepEqual(extractSearchChannels("<html><body>nichts</body></html>"), []);
+});
+
+test("the search URL asks for channels, not videos", () => {
+  const url = youtubeSearchUrl("Easy German");
+  assert.match(url, /search_query=Easy%20German/);
+  assert.match(url, /sp=EgIQAg%3D%3D/);
+});
+
+test("a channel name is tried at every address a channel can live at", () => {
+  const candidates = channelPageCandidates("Easy German");
+  // The compact form is the modern handle and is worth trying first.
+  assert.equal(candidates[0], "https://www.youtube.com/@EasyGerman");
+  assert.ok(candidates.some((url) => url.includes("/c/")));
+  assert.ok(candidates.some((url) => url.includes("/user/")));
+});
+
+test("a pasted handle keeps its exact form as the first guess", () => {
+  const candidates = channelPageCandidates("@easygerman");
+  assert.equal(candidates[0], "https://www.youtube.com/@easygerman");
+  assert.equal(new Set(candidates).size, candidates.length, "no duplicate attempts");
 });

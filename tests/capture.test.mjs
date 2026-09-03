@@ -78,3 +78,44 @@ test("flushing an empty buffer emits nothing", () => {
   buffer.flush();
   assert.equal(emitted.length, 0);
 });
+
+// --- passthrough range arithmetic -------------------------------------------
+
+const { parseRange, totalFromContentRange, boundedRange } = await import(
+  "../.scripts-out/lib/server/range.js"
+);
+
+test("a plain range is read as written", () => {
+  assert.deepEqual(parseRange("bytes=100-199"), { start: 100, end: 199 });
+});
+
+test("an open-ended range has no end", () => {
+  assert.deepEqual(parseRange("bytes=0-"), { start: 0, end: undefined });
+});
+
+test("nonsense and suffix ranges are refused rather than guessed at", () => {
+  assert.equal(parseRange(null), null);
+  assert.equal(parseRange("bytes=-500"), null, "a suffix range needs the total length");
+  assert.equal(parseRange("items=0-10"), null);
+  assert.equal(parseRange("bytes=200-100"), null, "an inverted range is not a range");
+});
+
+test("an open-ended request is capped, so no single response is unbounded", () => {
+  assert.deepEqual(boundedRange("bytes=0-", 1000), { start: 0, end: 999 });
+  assert.deepEqual(boundedRange(null, 1000), { start: 0, end: 999 });
+  assert.deepEqual(boundedRange("bytes=5000-", 1000), { start: 5000, end: 5999 });
+});
+
+test("a request smaller than the cap is honoured exactly", () => {
+  assert.deepEqual(boundedRange("bytes=10-19", 1000), { start: 10, end: 19 });
+});
+
+test("a request larger than the cap is trimmed, not refused", () => {
+  assert.deepEqual(boundedRange("bytes=0-999999", 1000), { start: 0, end: 999 });
+});
+
+test("the total length is read off a Content-Range", () => {
+  assert.equal(totalFromContentRange("bytes 0-999/45678"), 45678);
+  assert.equal(totalFromContentRange("bytes 0-999/*"), null);
+  assert.equal(totalFromContentRange(null), null);
+});

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { assertPublicUrl } from "@/lib/server/feed";
 import {
+  channelPageCandidates,
   classifyInput,
   cleanSpotifyTitle,
   extractChannelId,
+  extractSearchChannels,
   extractFeedLinks,
   extractOpenGraph,
   isYouTubeHandle,
@@ -14,8 +16,10 @@ import {
   spotifyShowUrl,
   youtubeChannelFeed,
   youtubePlaylistFeed,
+  youtubeSearchUrl,
   type DiscoverResult,
   type ITunesPodcast,
+  type YouTubeChannel,
 } from "@/lib/server/discover";
 
 export const runtime = "nodejs";
@@ -183,63 +187,111 @@ async function fromYouTubeChannel(channelId: string): Promise<DiscoverResult> {
   };
 }
 
+/**
+ * Turns a handle into a channel, without insisting the handle is right.
+ *
+ * A handle is only one of the addresses a channel can live at, and one typed
+ * or remembered slightly wrong returns a flat 404 that tells the reader
+ * nothing. So the obvious addresses are tried in turn, and if none of them
+ * answers, the handle is treated as what it usually is anyway - the channel's
+ * name - and searched for.
+ */
 async function fromYouTubeHandle(handle: string): Promise<DiscoverResult[]> {
-  const html = await fetchText(`https://www.youtube.com/@${handle}`, "text/html");
-  const channelId = extractChannelId(html);
-  if (!channelId) {
-    throw new Error(`Zu @${handle} ließ sich keine Kanal-ID finden. Der Kanal-Link mit /channel/UC… funktioniert sicher.`);
+  for (const candidate of channelPageCandidates(handle)) {
+    let html: string;
+    try {
+      html = await fetchText(candidate, "text/html");
+    } catch {
+      continue;
+    }
+    const channelId = extractChannelId(html);
+    if (!channelId) continue;
+    return [
+      {
+        id: `yt:channel:${channelId}`,
+        title: extractOpenGraph(html, "title") ?? `@${handle}`,
+        publisher: "YouTube",
+        description: extractOpenGraph(html, "description") ?? "Die neuesten Videos dieses Kanals.",
+        artwork: extractOpenGraph(html, "image"),
+        feedUrl: youtubeChannelFeed(channelId),
+        origin: "youtube",
+        pageUrl: `https://www.youtube.com/channel/${channelId}`,
+      },
+    ];
   }
-  const title = extractOpenGraph(html, "title") ?? `@${handle}`;
-  return [
-    {
-      id: `yt:channel:${channelId}`,
-      title,
+
+  const searched = await searchYouTube(handle.replace(/[-_.]+/g, " "));
+  if (searched.length > 0) return searched;
+
+  throw new Error(
+    `Zu „${handle}" ließ sich kein YouTube-Kanal finden. Ein Link der Form youtube.com/channel/UC… funktioniert immer.`,
+  );
+}
+
+async function searchYouTubeWithKey(term: string, key: string): Promise<DiscoverResult[]> {
+  const params = new URLSearchParams({
+    part: "snippet",
+    type: "channel",
+    maxResults: "6",
+    relevanceLanguage: "de",
+    q: term,
+    key,
+  });
+  const raw = await fetchText(`https://www.googleapis.com/youtube/v3/search?${params}`, "application/json");
+  const data = JSON.parse(raw) as {
+    items?: Array<{
+      id?: { channelId?: string };
+      snippet?: { title?: string; description?: string; thumbnails?: { high?: { url?: string } } };
+    }>;
+  };
+  return (data.items ?? [])
+    .filter((item) => item.id?.channelId)
+    .map((item) => ({
+      id: `yt:channel:${item.id!.channelId}`,
+      title: item.snippet?.title ?? "YouTube-Kanal",
       publisher: "YouTube",
-      description: extractOpenGraph(html, "description")?.slice(0, 300) ?? "",
-      artwork: extractOpenGraph(html, "image"),
-      feedUrl: youtubeChannelFeed(channelId),
-      origin: "youtube",
-      pageUrl: `https://www.youtube.com/channel/${channelId}`,
-    },
-  ];
+      description: (item.snippet?.description ?? "").slice(0, 300),
+      artwork: item.snippet?.thumbnails?.high?.url ?? null,
+      feedUrl: youtubeChannelFeed(item.id!.channelId!),
+      origin: "youtube" as const,
+      pageUrl: `https://www.youtube.com/channel/${item.id!.channelId}`,
+    }));
+}
+
+function channelResult(channel: YouTubeChannel): DiscoverResult {
+  return {
+    id: `yt:channel:${channel.channelId}`,
+    title: channel.title,
+    publisher: "YouTube",
+    description: channel.description,
+    artwork: channel.artwork,
+    feedUrl: youtubeChannelFeed(channel.channelId),
+    origin: "youtube",
+    pageUrl: `https://www.youtube.com/channel/${channel.channelId}`,
+  };
 }
 
 /**
- * Keyword search on YouTube needs the Data API, which needs a key. Without one
- * this returns nothing rather than guessing, and the Apple results carry the
- * search on their own.
+ * Finds YouTube channels for a typed name.
+ *
+ * The official API is used when a key is configured, because it is cleaner and
+ * more stable. Without one the results page is read directly, which is what
+ * makes YouTube work here for everyone rather than only for a deployment that
+ * has been given a key. Either way a failure is not fatal: YouTube results are
+ * an addition to a podcast search, never the whole of it.
  */
 async function searchYouTube(term: string): Promise<DiscoverResult[]> {
   const key = process.env.YOUTUBE_API_KEY;
-  if (!key) return [];
+  if (key) {
+    try {
+      return await searchYouTubeWithKey(term, key);
+    } catch (error) {
+      console.error("[discover] YouTube API search failed, falling back:", error);
+    }
+  }
   try {
-    const params = new URLSearchParams({
-      part: "snippet",
-      type: "channel",
-      maxResults: "6",
-      relevanceLanguage: "de",
-      q: term,
-      key,
-    });
-    const raw = await fetchText(`https://www.googleapis.com/youtube/v3/search?${params}`, "application/json");
-    const data = JSON.parse(raw) as {
-      items?: Array<{
-        id?: { channelId?: string };
-        snippet?: { title?: string; description?: string; thumbnails?: { high?: { url?: string } } };
-      }>;
-    };
-    return (data.items ?? [])
-      .filter((item) => item.id?.channelId)
-      .map((item) => ({
-        id: `yt:channel:${item.id!.channelId}`,
-        title: item.snippet?.title ?? "YouTube-Kanal",
-        publisher: "YouTube",
-        description: (item.snippet?.description ?? "").slice(0, 300),
-        artwork: item.snippet?.thumbnails?.high?.url ?? null,
-        feedUrl: youtubeChannelFeed(item.id!.channelId!),
-        origin: "youtube" as const,
-        pageUrl: `https://www.youtube.com/channel/${item.id!.channelId}`,
-      }));
+    const html = await fetchText(youtubeSearchUrl(term), "text/html");
+    return extractSearchChannels(html).map(channelResult);
   } catch (error) {
     console.error("[discover] YouTube search failed:", error);
     return [];

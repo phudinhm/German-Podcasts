@@ -150,7 +150,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
               </div>
               <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {group.items.map((item: Suggestion) => (
-                  <li key={item.query}>
+                  <li key={`${item.query}|${item.video ? "v" : "a"}`}>
                     <button
                       type="button"
                       className="row-hover w-full p-2.5 text-left"
