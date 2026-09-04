@@ -4,7 +4,7 @@ import type { MediaSource } from "./types";
  * Turning a pasted URL into something playable.
  *
  * The app never proxies or re-hosts media: whatever we resolve here is handed
- * straight to a YouTube iframe or a media element, and the bytes travel from
+ * straight to a media element, and the bytes travel from
  * the publisher's CDN to the listener. That is the whole reason bandwidth cost
  * does not scale with usage.
  */
@@ -36,31 +36,6 @@ export function isMixedContent(raw: string): boolean {
   return window.location.protocol === "https:" && raw.startsWith("http://");
 }
 
-export function parseYouTubeId(raw: string): string | null {
-  const value = raw.trim();
-  // A bare 11-character id is the most common thing people paste.
-  if (/^[\w-]{11}$/.test(value)) return value;
-
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return null;
-  }
-  const host = url.hostname.replace(/^www\./, "");
-  if (host === "youtu.be") {
-    const id = url.pathname.slice(1).split("/")[0];
-    return /^[\w-]{11}$/.test(id) ? id : null;
-  }
-  if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
-    const v = url.searchParams.get("v");
-    if (v && /^[\w-]{11}$/.test(v)) return v;
-    const match = url.pathname.match(/^\/(?:shorts|embed|live|v)\/([\w-]{11})/);
-    if (match) return match[1];
-  }
-  return null;
-}
-
 export interface ParsedMedia {
   source: MediaSource;
   /** What the UI should say about this choice. */
@@ -76,13 +51,6 @@ export function parseMediaUrl(raw: string): ParsedMedia | null {
   const value = raw.trim();
   if (!value) return null;
 
-  const youtubeId = parseYouTubeId(value);
-  if (youtubeId) {
-    return {
-      source: { kind: "youtube", youtubeId, pageUrl: `https://www.youtube.com/watch?v=${youtubeId}` },
-      label: "YouTube",
-    };
-  }
 
   let url: URL;
   try {
@@ -109,13 +77,11 @@ export function parseMediaUrl(raw: string): ParsedMedia | null {
 }
 
 export function isStreamable(source: MediaSource): boolean {
-  return source.kind === "youtube" || source.kind === "audio" || source.kind === "video";
+  return source.kind === "audio" || source.kind === "video";
 }
 
 export function describeSource(source: MediaSource): string {
   switch (source.kind) {
-    case "youtube":
-      return "YouTube";
     case "audio":
       return "Audio-Stream";
     case "video":

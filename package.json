@@ -2,7 +2,7 @@
   "name": "hoerbar",
   "version": "0.1.0",
   "private": true,
-  "description": "H\u00f6rbar - CEFR-graded German podcast and video shadowing trainer",
+  "description": "A podcast player with a library that syncs through your own Google Drive",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,10 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "npm run build:scripts && node --test tests/*.test.mjs",
-    "classify": "npm run build:scripts && node .scripts-out/scripts/classify-level.js",
-    "build-catalog": "npm run build:scripts && node .scripts-out/scripts/build-catalog.js",
-    "build:scripts": "tsc -p tsconfig.scripts.json",
-    "ingest": "python3 worker/ingest.py"
+    "build:scripts": "tsc -p tsconfig.scripts.json"
   },
   "dependencies": {
     "next": "15.5.25",

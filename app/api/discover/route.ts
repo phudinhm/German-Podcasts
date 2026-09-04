@@ -1,25 +1,20 @@
 import { NextResponse } from "next/server";
 import { assertPublicUrl } from "@/lib/server/feed";
 import {
-  channelPageCandidates,
   classifyInput,
   cleanSpotifyTitle,
-  extractChannelId,
-  extractSearchChannels,
   extractFeedLinks,
   extractOpenGraph,
   isYouTubeHandle,
+  isYouTubeInput,
+  YOUTUBE_UNSUPPORTED,
   itunesLookupUrl,
   itunesSearchUrl,
   mapITunesResults,
   spotifyBridgeNote,
   spotifyShowUrl,
-  youtubeChannelFeed,
-  youtubePlaylistFeed,
-  youtubeSearchUrl,
   type DiscoverResult,
   type ITunesPodcast,
-  type YouTubeChannel,
 } from "@/lib/server/discover";
 
 export const runtime = "nodejs";
@@ -49,8 +44,15 @@ export async function POST(request: Request) {
   }
   if (!query) return NextResponse.json({ error: "q is required" }, { status: 400 });
 
-  const handle = isYouTubeHandle(query);
-  const input = handle ? ({ kind: "youtube-handle", handle } as const) : classifyInput(query);
+  // YouTube is no longer a source here. Channels can be read, but a large
+  // share of German broadcasters forbid playback outside YouTube, so what a
+  // learner actually got was a black rectangle and an apology. Saying so up
+  // front is better than shipping a path that fails for the very publishers
+  // people search for.
+  if (isYouTubeHandle(query) || isYouTubeInput(query)) {
+    return NextResponse.json({ error: YOUTUBE_UNSUPPORTED, results: [], count: 0 }, { status: 200 });
+  }
+  const input = classifyInput(query);
 
   try {
     switch (input.kind) {
@@ -59,37 +61,6 @@ export async function POST(request: Request) {
       case "spotify-show":
       case "spotify-episode":
         return json(await fromSpotify(input.id, country));
-      case "youtube-channel":
-        return json([await fromYouTubeChannel(input.channelId)]);
-      case "youtube-handle":
-        return json(await fromYouTubeHandle(input.handle));
-      case "youtube-playlist":
-        return json([
-          {
-            id: `yt:playlist:${input.playlistId}`,
-            title: "YouTube-Playlist",
-            publisher: "YouTube",
-            description: "Alle Videos dieser Playlist.",
-            artwork: null,
-            feedUrl: youtubePlaylistFeed(input.playlistId),
-            origin: "youtube" as const,
-            pageUrl: `https://www.youtube.com/playlist?list=${input.playlistId}`,
-          },
-        ]);
-      case "youtube-video":
-        return json([
-          {
-            id: `yt:video:${input.videoId}`,
-            title: "YouTube-Video",
-            publisher: "YouTube",
-            description: "Einzelnes Video, direkt abspielbar.",
-            artwork: `https://i.ytimg.com/vi/${input.videoId}/hqdefault.jpg`,
-            feedUrl: null,
-            youtubeId: input.videoId,
-            origin: "youtube" as const,
-            pageUrl: `https://www.youtube.com/watch?v=${input.videoId}`,
-          },
-        ]);
       case "feed":
         return json([
           {
@@ -161,8 +132,7 @@ async function fromSearch(term: string, country: string): Promise<DiscoverResult
   if (!term) return [];
   const raw = await fetchText(itunesSearchUrl(term, country), "application/json");
   const results = mapITunesResults(parseITunes(raw));
-  const youtube = await searchYouTube(term);
-  return [...results, ...youtube];
+  return results;
 }
 
 async function fromApplePodcast(id: string): Promise<DiscoverResult[]> {
@@ -172,130 +142,6 @@ async function fromApplePodcast(id: string): Promise<DiscoverResult[]> {
     throw new Error("Zu diesem Apple-Podcast-Link ist kein RSS-Feed hinterlegt.");
   }
   return results;
-}
-
-async function fromYouTubeChannel(channelId: string): Promise<DiscoverResult> {
-  return {
-    id: `yt:channel:${channelId}`,
-    title: "YouTube-Kanal",
-    publisher: "YouTube",
-    description: "Die neuesten Videos dieses Kanals.",
-    artwork: null,
-    feedUrl: youtubeChannelFeed(channelId),
-    origin: "youtube",
-    pageUrl: `https://www.youtube.com/channel/${channelId}`,
-  };
-}
-
-/**
- * Turns a handle into a channel, without insisting the handle is right.
- *
- * A handle is only one of the addresses a channel can live at, and one typed
- * or remembered slightly wrong returns a flat 404 that tells the reader
- * nothing. So the obvious addresses are tried in turn, and if none of them
- * answers, the handle is treated as what it usually is anyway - the channel's
- * name - and searched for.
- */
-async function fromYouTubeHandle(handle: string): Promise<DiscoverResult[]> {
-  for (const candidate of channelPageCandidates(handle)) {
-    let html: string;
-    try {
-      html = await fetchText(candidate, "text/html");
-    } catch {
-      continue;
-    }
-    const channelId = extractChannelId(html);
-    if (!channelId) continue;
-    return [
-      {
-        id: `yt:channel:${channelId}`,
-        title: extractOpenGraph(html, "title") ?? `@${handle}`,
-        publisher: "YouTube",
-        description: extractOpenGraph(html, "description") ?? "Die neuesten Videos dieses Kanals.",
-        artwork: extractOpenGraph(html, "image"),
-        feedUrl: youtubeChannelFeed(channelId),
-        origin: "youtube",
-        pageUrl: `https://www.youtube.com/channel/${channelId}`,
-      },
-    ];
-  }
-
-  const searched = await searchYouTube(handle.replace(/[-_.]+/g, " "));
-  if (searched.length > 0) return searched;
-
-  throw new Error(
-    `Zu „${handle}" ließ sich kein YouTube-Kanal finden. Ein Link der Form youtube.com/channel/UC… funktioniert immer.`,
-  );
-}
-
-async function searchYouTubeWithKey(term: string, key: string): Promise<DiscoverResult[]> {
-  const params = new URLSearchParams({
-    part: "snippet",
-    type: "channel",
-    maxResults: "6",
-    relevanceLanguage: "de",
-    q: term,
-    key,
-  });
-  const raw = await fetchText(`https://www.googleapis.com/youtube/v3/search?${params}`, "application/json");
-  const data = JSON.parse(raw) as {
-    items?: Array<{
-      id?: { channelId?: string };
-      snippet?: { title?: string; description?: string; thumbnails?: { high?: { url?: string } } };
-    }>;
-  };
-  return (data.items ?? [])
-    .filter((item) => item.id?.channelId)
-    .map((item) => ({
-      id: `yt:channel:${item.id!.channelId}`,
-      title: item.snippet?.title ?? "YouTube-Kanal",
-      publisher: "YouTube",
-      description: (item.snippet?.description ?? "").slice(0, 300),
-      artwork: item.snippet?.thumbnails?.high?.url ?? null,
-      feedUrl: youtubeChannelFeed(item.id!.channelId!),
-      origin: "youtube" as const,
-      pageUrl: `https://www.youtube.com/channel/${item.id!.channelId}`,
-    }));
-}
-
-function channelResult(channel: YouTubeChannel): DiscoverResult {
-  return {
-    id: `yt:channel:${channel.channelId}`,
-    title: channel.title,
-    publisher: "YouTube",
-    description: channel.description,
-    artwork: channel.artwork,
-    feedUrl: youtubeChannelFeed(channel.channelId),
-    origin: "youtube",
-    pageUrl: `https://www.youtube.com/channel/${channel.channelId}`,
-  };
-}
-
-/**
- * Finds YouTube channels for a typed name.
- *
- * The official API is used when a key is configured, because it is cleaner and
- * more stable. Without one the results page is read directly, which is what
- * makes YouTube work here for everyone rather than only for a deployment that
- * has been given a key. Either way a failure is not fatal: YouTube results are
- * an addition to a podcast search, never the whole of it.
- */
-async function searchYouTube(term: string): Promise<DiscoverResult[]> {
-  const key = process.env.YOUTUBE_API_KEY;
-  if (key) {
-    try {
-      return await searchYouTubeWithKey(term, key);
-    } catch (error) {
-      console.error("[discover] YouTube API search failed, falling back:", error);
-    }
-  }
-  try {
-    const html = await fetchText(youtubeSearchUrl(term), "text/html");
-    return extractSearchChannels(html).map(channelResult);
-  } catch (error) {
-    console.error("[discover] YouTube search failed:", error);
-    return [];
-  }
 }
 
 /**

@@ -1,22 +1,38 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { ListenClient } from "@/components/ListenClient";
 
 /**
  * Listening is the front door.
  *
- * The catalog used to be here, and it made a poor first impression: most of its
- * entries have no transcript yet, so the first thing a new arrival saw was a
- * grid of things they could not play, with the one feature that actually works
- * on any show - paste a link, press play - hidden behind a nav item. The
- * catalog is still worth having, as graded material for shadowing, but it is a
- * second room rather than the entrance.
+ * Everything else in the app exists to get someone back to a stream they were
+ * part-way through, so the search box and the shelf are the first things on the
+ * page rather than a room you navigate to.
  */
 export const metadata: Metadata = {
-  title: "Hörbar - listen to German podcasts with transcripts",
+  title: "Hörbar - podcasts, and where you left off",
   description:
-    "Find German podcasts on Apple Podcasts, Spotify, YouTube or any RSS feed and stream them straight away, with transcripts or live captions.",
+    "Find podcasts on Apple Podcasts, Spotify or any RSS feed, follow the shows you like, and pick up every episode where you left it.",
 };
 
 export default function HomePage() {
-  return <ListenClient />;
+  // ListenClient reads ?feed= so the library can link straight to a show's
+  // episodes. Reading search params opts a page out of static prerendering
+  // unless the boundary is here to say what to show meanwhile. The fallback is
+  // shaped like the page it replaces, so the layout does not jump when the real
+  // thing arrives.
+  return (
+    <Suspense
+      fallback={
+        <div className="animate-pulse" aria-hidden>
+          <div className="h-7 w-56 rounded-lg bg-[var(--surface)]" />
+          <div className="mt-3 h-4 w-full max-w-xl rounded bg-[var(--surface)]" />
+          <div className="mt-2 h-4 w-3/4 max-w-md rounded bg-[var(--surface)]" />
+          <div className="mt-5 h-11 w-full rounded-full bg-[var(--surface)]" />
+        </div>
+      }
+    >
+      <ListenClient />
+    </Suspense>
+  );
 }

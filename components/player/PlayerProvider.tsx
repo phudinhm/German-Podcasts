@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import { useMediaElement, type MediaElementState } from "./useMediaElement";
-import { useYouTube } from "./useYouTube";
 import { NOOP_PLAYER, type PlayerHandle } from "./types";
 
 export interface Track {
@@ -26,6 +25,12 @@ export interface Track {
   pageUrl?: string;
   durationSec?: number | null;
   publishedAt?: string | null;
+  /**
+   * Where to start, in seconds. Applied once the element knows how long the
+   * episode is: seeking before then is silently ignored, which is why resuming
+   * used to drop you back at the beginning.
+   */
+  startAt?: number;
 }
 
 interface PlayerContextValue {
@@ -37,7 +42,6 @@ interface PlayerContextValue {
   retry: () => void;
   /** URL actually handed to the element, after the https upgrade. */
   src: string | null;
-  youtubeUnavailable: boolean;
   /**
    * Registers the element the video should appear over on the current page.
    * Pass null when the page unmounts and the video docks into the mini bar.
@@ -76,14 +80,13 @@ export function usePlayer(): PlayerContextValue {
  */
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [track, setTrack] = useState<Track | null>(null);
+  const pendingSeekRef = useRef<number | null>(null);
   const [stage, setStageElement] = useState<HTMLElement | null>(null);
-  const isYouTube = track?.kind === "youtube";
   // Playback always streams from the publisher. Transcription keeps its own
   // silent copy of the episode, so nothing it does can reach this element.
-  const media = useMediaElement(isYouTube ? null : (track?.url ?? null));
-  const youtube = useYouTube(track?.youtubeId ?? null);
+  const media = useMediaElement(track?.url ?? null);
 
-  const handle = isYouTube ? youtube.handle : track ? media.handle : NOOP_PLAYER;
+  const handle = track ? media.handle : NOOP_PLAYER;
 
   const layerRef = useRef<HTMLDivElement | null>(null);
   const [videoLayer, setVideoLayer] = useState<HTMLDivElement | null>(null);
@@ -98,13 +101,30 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (current?.id === next.id) return current;
         return next;
       });
+      pendingSeekRef.current = next.startAt && next.startAt > 0 ? next.startAt : null;
       // Let the element pick up the new source before asking it to play.
       window.setTimeout(() => {
-        if (next.kind !== "youtube") media.handle.play();
+        media.handle.play();
       }, 80);
     },
     [media.handle],
   );
+
+  /**
+   * Applies a requested start position as soon as the element is ready.
+   *
+   * A media element ignores a seek before it has metadata, so resuming an
+   * episode has to wait for it rather than guess at a delay.
+   */
+  useEffect(() => {
+    const at = pendingSeekRef.current;
+    if (at === null || !media.state.ready) return;
+    pendingSeekRef.current = null;
+    media.handle.seekTo(at, true);
+    // track?.id is in the dependencies because a new episode can start while
+    // the element already reports ready, and without it the effect would never
+    // re-run for the second episode of a session.
+  }, [media.state.ready, media.handle, track?.id]);
 
   const stop = useCallback(() => {
     handle.pause();
@@ -124,7 +144,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       mediaState: media.state,
       retry: media.retry,
       src: media.src,
-      youtubeUnavailable: youtube.unavailable,
       setStage,
       mediaElement: () => media.mediaRef.current,
       videoLayer,
@@ -138,7 +157,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       media.retry,
       media.src,
       media.mediaRef,
-      youtube.unavailable,
       setStage,
       videoLayer,
     ],
@@ -175,15 +193,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      {track && track.kind === "youtube" ? (
-        <div
-          ref={attachLayer}
-          className="fixed z-[60] overflow-hidden bg-black shadow-lg"
-          style={{ top: 0, left: 0, width: 0, height: 0 }}
-        >
-          <div ref={youtube.containerRef} className="h-full w-full [&_iframe]:h-full [&_iframe]:w-full" />
-        </div>
-      ) : null}
     </PlayerContext.Provider>
   );
 }

@@ -17,31 +17,11 @@
     ]
   },
   "files": [
-    "scripts/build-catalog.ts",
-    "scripts/classify-level.ts",
     "lib/types.ts",
-    "lib/cefr.ts",
-    "lib/sdm.ts",
-    "lib/srs.ts",
-    "lib/german/orthography.ts",
-    "lib/german/phonetics.ts",
-    "lib/german/compound.ts",
-    "lib/german/stems.ts",
-    "lib/german/lemma.ts",
-    "lib/german/syntax.ts",
-    "data/lexicon/core.ts",
-    "data/lexicon/goethe.ts",
-    "data/lexicon/irregular-verbs.ts",
-    "data/lexicon/proper-nouns.ts",
-    "data/lexicon/stems.extra.ts",
     "lib/server/feed.ts",
     "lib/media.ts",
     "lib/server/discover.ts",
-    "lib/audio/captions.ts",
-    "lib/audio/segment.ts",
-    "lib/audio/proxy.ts",
-    "lib/audio/capture.ts",
-    "lib/export.ts",
-    "lib/server/range.ts"
+    "lib/server/range.ts",
+    "lib/library.ts"
   ]
 }

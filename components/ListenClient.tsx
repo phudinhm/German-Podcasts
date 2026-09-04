@@ -1,47 +1,44 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedEpisode, FeedResult } from "@/lib/server/feed";
 import type { DiscoverResult } from "@/lib/server/discover";
-import type { Segment, TargetLang } from "@/lib/types";
 import { useUi } from "@/lib/i18n";
-import { isFollowing, listSubscriptions, toggleFollow, type Subscription } from "@/lib/subscriptions";
 import { isMixedContent } from "@/lib/media";
-import { loadVault } from "@/lib/vault";
-import { usePlayer, useVideoStage, type Track } from "./player/PlayerProvider";
+import {
+  forgetRecent,
+  isSaved,
+  listRecents,
+  listShows,
+  noteplayed,
+  notePosition,
+  resumeAt,
+  toggleShow,
+  type RecentEpisode,
+  type SavedShow,
+} from "@/lib/library";
+import { usePlayer, type Track } from "./player/PlayerProvider";
 import { Transport } from "./player/Transport";
 import { StreamControls } from "./StreamControls";
-import { EpisodeTranscript } from "./EpisodeTranscript";
-import { useCaptions, type CaptionLine, type CaptionMode } from "./captions/useCaptions";
-import { CaptionPanel } from "./captions/CaptionPanel";
-import { SubtitleButton, SubtitleOverlay, type SubtitleMode } from "./captions/SubtitleOverlay";
-import { SubtitleExport } from "./captions/SubtitleExport";
-import { QuickLookup, type QuickSelection } from "./QuickLookup";
 import { DiscoverPanel } from "./listen/DiscoverPanel";
 import { Art } from "./listen/Art";
+import { LibraryPanel } from "./listen/LibraryPanel";
 
 const RECENT_KEY = "hoerbar.discover.v2";
-const LEGACY_RECENT_KEY = "hoerbar.discover.v1";
-
-/**
- * A recent search remembers what to run again and what to call it. Storing only
- * the query meant a pasted Apple or Spotify URL showed up as a URL, which tells
- * you nothing about which show it was.
- */
-interface RecentEntry {
-  q: string;
-  label: string;
-}
 const PAGE_SIZE = 40;
 
 const ORIGIN_LABEL: Record<DiscoverResult["origin"], string> = {
   apple: "Apple Podcasts",
-  youtube: "YouTube",
   spotify: "Spotify",
   rss: "RSS",
   web: "Website",
 };
+
+interface RecentSearch {
+  q: string;
+  label: string;
+}
 
 function formatDuration(seconds: number | null, unit: string): string {
   if (!seconds) return "";
@@ -62,6 +59,8 @@ export function ListenClient() {
   const { t, lang } = useUi();
   const locale = lang === "de" ? "de-DE" : lang === "vi" ? "vi-VN" : "en-GB";
   const player = usePlayer();
+  const params = useSearchParams();
+  const router = useRouter();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DiscoverResult[] | null>(null);
@@ -73,161 +72,64 @@ export function ListenClient() {
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [visible, setVisible] = useState(PAGE_SIZE);
 
-  const [recent, setRecent] = useState<RecentEntry[]>([]);
-  const [follows, setFollows] = useState<Subscription[]>([]);
-  const [following, setFollowing] = useState(false);
-
-  const [transcript, setTranscript] = useState<Segment[] | null>(null);
-  const [showText, setShowText] = useState(false);
-  const [dual, setDual] = useState(true);
-  const [columns, setColumns] = useState(false);
-  const [sidePanel, setSidePanel] = useState(false);
-  const [targetLang, setTargetLang] = useState<TargetLang>("en");
+  const [searches, setSearches] = useState<RecentSearch[]>([]);
+  const [shows, setShows] = useState<SavedShow[]>([]);
+  const [recents, setRecents] = useState<RecentEpisode[]>([]);
+  const [saved, setSaved] = useState(false);
   const [expandedDescription, setExpandedDescription] = useState(false);
 
-  /** Title translations, keyed by the German title. */
-  const [titles, setTitles] = useState<Record<string, string>>({});
-  const [translateTitles, setTranslateTitles] = useState(false);
-
-  /** Narrows a mixed feed to the episodes that have a picture to watch. */
-  const [videoOnly, setVideoOnly] = useState(false);
-
-  const [captionMode, setCaptionMode] = useState<CaptionMode>("internal");
-  const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>("off");
-
-  const [selection, setSelection] = useState<QuickSelection | null>(null);
-  const [savedWords, setSavedWords] = useState<Set<string>>(new Set());
-  /** Everything but the player recedes right after you press play. */
-  const [focusMode, setFocusMode] = useState(false);
-
   const playing = player.track;
-  const isYouTubeEpisode = playing?.kind === "youtube";
-  const isVideo = playing?.kind === "video";
-  const stageRef = useVideoStage(Boolean(playing) && (isYouTubeEpisode || isVideo));
   const playerRef = useRef<HTMLDivElement | null>(null);
+  const openedFeedRef = useRef<string | null>(null);
 
-  const captions = useCaptions({
-    handle: player.handle,
-    // YouTube plays inside an iframe whose audio the page cannot reach, so
-    // there is nothing to tap there; the microphone path still is.
-    mediaUrl: playing && playing.kind !== "youtube" ? (playing.url ?? null) : null,
-    targetLang,
-    translate: dual,
-  });
-
-  /**
-   * Subtitles read from the finished transcript when there is one, and from the
-   * live recogniser when there is not. Same shape either way, so the overlay
-   * does not care which produced them.
-   */
-  const subtitleLines: CaptionLine[] = useMemo(() => {
-    if (transcript && transcript.length > 0) {
-      return transcript.map((segment) => ({
-        id: segment.id,
-        at: segment.start,
-        until: segment.end,
-        de: segment.de,
-        translation: targetLang === "vi" ? segment.vi : segment.en,
-      }));
-    }
-    return captions.state.lines;
-  }, [transcript, targetLang, captions.state.lines]);
-
-  // Subtitles over a video with no transcript need the recogniser running.
-  const startCaptions = captions.start;
-  useEffect(() => {
-    if (subtitleMode === "off") return;
-    if (transcript === null || transcript.length > 0) return;
-    if (captions.state.running) return;
-    startCaptions(captionMode);
-  }, [subtitleMode, transcript, captions.state.running, startCaptions, captionMode]);
-
-  // A new episode is new ground: drop the old lines and release the tap.
-  const stopCaptions = captions.stop;
-  const clearCaptions = captions.clear;
-  const trackId = playing?.id ?? null;
-  useEffect(() => {
-    stopCaptions();
-    clearCaptions();
-  }, [trackId, stopCaptions, clearCaptions]);
-
-  const refreshFollows = useCallback(() => setFollows(listSubscriptions()), []);
-  const refreshSaved = useCallback(() => {
-    const set = new Set<string>();
-    for (const entry of loadVault()) {
-      set.add(entry.surface.toLowerCase());
-      set.add(entry.lemma.toLowerCase());
-    }
-    setSavedWords(set);
+  const refreshLibrary = useCallback(() => {
+    setShows(listShows());
+    setRecents(listRecents());
   }, []);
+
+  useEffect(() => {
+    refreshLibrary();
+    window.addEventListener("hoerbar:library-changed", refreshLibrary);
+    return () => window.removeEventListener("hoerbar:library-changed", refreshLibrary);
+  }, [refreshLibrary]);
 
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(RECENT_KEY);
-      if (raw) {
-        setRecent(JSON.parse(raw) as RecentEntry[]);
-      } else {
-        // Carry over the old plain-string list, labelled with itself.
-        const legacy = window.localStorage.getItem(LEGACY_RECENT_KEY);
-        if (legacy) {
-          const migrated = (JSON.parse(legacy) as string[]).map((q) => ({ q, label: q }));
-          setRecent(migrated);
-          window.localStorage.setItem(RECENT_KEY, JSON.stringify(migrated));
-        }
-      }
+      if (raw) setSearches(JSON.parse(raw) as RecentSearch[]);
     } catch {
       // A corrupt convenience list is not worth surfacing.
     }
-    refreshFollows();
-    refreshSaved();
-    window.addEventListener("hoerbar:follows-changed", refreshFollows);
-    window.addEventListener("hoerbar:vault-changed", refreshSaved);
-    return () => {
-      window.removeEventListener("hoerbar:follows-changed", refreshFollows);
-      window.removeEventListener("hoerbar:vault-changed", refreshSaved);
-    };
-  }, [refreshFollows, refreshSaved]);
+  }, []);
 
   useEffect(() => {
-    setFollowing(show?.feedUrl ? isFollowing(show.feedUrl) : false);
-  }, [show, follows]);
+    setSaved(show?.feedUrl ? isSaved(show.feedUrl) : false);
+  }, [show, shows]);
 
-  const openShow = useCallback(async (result: DiscoverResult) => {
-    if (!result.feedUrl) return;
-    setShow(result);
-    setLoadingFeed(true);
+  // ---- search and feed ---------------------------------------------------
+
+  const openFeed = useCallback(async (target: DiscoverResult) => {
+    if (!target.feedUrl) return;
+    setShow(target);
     setFeed(null);
     setVisible(PAGE_SIZE);
+    setLoadingFeed(true);
     setError(null);
     try {
       const response = await fetch("/api/feed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: result.feedUrl }),
+        body: JSON.stringify({ url: target.feedUrl }),
       });
       const data = (await response.json()) as FeedResult & { error?: string };
-      if (!response.ok) {
-        setError(data.error ?? `The feed responded ${response.status}.`);
-        return;
-      }
       setFeed(data);
       if (data.error) setError(data.error);
-      // The feed knows the show's real name; use it for the recent list.
-      if (data.title) {
-        setRecent((previous) => {
-          const next = previous.map((item, index) =>
-            index === 0 ? { ...item, label: data.title } : item,
-          );
-          window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
-          return next;
-        });
-      }
     } catch {
-      setError("That feed could not be loaded.");
+      setError(t("listen.feedFailed"));
     } finally {
       setLoadingFeed(false);
     }
-  }, []);
+  }, [t]);
 
   const search = useCallback(
     async (term: string) => {
@@ -249,686 +151,464 @@ export function ListenClient() {
         if (data.error) setError(data.error);
         else if (found.length === 0) setError(t("listen.noResults"));
 
-        // Label it with the show as soon as one is known, rather than the URL
-        // the user happened to paste.
         const label = found[0]?.title ?? term.trim();
-        setRecent((previous) => {
-          const next = [
-            { q: term.trim(), label },
-            ...previous.filter((item) => item.q !== term.trim()),
-          ].slice(0, 8);
-          window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+        setSearches((previous) => {
+          const next = [{ q: term.trim(), label }, ...previous.filter((item) => item.q !== term.trim())].slice(0, 6);
+          try {
+            window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+          } catch {
+            // Not worth surfacing.
+          }
           return next;
         });
 
-        const only = found.length === 1 ? found[0] : null;
-        if (only?.feedUrl) void openShow(only);
+        if (found.length === 1 && found[0].feedUrl) void openFeed(found[0]);
       } catch {
-        setError("The search failed.");
+        setError(t("listen.searchFailed"));
       } finally {
         setSearching(false);
       }
     },
-    [openShow, t],
+    [t, openFeed],
   );
 
-  /** Looks for an ingested transcript belonging to this episode. */
-  const loadTranscript = useCallback(async (episode: FeedEpisode) => {
-    setTranscript(null);
-    try {
-      const response = await fetch("/api/transcript", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: episode.url, youtubeId: episode.youtubeId, title: episode.title }),
-      });
-      const data = (await response.json()) as { found?: boolean; segments?: Segment[] };
-      setTranscript(data.found ? (data.segments ?? []) : []);
-    } catch {
-      setTranscript([]);
-    }
-  }, []);
-
-  /**
-   * A feed can carry both, and a learner who wants to watch does not want to
-   * scroll past forty audio episodes to find the three with pictures. The
-   * toggle only appears when the feed actually has some of each.
-   */
-  const isVideoEpisode = (episode: FeedEpisode) =>
-    Boolean(episode.youtubeId) || episode.type.startsWith("video/");
-  const hasVideo = Boolean(feed?.episodes.some(isVideoEpisode));
-  const episodes = useMemo(() => {
-    const all = feed?.episodes ?? [];
-    return videoOnly ? all.filter(isVideoEpisode) : all;
-  }, [feed, videoOnly]);
-
-  /**
-   * Translates the visible episode titles in one batch. German feed titles are
-   * often the only clue to what an episode is about, and forty of them is a
-   * wall of text to a learner who cannot yet skim German.
-   */
-  useEffect(() => {
-    if (!translateTitles || !feed) return;
-    const pending = episodes.slice(0, visible).map((e) => e.title).filter((title) => !titles[title]);
-    if (pending.length === 0) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ texts: pending, lang: targetLang }),
-        });
-        const data = (await response.json()) as { texts?: Array<string | null> };
-        if (cancelled || !data.texts) return;
-        setTitles((previous) => {
-          const next = { ...previous };
-          pending.forEach((title, index) => {
-            const translated = data.texts?.[index];
-            if (translated) next[title] = translated;
-          });
-          return next;
-        });
-      } catch {
-        // Titles simply stay untranslated.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [translateTitles, feed, episodes, visible, targetLang, titles]);
-
-  // Changing gloss language invalidates the cached title translations.
-  useEffect(() => setTitles({}), [targetLang]);
-
-  /**
-   * Scrolling is the signal that the player has been dealt with and the page is
-   * wanted back. A pointer press counts too, so a dimmed control is never a
-   * dead control.
-   */
-  useEffect(() => {
-    if (!focusMode) return;
-    const lift = () => setFocusMode(false);
-    window.addEventListener("wheel", lift, { passive: true });
-    window.addEventListener("touchmove", lift, { passive: true });
-    window.addEventListener("scroll", lift, { passive: true });
-    window.addEventListener("keydown", lift);
-    window.addEventListener("pointerdown", lift);
-    return () => {
-      window.removeEventListener("wheel", lift);
-      window.removeEventListener("touchmove", lift);
-      window.removeEventListener("scroll", lift);
-      window.removeEventListener("keydown", lift);
-      window.removeEventListener("pointerdown", lift);
-    };
-  }, [focusMode]);
+  // ---- playing -----------------------------------------------------------
 
   const playEpisode = useCallback(
-    (episode: FeedEpisode) => {
+    (episode: FeedEpisode, from?: number) => {
+      const id = episode.guid || episode.url;
       const track: Track = {
-        id: episode.guid,
+        id,
         title: episode.title,
         showTitle: feed?.title ?? show?.title ?? "",
         artwork: episode.image ?? show?.artwork ?? feed?.image ?? null,
         description: episode.description,
-        kind: episode.youtubeId ? "youtube" : episode.type.startsWith("video/") ? "video" : "audio",
+        kind: episode.type.startsWith("video/") ? "video" : "audio",
         url: episode.url || undefined,
-        youtubeId: episode.youtubeId,
         pageUrl: episode.pageUrl,
         durationSec: episode.durationSec,
         publishedAt: episode.publishedAt,
+        startAt: from ?? resumeAt(id),
       };
       player.play(track);
-      setShowText(false);
+      noteplayed({
+        id,
+        title: episode.title,
+        showTitle: track.showTitle,
+        feedUrl: show?.feedUrl ?? null,
+        url: episode.url,
+        artwork: track.artwork,
+        durationSec: episode.durationSec,
+        publishedAt: episode.publishedAt,
+        description: episode.description,
+      });
+
       setExpandedDescription(false);
-      setFocusMode(true);
-      void loadTranscript(episode);
       window.setTimeout(() => playerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
     },
-    [feed, show, player, loadTranscript],
+    [feed, show, player],
   );
 
-  const onWord = useCallback(
-    (word: string, sentence: string, anchor: HTMLElement) => {
-      const rect = anchor.getBoundingClientRect();
-      setSelection({
-        word,
-        sentence,
-        at: player.handle.getTime(),
-        anchor: { top: rect.top + window.scrollY, left: rect.left + window.scrollX, width: rect.width },
+  /** Plays something remembered, without needing its feed open. */
+  const playRecent = useCallback(
+    (entry: RecentEpisode) => {
+      player.play({
+        id: entry.id,
+        title: entry.title,
+        showTitle: entry.showTitle,
+        artwork: entry.artwork,
+        description: entry.description,
+        kind: "audio",
+        url: entry.url,
+        durationSec: entry.durationSec,
+        publishedAt: entry.publishedAt,
+        startAt: resumeAt(entry.id),
       });
+      noteplayed(entry);
+      window.setTimeout(() => playerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
     },
-    [player.handle],
+    [player],
   );
 
-  const mixed = Boolean(playing && playing.kind === "audio" && playing.url && isMixedContent(playing.url));
-  const artwork = playing?.artwork ?? show?.artwork ?? feed?.image ?? null;
+  // Remember the position while playing. Writing is throttled inside the
+  // library, so this can run as often as it likes.
+  useEffect(() => {
+    if (!playing) return;
+    const timer = window.setInterval(() => {
+      notePosition(playing.id, player.handle.getTime(), playing.durationSec ?? player.handle.getDuration());
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [playing, player.handle]);
 
-  const textPanel = useMemo(() => {
-    if (!playing) return null;
-    if (transcript === null) {
-      return <p className="text-[12.5px] text-[var(--ink-faint)]">{t("common.loading")}</p>;
-    }
-    if (transcript.length > 0) {
-      return (
-        <div>
-          <EpisodeTranscript
-            segments={transcript}
-            handle={player.handle}
-            targetLang={targetLang}
-            showTranslation={dual}
-            layout={columns ? "columns" : "stacked"}
-            maxHeight={sidePanel ? "calc(100vh - 210px)" : 420}
-            onWord={onWord}
-            savedWords={savedWords}
-          />
-          <SubtitleExport lines={subtitleLines} title={playing.title} />
-        </div>
-      );
-    }
-    return (
-      <div>
-        <p className="mb-3 text-[12.5px] text-[var(--ink-faint)]">{t("listen.noTranscriptYet")}</p>
-        <CaptionPanel
-          state={captions.state}
-          mode={captionMode}
-          onMode={setCaptionMode}
-          onStart={() => captions.start(captionMode)}
-          onStop={captions.stop}
-          onClear={captions.clear}
-          onSeek={(seconds) => player.handle.seekTo(seconds, true)}
-          showTranslation={dual}
-          onWord={onWord}
-          savedWords={savedWords}
-        />
-        <SubtitleExport lines={captions.state.lines} title={playing.title} />
-      </div>
-    );
-  }, [
-    playing,
-    transcript,
-    player.handle,
-    targetLang,
-    dual,
-    columns,
-    sidePanel,
-    onWord,
-    savedWords,
-    t,
-    captions,
-    captionMode,
-    subtitleLines,
-  ]);
+  /** Returns to browsing without disturbing whatever is playing. */
+  const browse = useCallback(() => {
+    setFeed(null);
+    setShow(null);
+    setResults(null);
+    setError(null);
+    setVisible(PAGE_SIZE);
+    // Drop ?feed= as well, otherwise the URL still claims a show is open and
+    // picking that same show from the library again would be a dead click.
+    openedFeedRef.current = null;
+    if (params.get("feed")) router.replace("/", { scroll: false });
+  }, [params, router]);
 
-  const textControls = (
-    <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        className="btn text-[12.5px]"
-        data-active={showText}
-        onClick={() => setShowText((value) => !value)}
-      >
-        {showText ? t("listen.hideTranscript") : t("listen.showTranscript")}
-      </button>
-      <label className="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-[var(--ink-soft)]">
-        <input
-          type="checkbox"
-          checked={dual}
-          onChange={(event) => setDual(event.target.checked)}
-          className="accent-[var(--accent-ring)]"
-        />
-        {t("listen.dual")}
-      </label>
-      <div className="flex overflow-hidden rounded-full border border-[var(--rule)]">
-        {(["en", "vi"] as const).map((code) => (
-          <button
-            key={code}
-            type="button"
-            data-active={targetLang === code}
-            onClick={() => setTargetLang(code)}
-            className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-0.5 text-[11.5px] last:border-r-0"
-          >
-            {code === "en" ? "English" : "Tiếng Việt"}
-          </button>
-        ))}
-      </div>
-      {dual ? (
-        <button
-          type="button"
-          className="btn px-2.5 py-1 text-[11.5px]"
-          data-active={columns}
-          onClick={() => setColumns((value) => !value)}
-        >
-          {columns ? t("listen.sideBySide") : t("listen.stacked")}
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className="btn px-2.5 py-1 text-[11.5px]"
-        data-active={sidePanel}
-        onClick={() => setSidePanel((value) => !value)}
-        title={t("listen.layout")}
-      >
-        {sidePanel ? t("listen.sidePanel") : t("listen.inline")}
-      </button>
-    </div>
-  );
+  // The library links here with the feed to open, so following a saved show
+  // lands on its episodes rather than on a search box.
+  const requestedFeed = params.get("feed");
+  useEffect(() => {
+    if (!requestedFeed || openedFeedRef.current === requestedFeed) return;
+    openedFeedRef.current = requestedFeed;
+    const saved = listShows().find((item) => item.feedUrl === requestedFeed);
+    void openFeed({
+      id: `rss:${requestedFeed}`,
+      title: saved?.title ?? requestedFeed,
+      publisher: saved?.publisher ?? "",
+      description: "",
+      artwork: saved?.artwork ?? null,
+      feedUrl: requestedFeed,
+      origin: (saved?.origin as DiscoverResult["origin"]) ?? "rss",
+      pageUrl: saved?.pageUrl ?? null,
+    });
+  }, [requestedFeed, openFeed]);
+
+  const episodes = feed?.episodes ?? [];
+  const mixed = Boolean(playing && playing.url && isMixedContent(playing.url));
+
+  // The lede explains what the app is, which is worth a screen exactly once.
+  // Once something is playing or open, it is a banner sitting between a phone
+  // user and the thing they came back for.
+  const idle = !playing && !feed && !results;
 
   return (
-    <div className={sidePanel && playing && showText ? "lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6" : ""}>
-      <div className="min-w-0">
-        <header className="mb-5 max-w-2xl" data-dim={playing ? focusMode : false}>
-          <h1 className="text-[27px] font-semibold">{t("listen.title")}</h1>
+    <div>
+      {idle ? (
+        <header className="mb-4 max-w-2xl">
+          <h1 className="text-[24px] font-semibold sm:text-[27px]">{t("listen.title")}</h1>
           <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">{t("listen.lede")}</p>
         </header>
+      ) : (
+        <h1 className="sr-only">{t("listen.title")}</h1>
+      )}
 
-        <div className="flex flex-wrap gap-2">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void search(query);
-            }}
-            placeholder={t("listen.placeholder")}
-            className="btn min-w-[240px] flex-1 justify-start font-normal"
-          />
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!query.trim() || searching}
-            onClick={() => void search(query)}
-          >
-            {searching ? t("common.searching") : t("common.search")}
-          </button>
+      <form
+        role="search"
+        className="flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void search(query);
+        }}
+      >
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          aria-label={t("listen.title")}
+          placeholder={t("listen.placeholder")}
+          className="field min-w-0 flex-1"
+        />
+        {/* Not disabled on an empty box: a greyed-out primary button beside an
+            empty field is the first thing on the page and reads as broken.
+            search() ignores an empty term anyway. */}
+        <button type="submit" className="btn btn-primary shrink-0" disabled={searching}>
+          {searching ? t("common.searching") : t("common.search")}
+        </button>
+      </form>
+
+      {/* Screen readers otherwise get no word about a search that found nothing
+          or is still running, because both only change things further down. */}
+      <p aria-live="polite" className="sr-only">
+        {searching ? t("common.searching") : results ? t("listen.results", { count: results.length }) : ""}
+      </p>
+
+      {searches.length > 0 ? (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--ink-faint)]">
+          <span>{t("listen.recent")}</span>
+          {searches.map((item) => (
+            <button
+              key={item.q}
+              type="button"
+              className="max-w-[220px] truncate hover:text-[var(--accent)]"
+              title={item.q}
+              onClick={() => {
+                setQuery(item.q);
+                void search(item.q);
+              }}
+            >
+              {item.label.replace(/^https?:\/\//, "")}
+            </button>
+          ))}
         </div>
+      ) : null}
 
-        {recent.length > 0 ? (
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--ink-faint)]">
-            <span>{t("listen.recent")}</span>
-            {recent.map((item) => (
-              <button
-                key={item.q}
-                type="button"
-                className="max-w-[220px] truncate hover:text-[var(--accent)]"
-                title={item.q}
-                onClick={() => {
-                  setQuery(item.q);
-                  void search(item.q);
-                }}
-              >
-                {item.label.replace(/^https?:\/\//, "")}
-              </button>
-            ))}
-          </div>
-        ) : null}
+      {error ? <p className="mt-3 text-[13px] text-rose-600">{error}</p> : null}
 
-        {error ? (
-          <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[12.5px] text-amber-800 dark:text-amber-300">
-            <p>{error}</p>
-            <p className="mt-1 opacity-80">{t("listen.feedHint")}</p>
-          </div>
-        ) : null}
-
-        {/* ---------------- player ---------------- */}
-        {playing ? (
-          <section ref={playerRef} className="card mt-5 overflow-hidden">
-            <div className="flex flex-col gap-4 p-4 sm:flex-row">
-              {playing.kind === "audio" ? <Art src={artwork} alt="" size={132} /> : null}
-
+      {/* ---------------- player ---------------- */}
+      {playing ? (
+        <section ref={playerRef} className="card mt-6 overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-start gap-3">
+              <span className="hidden sm:block">
+                <Art src={playing.artwork} alt="" size={88} seed={playing.showTitle || playing.title} />
+              </span>
+              <span className="sm:hidden">
+                <Art src={playing.artwork} alt="" size={56} seed={playing.showTitle || playing.title} />
+              </span>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-[16px] font-medium leading-snug">{playing.title}</h2>
-                    {translateTitles && titles[playing.title] ? (
-                      <p className="mt-0.5 text-[13px] leading-snug text-[var(--ink-faint)]">
-                        {titles[playing.title]}
-                      </p>
-                    ) : null}
-                    <p className="mt-0.5 text-[12.5px] text-[var(--ink-faint)]">
-                      {playing.showTitle}
-                      {playing.publishedAt ? ` · ${formatDate(playing.publishedAt, locale)}` : ""}
-                    </p>
-                  </div>
+                <h2 className="line-clamp-3 text-[16px] font-semibold leading-snug">{playing.title}</h2>
+                <p className="mt-0.5 truncate text-[12.5px] text-[var(--ink-faint)]">
+                  {playing.showTitle}
+                  {playing.publishedAt ? ` · ${formatDate(playing.publishedAt, locale)}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="icon-btn -mr-1 -mt-1 shrink-0 text-[18px]"
+                aria-label={t("common.close")}
+                title={t("common.close")}
+                onClick={() => player.stop()}
+              >
+                ×
+              </button>
+            </div>
+
+            {mixed ? (
+              <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12.5px] text-amber-800 dark:text-amber-300">
+                <p>{t("listen.mixedContent")}</p>
+                <a href={playing.url} target="_blank" rel="noreferrer noopener" className="btn mt-2 text-[12px]">
+                  {t("listen.openDirect")}
+                </a>
+              </div>
+            ) : null}
+
+            <div className="mt-3">
+              <Transport handle={player.handle} state={player.mediaState} onRetry={player.retry} compact />
+            </div>
+
+            {playing.description ? (
+              <div className="mt-3 text-[12.5px] leading-relaxed text-[var(--ink-soft)]">
+                <p className={expandedDescription ? "" : "line-clamp-3"}>{playing.description}</p>
+                {playing.description.length > 200 ? (
                   <button
                     type="button"
-                    className="text-[12px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
-                    onClick={() => player.stop()}
+                    className="mt-1 text-[12px] text-[var(--ink-faint)] hover:text-[var(--accent)]"
+                    onClick={() => setExpandedDescription((value) => !value)}
                   >
-                    {t("common.close")}
+                    {expandedDescription ? t("listen.showLessText") : t("listen.showMoreText")}
                   </button>
-                </div>
-
-                {playing.kind !== "audio" ? (
-                  <div className="relative mt-3">
-                    {/* The video itself lives in the persistent layer and is
-                        positioned over this box, so it survives navigation. */}
-                    <div ref={stageRef} className="aspect-video w-full rounded-xl bg-black" />
-                    {player.videoLayer
-                      ? createPortal(
-                          <SubtitleOverlay
-                            handle={player.handle}
-                            lines={subtitleLines}
-                            mode={subtitleMode}
-                          />,
-                          player.videoLayer,
-                        )
-                      : null}
-                    {isYouTubeEpisode && player.youtubeUnavailable ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-[var(--paper-raised)] p-4 text-center">
-                        <p className="text-[13px] text-[var(--ink-soft)]">{t("listen.playerBlocked")}</p>
-                        <a
-                          href={playing.pageUrl ?? `https://www.youtube.com/watch?v=${playing.youtubeId}`}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className="btn"
-                        >
-                          {t("listen.openOnYouTube")}
-                        </a>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {playing.kind !== "audio" ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <SubtitleButton mode={subtitleMode} onChange={setSubtitleMode} />
-                    {subtitleMode !== "off" && captions.state.whisper.state === "loading" ? (
-                      <span className="text-[11.5px] text-[var(--ink-faint)]">
-                        {t("caption.loadingModel")}{" "}
-                        {Math.round((captions.state.whisper.progress ?? 0) * 100)}%
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {mixed ? (
-                  <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12.5px] text-amber-800 dark:text-amber-300">
-                    <p>{t("listen.mixedContent")}</p>
-                    <a href={playing.url} target="_blank" rel="noreferrer noopener" className="btn mt-2 text-[12px]">
-                      {t("listen.openDirect")}
-                    </a>
-                  </div>
-                ) : null}
-
-                {!isYouTubeEpisode ? (
-                  <div className="mt-3">
-                    <Transport handle={player.handle} state={player.mediaState} onRetry={player.retry} compact />
-                  </div>
-                ) : null}
-
-                {playing.description ? (
-                  <div className="mt-3 text-[12.5px] leading-relaxed text-[var(--ink-soft)]">
-                    <p className={expandedDescription ? "" : "line-clamp-3"}>{playing.description}</p>
-                    {playing.description.length > 200 ? (
-                      <button
-                        type="button"
-                        className="mt-1 text-[12px] text-[var(--ink-faint)] hover:text-[var(--accent)]"
-                        onClick={() => setExpandedDescription((value) => !value)}
-                      >
-                        {expandedDescription ? t("listen.showLessText") : t("listen.showMoreText")}
-                      </button>
-                    ) : null}
-                  </div>
                 ) : null}
               </div>
-            </div>
-
-            <div className="border-t border-[var(--rule)] px-4 py-3">
-              <StreamControls handle={player.handle} />
-            </div>
-
-            {focusMode ? (
-              <p className="border-t border-[var(--rule)] px-4 py-1.5 text-[11px] text-[var(--ink-faint)]">
-                {t("listen.focusHint")}
-              </p>
             ) : null}
+          </div>
 
-            <div className="border-t border-[var(--rule)] px-4 py-3">
-              {textControls}
-              {showText && !sidePanel ? <div className="mt-3">{textPanel}</div> : null}
-            </div>
-          </section>
-        ) : null}
+          <div className="border-t border-[var(--rule)] px-4 py-3">
+            <StreamControls handle={player.handle} />
+          </div>
+        </section>
+      ) : null}
 
-        <div data-dim={playing ? focusMode : false}>
-        {/* ---------------- results ---------------- */}
-        {results && results.length > 0 && !feed ? (
-          <section className="mt-6">
-            <h2 className="mb-3 text-[13px] font-medium text-[var(--ink-soft)]">
+      {/* ---------------- results ---------------- */}
+      {results && results.length > 0 && !feed ? (
+        <section className="mt-6">
+          <div className="mb-3 flex items-center gap-3">
+            <h2 className="text-[13px] font-medium text-[var(--ink-soft)]">
               {t("listen.results", { count: results.length })}
             </h2>
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {results.map((result) => (
-                <li key={result.id}>
-                  <button
-                    type="button"
-                    onClick={() => (result.feedUrl ? void openShow(result) : undefined)}
-                    disabled={!result.feedUrl}
-                    className="row-hover flex w-full gap-3 p-2.5 text-left disabled:opacity-60"
-                  >
-                    <Art src={result.artwork} alt="" size={64} />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate text-[14.5px] font-medium">{result.title}</span>
-                        <span className="chip shrink-0 text-[11px]">{ORIGIN_LABEL[result.origin]}</span>
-                      </span>
-                      {result.publisher ? (
-                        <span className="mt-0.5 block truncate text-[12.5px] text-[var(--ink-soft)]">
-                          {result.publisher}
-                        </span>
-                      ) : null}
-                      {result.note ? (
-                        <span className="mt-1 block text-[11.5px] leading-snug text-[var(--accent)]">
-                          {result.note}
-                        </span>
-                      ) : null}
+            <button
+              type="button"
+              className="ml-auto btn px-2.5 py-1 text-[12px]"
+              onClick={browse}
+            >
+              {t("listen.backToBrowse")}
+            </button>
+          </div>
+          <ul className="grid gap-1 sm:grid-cols-2">
+            {results.map((result) => (
+              <li key={result.id} className="min-w-0">
+                <button
+                  type="button"
+                  className="row-hover flex w-full items-start gap-3 p-2.5 text-left"
+                  onClick={() => void openFeed(result)}
+                  disabled={!result.feedUrl}
+                >
+                  <Art src={result.artwork} alt="" size={56} seed={result.title} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14.5px] font-medium leading-snug">{result.title}</span>
+                    <span className="block truncate text-[12.5px] text-[var(--ink-faint)]">
+                      {result.publisher} · {ORIGIN_LABEL[result.origin]}
                     </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
+                    {result.note ? (
+                      <span className="mt-1 block text-[12px] leading-snug text-[var(--ink-faint)]">
+                        {result.note}
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
-        {loadingFeed ? (
-          <p className="mt-6 text-[13px] text-[var(--ink-faint)]">{t("listen.loadingEpisodes")}</p>
-        ) : null}
+      {loadingFeed ? <p className="mt-6 text-[13px] text-[var(--ink-faint)]">{t("common.loading")}</p> : null}
 
-        {/* ---------------- episode list ---------------- */}
-        {feed && feed.episodes.length > 0 ? (
-          <section className="mt-6">
-            {show?.note ? (
-              <p className="mb-3 rounded-xl bg-[var(--accent-soft)] px-3 py-2 text-[12.5px] leading-relaxed">
-                {show.note}
-              </p>
-            ) : null}
-
-            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--rule)] pb-3">
-              <Art src={show?.artwork ?? feed.image} alt="" size={56} />
+      {/* ---------------- episodes ---------------- */}
+      {feed ? (
+        <section className="card mt-6 p-4">
+          {/* Two rows on a phone. Squeezed onto one, the show title got about
+              nine characters before the two buttons took the rest. */}
+          <div className="mb-3">
+            <div className="flex items-center gap-3">
+              <Art src={show?.artwork ?? feed.image} alt="" size={56} seed={feed.title} />
               <div className="min-w-0 flex-1">
-                <h2 className="truncate text-[18px] font-semibold">{feed.title}</h2>
-                <p className="text-[12.5px] text-[var(--ink-faint)]">
-                  {feed.episodes.length}{" "}
-                  {feed.format === "youtube" ? t("common.videos") : t("common.episodes")}
+                <h2 className="truncate text-[17px] font-semibold sm:text-[18px]">{feed.title}</h2>
+                <p className="truncate text-[12.5px] text-[var(--ink-faint)]">
+                  {feed.episodes.length} {t("common.episodes")}
                   {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
                 </p>
               </div>
-              <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-[var(--ink-soft)]">
-                <input
-                  type="checkbox"
-                  checked={translateTitles}
-                  onChange={(event) => setTranslateTitles(event.target.checked)}
-                  className="accent-[var(--accent-ring)]"
-                />
-                {t("listen.translateTitles")}
-              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
               {show?.feedUrl ? (
                 <button
                   type="button"
                   className="btn text-[12.5px]"
-                  data-active={following}
+                  data-active={saved}
+                  aria-pressed={saved}
                   onClick={() => {
-                    const next = toggleFollow({
-                      id: show.id,
-                      title: show.title,
-                      publisher: show.publisher,
-                      artwork: show.artwork,
-                      feedUrl: show.feedUrl!,
-                      origin: show.origin,
-                      pageUrl: show.pageUrl,
-                    });
-                    setFollowing(next);
-                    refreshFollows();
+                    setSaved(
+                      toggleShow({
+                        feedUrl: show.feedUrl!,
+                        title: show.title,
+                        publisher: show.publisher,
+                        artwork: show.artwork,
+                        origin: show.origin,
+                        pageUrl: show.pageUrl ?? undefined,
+                      }),
+                    );
                   }}
                 >
-                  {following ? `✓ ${t("listen.following")}` : t("listen.follow")}
+                  {saved ? `★ ${t("library.saved")}` : `☆ ${t("library.save")}`}
                 </button>
               ) : null}
-              {hasVideo ? (
-                <button
-                  type="button"
-                  className="btn text-[12.5px]"
-                  data-active={videoOnly}
-                  onClick={() => setVideoOnly((value) => !value)}
-                >
-                  {t("listen.videoEpisodes")}
-                </button>
-              ) : null}
-              {results && results.length > 1 ? (
-                <button
-                  type="button"
-                  className="text-[12px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
-                  onClick={() => {
-                    setFeed(null);
-                    setShow(null);
-                  }}
-                >
-                  {t("listen.backToResults")}
-                </button>
-              ) : null}
+              <button type="button" className="btn text-[12.5px]" onClick={browse}>
+                {results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
+              </button>
             </div>
+          </div>
 
-            <ul>
-              {episodes.slice(0, visible).map((episode) => (
-                <li key={episode.guid}>
+          <ul>
+            {episodes.slice(0, visible).map((episode) => {
+              const id = episode.guid || episode.url;
+              const remembered = recents.find((item) => item.id === id);
+              const progress =
+                remembered && episode.durationSec
+                  ? Math.min(100, Math.round((remembered.position / episode.durationSec) * 100))
+                  : 0;
+              const current = playing?.id === id;
+              return (
+                <li key={id} className="min-w-0">
                   <button
                     type="button"
                     onClick={() => playEpisode(episode)}
                     className="row-hover flex w-full items-start gap-3 p-2.5 text-left"
-                    data-active={playing?.id === episode.guid}
+                    data-active={current}
+                    aria-current={current ? "true" : undefined}
                   >
-                    <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={56} />
+                    <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={56} seed={feed.title} />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[14.5px] font-medium leading-snug">{episode.title}</span>
-                      {translateTitles && titles[episode.title] ? (
-                        <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-faint)]">
-                          {titles[episode.title]}
-                        </span>
-                      ) : null}
+                      <span className="flex items-start gap-2">
+                        {current ? (
+                          // Aligned to the first line rather than centred: on a
+                          // phone a title runs to three lines and a centred
+                          // marker lands in the middle of a word.
+                          <span className="now-playing mt-[5px] shrink-0" aria-hidden>
+                            <span />
+                            <span />
+                            <span />
+                          </span>
+                        ) : null}
+                        <span className="min-w-0 text-[14.5px] font-medium leading-snug">{episode.title}</span>
+                      </span>
                       {episode.description ? (
                         <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-relaxed text-[var(--ink-faint)]">
                           {episode.description}
                         </span>
                       ) : null}
-                      <span className="mt-1 flex flex-wrap gap-x-3 text-[11.5px] text-[var(--ink-faint)]">
+                      <span className="mt-1 flex flex-wrap items-center gap-x-3 text-[11.5px] text-[var(--ink-faint)]">
                         {formatDate(episode.publishedAt, locale) ? (
                           <span>{formatDate(episode.publishedAt, locale)}</span>
                         ) : null}
                         {formatDuration(episode.durationSec, t("common.min")) ? (
                           <span>{formatDuration(episode.durationSec, t("common.min"))}</span>
                         ) : null}
-                        <span>{episode.youtubeId ? "YouTube" : episode.type}</span>
+                        {remembered?.finished ? (
+                          <span className="text-[var(--accent)]">✓ {t("library.finished")}</span>
+                        ) : progress > 0 ? (
+                          <span className="text-[var(--accent)]">{t("library.resumeAt", { percent: progress })}</span>
+                        ) : null}
                       </span>
+                      {/* Part-heard episodes get the bar as well as the wording:
+                          in a list of sixty, "41% in" is something you read, a
+                          bar is something you see. */}
+                      {!remembered?.finished && progress > 0 ? (
+                        <span className="mt-1.5 block h-1 w-full max-w-[220px] overflow-hidden rounded-full bg-[var(--rule)]">
+                          <span
+                            className="block h-full rounded-full bg-[var(--accent-ring)]"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </span>
+                      ) : null}
                     </span>
                   </button>
                 </li>
-              ))}
-            </ul>
+              );
+            })}
+          </ul>
 
-            {visible < episodes.length ? (
-              <div className="mt-3 flex justify-center">
-                <button type="button" className="btn" onClick={() => setVisible((value) => value + PAGE_SIZE)}>
-                  {t("common.more")} ({episodes.length - visible})
-                </button>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
-        {/* ---------------- following ---------------- */}
-        {!feed && follows.length > 0 ? (
-          <section className="mt-8">
-            <h2 className="mb-3 text-[13px] font-medium text-[var(--ink-soft)]">{t("listen.following")}</h2>
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {follows.map((item) => (
-                <li key={item.feedUrl}>
-                  <button
-                    type="button"
-                    className="row-hover flex w-full items-center gap-3 p-2.5 text-left"
-                    onClick={() =>
-                      void openShow({
-                        id: item.id,
-                        title: item.title,
-                        publisher: item.publisher,
-                        description: "",
-                        artwork: item.artwork,
-                        feedUrl: item.feedUrl,
-                        origin: item.origin as DiscoverResult["origin"],
-                        pageUrl: item.pageUrl,
-                      })
-                    }
-                  >
-                    <Art src={item.artwork} alt="" size={48} />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[14px] font-medium">{item.title}</span>
-                      <span className="block truncate text-[12px] text-[var(--ink-faint)]">
-                        {item.publisher}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        {/* ---------------- discovery ---------------- */}
-        {!feed && !results ? (
-          <DiscoverPanel
-            onPick={(term) => {
-              setQuery(term);
-              void search(term);
-            }}
-          />
-        ) : null}
-        </div>
-      </div>
-
-      {/* ---------------- side panel, Spotify-lyrics style ---------------- */}
-      {sidePanel && playing && showText ? (
-        <aside className="mt-6 lg:sticky lg:top-[64px] lg:mt-0 lg:h-[calc(100vh-96px)] lg:self-start">
-          <div className="card flex h-full flex-col overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-[var(--rule)] px-3 py-2">
-              <h3 className="truncate text-[13px] font-medium">{t("listen.transcript")}</h3>
-              <button
-                type="button"
-                className="ml-auto text-[12px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
-                onClick={() => setSidePanel(false)}
-              >
-                {t("listen.inline")}
+          {visible < episodes.length ? (
+            <div className="mt-3 flex justify-center">
+              <button type="button" className="btn" onClick={() => setVisible((value) => value + PAGE_SIZE)}>
+                {t("common.more")} ({episodes.length - visible})
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden px-2 py-2">{textPanel}</div>
-          </div>
-        </aside>
+          ) : null}
+        </section>
       ) : null}
 
-      {selection && playing ? (
-        <QuickLookup
-          selection={selection}
-          lang={targetLang}
-          context={{ episodeSlug: `stream:${playing.id}`, episodeTitle: playing.title }}
-          onClose={() => setSelection(null)}
-          onSaved={refreshSaved}
+      {/* ---------------- library ---------------- */}
+      {!feed && !results ? (
+        <LibraryPanel
+          shows={shows}
+          recents={recents}
+          onOpenShow={(saved) =>
+            void openFeed({
+              id: `rss:${saved.feedUrl}`,
+              title: saved.title,
+              publisher: saved.publisher,
+              description: "",
+              artwork: saved.artwork,
+              feedUrl: saved.feedUrl,
+              origin: saved.origin as DiscoverResult["origin"],
+              pageUrl: saved.pageUrl ?? null,
+            })
+          }
+          onPlayRecent={playRecent}
+          onForget={(id) => forgetRecent(id)}
+        />
+      ) : null}
+
+      {/* ---------------- discovery ---------------- */}
+      {!feed && !results ? (
+        <DiscoverPanel
+          onPick={(term) => {
+            setQuery(term);
+            void search(term);
+          }}
         />
       ) : null}
     </div>

@@ -2,12 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 const {
-  classifyInput, isYouTubeHandle, mapITunesResults, extractChannelId,
-  extractFeedLinks, extractOpenGraph, cleanSpotifyTitle,
-  youtubeChannelFeed, itunesSearchUrl,
+  classifyInput, isYouTubeHandle, isYouTubeInput, mapITunesResults,
+  extractFeedLinks, extractOpenGraph, cleanSpotifyTitle, itunesSearchUrl,
 } = await import("../.scripts-out/lib/server/discover.js");
-const discover = await import("../.scripts-out/lib/server/discover.js");
-const { parseFeed, parseYouTubeFeed } = await import("../.scripts-out/lib/server/feed.js");
+const { parseFeed } = await import("../.scripts-out/lib/server/feed.js");
 
 test("routes Apple Podcasts links to a lookup by id", () => {
   assert.deepEqual(
@@ -28,16 +26,6 @@ test("routes Spotify shows and episodes", () => {
   assert.equal(classifyInput("https://open.spotify.com/episode/abc123").kind, "spotify-episode");
 });
 
-test("routes every shape of YouTube link", () => {
-  assert.deepEqual(classifyInput("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), { kind: "youtube-video", videoId: "dQw4w9WgXcQ" });
-  assert.deepEqual(classifyInput("https://youtu.be/dQw4w9WgXcQ"), { kind: "youtube-video", videoId: "dQw4w9WgXcQ" });
-  assert.deepEqual(classifyInput("https://www.youtube.com/channel/UCbxb2fqe9oNgglAoYqsYOtQ"), { kind: "youtube-channel", channelId: "UCbxb2fqe9oNgglAoYqsYOtQ" });
-  assert.deepEqual(classifyInput("https://www.youtube.com/@easygerman"), { kind: "youtube-handle", handle: "easygerman" });
-  assert.deepEqual(classifyInput("https://www.youtube.com/c/EasyGerman"), { kind: "youtube-handle", handle: "EasyGerman" });
-  assert.equal(classifyInput("https://www.youtube.com/playlist?list=PLabc123").kind, "youtube-playlist");
-  // A watch URL inside a playlist is still a video, because that is what plays.
-  assert.equal(classifyInput("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLx").kind, "youtube-video");
-});
 
 test("treats a bare handle and a plain name correctly", () => {
   assert.equal(isYouTubeHandle("@easygerman"), "easygerman");
@@ -67,23 +55,7 @@ test("maps iTunes results and drops shows with no feed", () => {
   assert.match(mapped[0].description, /120 Folgen/);
 });
 
-test("builds the keyless iTunes and YouTube feed URLs", () => {
-  const url = new URL(itunesSearchUrl("Easy German", "DE"));
-  assert.equal(url.searchParams.get("term"), "Easy German");
-  assert.equal(url.searchParams.get("country"), "DE");
-  assert.equal(url.searchParams.get("media"), "podcast");
-  assert.equal(
-    youtubeChannelFeed("UCbxb2fqe9oNgglAoYqsYOtQ"),
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UCbxb2fqe9oNgglAoYqsYOtQ",
-  );
-});
 
-test("extracts a channel id from the shapes YouTube pages use", () => {
-  assert.equal(extractChannelId('{"channelId":"UCbxb2fqe9oNgglAoYqsYOtQ"}'), "UCbxb2fqe9oNgglAoYqsYOtQ");
-  assert.equal(extractChannelId('<meta itemprop="identifier" content="UCbxb2fqe9oNgglAoYqsYOtQ">'), "UCbxb2fqe9oNgglAoYqsYOtQ");
-  assert.equal(extractChannelId('<link rel="canonical" href="https://www.youtube.com/channel/UCbxb2fqe9oNgglAoYqsYOtQ">'), "UCbxb2fqe9oNgglAoYqsYOtQ");
-  assert.equal(extractChannelId("<html>nothing here</html>"), null);
-});
 
 test("finds feed links advertised in page markup, resolving relative hrefs", () => {
   const html = `<html><head>
@@ -128,23 +100,7 @@ const YT_FEED = `<?xml version="1.0" encoding="UTF-8"?>
   </entry>
 </feed>`;
 
-test("parses a YouTube channel feed into playable entries", () => {
-  const feed = parseYouTubeFeed(YT_FEED, "fallback");
-  assert.equal(feed.format, "youtube");
-  assert.equal(feed.title, "Easy German");
-  assert.equal(feed.episodes.length, 1, "the entry without a valid videoId is dropped");
-  const [entry] = feed.episodes;
-  assert.equal(entry.youtubeId, "dQw4w9WgXcQ");
-  assert.equal(entry.description, "Straßeninterviews in Berlin.");
-  assert.equal(entry.pageUrl, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-  assert.equal(entry.url, "", "a YouTube entry has no enclosure to stream");
-});
 
-test("parseFeed detects a YouTube Atom feed without being told", () => {
-  const feed = parseFeed(YT_FEED, "fallback");
-  assert.equal(feed.format, "youtube");
-  assert.equal(feed.episodes[0].youtubeId, "dQw4w9WgXcQ");
-});
 
 test("parseFeed still reports rss for a podcast feed", () => {
   const rss = `<rss><channel><title>P</title><item><title>E</title>
@@ -154,9 +110,7 @@ test("parseFeed still reports rss for a podcast feed", () => {
   assert.equal(feed.episodes[0].youtubeId, undefined);
 });
 
-// --- YouTube channel search --------------------------------------------------
 
-const { extractSearchChannels, channelPageCandidates, youtubeSearchUrl } = discover;
 
 // Shaped like the ytInitialData blob a results page actually carries: escaped
 // unicode in titles, protocol-relative thumbnails, and video renderers mixed in.
@@ -170,49 +124,31 @@ const SEARCH_HTML = `<!DOCTYPE html><html><script>var ytInitialData = {"contents
 "descriptionSnippet":{"runs":[{"text":"Gro\\u00dfe Fragen, kurz erkl\\u00e4rt"}]}}}
 ]}};</script></html>`;
 
-test("reads channels out of a search results page", () => {
-  const channels = extractSearchChannels(SEARCH_HTML);
-  assert.equal(channels.length, 2, "the video renderer must not be counted as a channel");
-  assert.equal(channels[0].channelId, "UCbxb2fqe9oNgglAoYqsYOtQ");
-  assert.equal(channels[0].title, "Easy German");
-  assert.equal(channels[0].artwork, "https://yt3.ggpht.com/ytc/easy=s88");
-  assert.match(channels[0].description, /Straßeninterviews/);
+
+
+
+
+
+
+
+test("every shape of YouTube address is recognised, so it can be refused clearly", () => {
+  for (const value of [
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://youtu.be/dQw4w9WgXcQ",
+    "youtube.com/@easygerman",
+    "https://m.youtube.com/playlist?list=PL123",
+  ]) {
+    assert.equal(isYouTubeInput(value), true, value);
+  }
 });
 
-test("decodes the escaped unicode YouTube leaves in titles", () => {
-  const channels = extractSearchChannels(SEARCH_HTML);
-  assert.equal(channels[1].title, "Dinge Erklärt – Kurzgesagt");
+test("a podcast address is not mistaken for YouTube", () => {
+  assert.equal(isYouTubeInput("https://feeds.deutschlandfunk.de/nachrichtenleicht.xml"), false);
+  assert.equal(isYouTubeInput("Easy German"), false);
+  assert.equal(isYouTubeInput(""), false);
 });
 
-test("a title is never taken from the next channel's block", () => {
-  // Second channel carries no title of its own; it must fall back, not borrow.
-  const html = `{"channelRenderer":{"channelId":"UCaaaaaaaaaaaaaaaaaaaaaa"}}` +
-    `{"channelRenderer":{"channelId":"UCbbbbbbbbbbbbbbbbbbbbbb","title":{"simpleText":"Zweiter"}}}`;
-  const channels = extractSearchChannels(html);
-  assert.equal(channels.length, 2);
-  assert.equal(channels[1].title, "Zweiter");
-});
-
-test("a page with no channels yields nothing rather than throwing", () => {
-  assert.deepEqual(extractSearchChannels("<html><body>nichts</body></html>"), []);
-});
-
-test("the search URL asks for channels, not videos", () => {
-  const url = youtubeSearchUrl("Easy German");
-  assert.match(url, /search_query=Easy%20German/);
-  assert.match(url, /sp=EgIQAg%3D%3D/);
-});
-
-test("a channel name is tried at every address a channel can live at", () => {
-  const candidates = channelPageCandidates("Easy German");
-  // The compact form is the modern handle and is worth trying first.
-  assert.equal(candidates[0], "https://www.youtube.com/@EasyGerman");
-  assert.ok(candidates.some((url) => url.includes("/c/")));
-  assert.ok(candidates.some((url) => url.includes("/user/")));
-});
-
-test("a pasted handle keeps its exact form as the first guess", () => {
-  const candidates = channelPageCandidates("@easygerman");
-  assert.equal(candidates[0], "https://www.youtube.com/@easygerman");
-  assert.equal(new Set(candidates).size, candidates.length, "no duplicate attempts");
+test("a YouTube URL no longer classifies as a playable source", () => {
+  const input = classifyInput("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.ok(!String(input.kind).startsWith("youtube"), `still routed as ${input.kind}`);
 });

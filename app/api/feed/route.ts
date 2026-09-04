@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
-import { assertPublicUrl, parseFeed, type FeedResult } from "@/lib/server/feed";
+import { assertPublicUrl, parseFeed, truncateToLastEntry, type FeedResult } from "@/lib/server/feed";
 
 export const runtime = "nodejs";
 
 export type { FeedEpisode, FeedResult } from "@/lib/server/feed";
 
-const MAX_BYTES = 4 * 1024 * 1024;
+/**
+ * How much of a feed to read.
+ *
+ * Long-running shows publish enormous feeds - a thousand episodes with full
+ * show notes runs well past ten megabytes - and this used to refuse them
+ * outright with "too large to parse". That was the wrong call twice over: the
+ * parser only ever looks at the newest three hundred episodes, and those are
+ * at the front of the document, so everything needed had already arrived by
+ * the time the limit was hit. Reading a prefix and stopping is what the reader
+ * wanted all along.
+ */
+const MAX_BYTES = 12 * 1024 * 1024;
 const TIMEOUT_MS = 12_000;
 
 /**
@@ -16,6 +27,38 @@ const TIMEOUT_MS = 12_000;
  * browser then streams from the publisher's CDN. No media is proxied through
  * this app, so the response stays small and the bandwidth is not ours.
  */
+/**
+ * Reads at most `limit` bytes, then cuts the XML back to the last complete
+ * entry.
+ *
+ * Truncating mid-item would hand the parser half an episode; cutting at the
+ * last closing tag hands it a shorter but honest document. Feeds are ordered
+ * newest first, so what survives is exactly what a listener wants to see.
+ */
+async function readPrefix(response: Response, limit: number): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return new TextDecoder("utf-8").decode(await response.arrayBuffer());
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (total < limit) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.byteLength;
+  }
+  await reader.cancel().catch(() => undefined);
+
+  const joined = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const text = new TextDecoder("utf-8").decode(joined);
+  return total < limit ? text : truncateToLastEntry(text);
+}
+
 export async function POST(request: Request) {
   let feedUrl: string;
   try {
@@ -53,11 +96,7 @@ export async function POST(request: Request) {
         { status: 502 },
       );
     }
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength > MAX_BYTES) {
-      return NextResponse.json({ error: "Dieser Feed ist zu groß zum Parsen." }, { status: 413 });
-    }
-    xml = new TextDecoder("utf-8").decode(buffer);
+    xml = await readPrefix(response, MAX_BYTES);
   } catch (error) {
     const message =
       error instanceof Error && error.name === "TimeoutError"
