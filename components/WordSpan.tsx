@@ -31,7 +31,6 @@ function WordSpanImpl({ de, spoken, saved, hazards = true, onSelect }: WordSpanP
         tabIndex={0}
         className="word"
         data-spoken={spoken ? "true" : undefined}
-        data-saved={saved ? "true" : undefined}
         onClick={(event) => {
           event.stopPropagation();
           onSelect(rendered.token, rendered, event.currentTarget);

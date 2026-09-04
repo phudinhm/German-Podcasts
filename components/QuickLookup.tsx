@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useUi } from "@/lib/i18n";
 import type { LookupResult, TargetLang } from "@/lib/types";
-import { addEntry, hasEntry } from "@/lib/vault";
 
 export interface QuickSelection {
   word: string;
@@ -30,18 +29,15 @@ export function QuickLookup({
   lang,
   context,
   onClose,
-  onSaved,
 }: {
   selection: QuickSelection;
   lang: TargetLang;
   context: QuickContext;
   onClose: () => void;
-  onSaved: () => void;
 }) {
   const { t } = useUi();
   const [result, setResult] = useState<LookupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -60,7 +56,6 @@ export function QuickLookup({
       })
       .then((data) => {
         setResult(data);
-        setSaved(hasEntry(data.lemma, context.episodeSlug));
       })
       .catch((cause: unknown) => {
         if (!controller.signal.aborted) {
@@ -86,31 +81,6 @@ export function QuickLookup({
     };
   }, [onClose]);
 
-  function save() {
-    if (!result) return;
-    addEntry({
-      surface: result.surface,
-      lemma: result.lemma,
-      pos: result.pos,
-      article: result.noun?.gender,
-      plural: result.noun?.plural,
-      translations: result.translations,
-      context: {
-        de: selection.sentence,
-        en: result.sentence?.en,
-        vi: result.sentence?.vi,
-        episodeSlug: context.episodeSlug,
-        episodeTitle: context.episodeTitle,
-        segmentId: `t${Math.floor(selection.at)}`,
-        start: selection.at,
-        end: selection.at + 5,
-        // Streamed audio has no measured level; B1 is the honest middle.
-        cefr: "B1",
-      },
-    });
-    setSaved(true);
-    onSaved();
-  }
 
   const glosses = result?.translations[lang] ?? [];
   const sentenceGloss = lang === "en" ? result?.sentence?.en : result?.sentence?.vi;
@@ -190,14 +160,6 @@ export function QuickLookup({
             ) : null}
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <button type="button" className="btn btn-primary flex-1" onClick={save} disabled={saved}>
-              {saved ? t("word.saved") : t("word.save")}
-            </button>
-            <Link href="/vault" className="text-[11px] text-[var(--ink-faint)] hover:text-[var(--accent)]">
-              {t("nav.vault")}
-            </Link>
-          </div>
         </>
       ) : null}
     </div>

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Episode, Segment, TargetLang } from "@/lib/types";
 import type { RenderedWord } from "@/lib/german/render";
-import { useYouTube } from "./player/useYouTube";
 import { useMediaElement } from "./player/useMediaElement";
 import { useTimeline } from "./player/useTimeline";
 import { Transport } from "./player/Transport";
@@ -21,8 +20,8 @@ import { BreakdownPanel } from "./BreakdownPanel";
 import { Quiz } from "./Quiz";
 import { LevelBadge } from "./LevelBadge";
 import { ShadowingBadge } from "./ShadowingBadge";
-import { loadSettings, loadVault, saveSettings } from "@/lib/vault";
 import { useUi } from "@/lib/i18n";
+import { loadSettings, saveSettings } from "@/lib/settings";
 import { FindSourceButton } from "./FindSourceButton";
 
 interface Props {
@@ -49,20 +48,17 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
   }, [refreshMedia]);
 
   const source = attached?.source ?? episode.source;
-  const youtubeId = source.kind === "youtube" ? source.youtubeId : null;
   const streamUrl =
     source.kind === "audio" ? source.audioUrl : source.kind === "video" ? source.videoUrl : null;
 
-  const youtube = useYouTube(youtubeId);
   const media = useMediaElement(streamUrl);
   const timeline = useTimeline(episode.durationSec);
 
   const handle = useMemo(() => {
-    if (source.kind === "youtube") return youtube.handle;
     if (source.kind === "audio" || source.kind === "video") return media.handle;
     if (source.kind === "timeline") return timeline.handle;
     return NOOP_PLAYER;
-  }, [source.kind, youtube.handle, media.handle, timeline.handle]);
+  }, [source.kind, media.handle, timeline.handle]);
 
   const [values, setValues] = useState<ControlValues>({
     mode: initialMode ?? "free",
@@ -106,25 +102,9 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
   const [focusIndex, setFocusIndex] = useState(-1);
   const [selection, setSelection] = useState<WordSelection | null>(null);
   const [breakdown, setBreakdown] = useState<Segment | null>(null);
-  const [savedLemmas, setSavedLemmas] = useState<Set<string>>(new Set());
   const [seeded, setSeeded] = useState(false);
   const recordToggleRef = useRef<(() => void) | null>(null);
 
-  const refreshSaved = useCallback(() => {
-    const entries = loadVault().filter((entry) => entry.context.episodeSlug === episode.slug);
-    const set = new Set<string>();
-    for (const entry of entries) {
-      set.add(entry.surface.toLowerCase());
-      set.add(entry.lemma.toLowerCase());
-    }
-    setSavedLemmas(set);
-  }, [episode.slug]);
-
-  useEffect(() => {
-    refreshSaved();
-    window.addEventListener("hoerbar:vault-changed", refreshSaved);
-    return () => window.removeEventListener("hoerbar:vault-changed", refreshSaved);
-  }, [refreshSaved]);
 
   useEffect(() => {
     saveSettings({
@@ -298,12 +278,6 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
         <EpisodeHeader episode={episode} />
 
         <div className="mb-4">
-          {source.kind === "youtube" ? (
-            <div
-              ref={youtube.containerRef}
-              className="aspect-video w-full overflow-hidden rounded-xl border border-[var(--rule)] bg-black [&_iframe]:h-full [&_iframe]:w-full"
-            />
-          ) : null}
           {source.kind === "video" ? (
             <video
               ref={media.mediaRef as React.RefObject<HTMLVideoElement>}
@@ -355,7 +329,7 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
           </div>
         ) : null}
 
-        {episode.transcript.length === 0 && (source.kind === "audio" || source.kind === "video" || source.kind === "youtube") ? (
+        {episode.transcript.length === 0 && (source.kind === "audio" || source.kind === "video") ? (
           <div className="mb-4">
             <StreamControls handle={handle} />
             <p className="mt-2 text-[12px] leading-relaxed text-[var(--ink-faint)]">
@@ -390,7 +364,6 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
                 showDual={values.showDual}
                 showHazards={values.showHazards}
                 karaoke={values.karaoke}
-                savedLemmas={savedLemmas}
                 drillIds={drillIds}
                 onSeek={seekToSegment}
                 onWord={onWord}
@@ -424,7 +397,6 @@ export function WatchClient({ episode, initialTime = 0, initialSegmentId, initia
           lang={values.lang}
           episode={{ slug: episode.slug, title: episode.title, cefr: episode.cefr }}
           onClose={() => setSelection(null)}
-          onSaved={refreshSaved}
         />
       ) : null}
     </div>

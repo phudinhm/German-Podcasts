@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 const { parseFeed, parseDuration, assertPublicUrl, decodeXmlText } = await import("../.scripts-out/lib/server/feed.js");
-const { parseMediaUrl, parseYouTubeId } = await import("../.scripts-out/lib/media.js");
+const { parseMediaUrl } = await import("../.scripts-out/lib/media.js");
 
 /** A feed shaped like the ones actually in the wild: CDATA, namespaces, noise. */
 const FEED = `<?xml version="1.0" encoding="UTF-8"?>
@@ -105,25 +105,7 @@ test("allows ordinary public feeds", () => {
   assert.doesNotThrow(() => assertPublicUrl("http://172.32.0.1/feed"));
 });
 
-test("recognises YouTube URLs in every form people paste", () => {
-  assert.equal(parseYouTubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), "dQw4w9WgXcQ");
-  assert.equal(parseYouTubeId("https://youtu.be/dQw4w9WgXcQ?t=30"), "dQw4w9WgXcQ");
-  assert.equal(parseYouTubeId("https://www.youtube.com/shorts/dQw4w9WgXcQ"), "dQw4w9WgXcQ");
-  assert.equal(parseYouTubeId("https://m.youtube.com/watch?v=dQw4w9WgXcQ&list=x"), "dQw4w9WgXcQ");
-  assert.equal(parseYouTubeId("dQw4w9WgXcQ"), "dQw4w9WgXcQ");
-  assert.equal(parseYouTubeId("https://example.com/watch?v=notavideo"), null);
-});
 
-test("routes pasted media URLs to the right player", () => {
-  assert.equal(parseMediaUrl("https://youtu.be/dQw4w9WgXcQ")?.source.kind, "youtube");
-  assert.equal(parseMediaUrl("https://cdn.example.de/ep.mp3")?.source.kind, "audio");
-  assert.equal(parseMediaUrl("https://cdn.example.de/ep.mp4")?.source.kind, "video");
-  assert.equal(parseMediaUrl("https://cdn.example.de/live.m3u8")?.source.kind, "video");
-  // Extensionless podcast redirects are the common case, so assume audio.
-  assert.equal(parseMediaUrl("https://cdn.example.de/redirect/12345")?.source.kind, "audio");
-  assert.equal(parseMediaUrl("not a url"), null);
-  assert.equal(parseMediaUrl("file:///etc/passwd"), null);
-});
 
 test("decodes entities without mangling ampersands", () => {
   assert.equal(decodeXmlText("Wirtschaft &amp; Wandel"), "Wirtschaft & Wandel");

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUi } from "@/lib/i18n";
 import type { PlayerHandle } from "../player/types";
+import { findActive } from "@/lib/audio/timeline";
 import type { CaptionLine } from "./useCaptions";
 
 export type SubtitleMode = "off" | "original" | "both" | "translated";
@@ -21,11 +22,12 @@ function useActiveLine(handle: PlayerHandle, lines: CaptionLine[], active: boole
     if (!active) return;
     let frame = 0;
     let last: string | null = null;
+    let hint = -1;
     function tick() {
       frame = requestAnimationFrame(tick);
       const time = handle.getTime();
-      const current = lines.find((line) => time >= line.at - 0.15 && time <= line.until + 0.4);
-      const next = current?.id ?? null;
+      hint = findActive(lines, time, hint, 0.25);
+      const next = hint >= 0 ? lines[hint].id : null;
       if (next !== last) {
         last = next;
         setId(next);

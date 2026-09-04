@@ -13,6 +13,7 @@ import {
   type Interval,
 } from "@/lib/audio/captions";
 import { splitUtterance } from "@/lib/audio/segment";
+import { findActive, insertSorted } from "@/lib/audio/timeline";
 import { captureFromElement, rms, SILENCE_THRESHOLD, type CaptureHandle } from "@/lib/audio/capture";
 import { useCaptureElement, type CaptureRoute } from "./useCaptureElement";
 import { WhisperEngine, hasWebGpu, type WhisperStatus } from "@/lib/audio/whisper";
@@ -135,7 +136,9 @@ export function useCaptions({
           until: chunk.until,
           de: chunk.text,
         }));
-      return [...previous, ...additions].sort((a, b) => a.at - b.at);
+      // Inserted in place rather than re-sorting the whole list on every
+      // arrival: lines almost always come in order, so this is a push.
+      return additions.reduce<CaptionLine[]>((list, line) => insertSorted(list, line), previous);
     });
   }, []);
 
@@ -385,10 +388,12 @@ export function useCaptions({
     let frame = 0;
     let lastId: string | null = null;
     let lastReplaying = false;
+    let hint = -1;
     function tick() {
       frame = requestAnimationFrame(tick);
       const time = handle.getTime();
-      const current = linesRef.current.find((line) => time >= line.at - 0.75 && time <= line.until + 0.75);
+      hint = findActive(linesRef.current, time, hint);
+      const current = hint >= 0 ? linesRef.current[hint] : undefined;
       const id = current?.id ?? null;
       if (id !== lastId) {
         lastId = id;

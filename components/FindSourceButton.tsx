@@ -58,11 +58,9 @@ export function FindSourceButton({
       }
 
       setMedia(slug, {
-        source: newest.youtubeId
-          ? { kind: "youtube", youtubeId: newest.youtubeId, pageUrl: newest.pageUrl }
-          : newest.type.startsWith("video/")
-            ? { kind: "video", videoUrl: newest.url, pageUrl: newest.pageUrl }
-            : { kind: "audio", audioUrl: newest.url, pageUrl: newest.pageUrl },
+        source: newest.type.startsWith("video/")
+          ? { kind: "video", videoUrl: newest.url, pageUrl: newest.pageUrl }
+          : { kind: "audio", audioUrl: newest.url, pageUrl: newest.pageUrl },
         label: `${feed.title}: ${newest.title}`,
         attachedAt: new Date().toISOString(),
       });

@@ -12,11 +12,9 @@ import { memo } from "react";
  */
 function CaptionWordImpl({
   word,
-  saved,
   onSelect,
 }: {
   word: string;
-  saved: boolean;
   onSelect: (word: string, anchor: HTMLElement) => void;
 }) {
   const clean = word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
@@ -32,7 +30,6 @@ function CaptionWordImpl({
         role="button"
         tabIndex={0}
         className="word"
-        data-saved={saved ? "true" : undefined}
         onClick={(event) => {
           // A drag-select means the user wants the phrase, not this one word.
           const selected = window.getSelection()?.toString().trim() ?? "";

@@ -15,7 +15,6 @@ interface Props {
   showDual: boolean;
   showHazards: boolean;
   karaoke: boolean;
-  savedLemmas: Set<string>;
   drillIds: Set<string>;
   onSeek: (index: number) => void;
   onWord: (token: string, rendered: RenderedWord, anchor: HTMLElement, segment: Segment) => void;
@@ -71,7 +70,6 @@ const SegmentRow = memo(function SegmentRow({
   showDual,
   showHazards,
   karaoke,
-  savedLemmas,
   drillIds,
   onSeek,
   onWord,
@@ -131,7 +129,6 @@ const SegmentRow = memo(function SegmentRow({
                 de={piece}
                 hazards={showHazards}
                 spoken={karaoke && activeWordIndex >= 0 && wordIndex <= activeWordIndex && active}
-                saved={savedLemmas.has(piece.replace(/[^\p{L}]/gu, "").toLowerCase())}
                 onSelect={handleWord}
               />
             );

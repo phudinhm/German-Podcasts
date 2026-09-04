@@ -22,7 +22,6 @@
     "lib/types.ts",
     "lib/cefr.ts",
     "lib/sdm.ts",
-    "lib/srs.ts",
     "lib/german/orthography.ts",
     "lib/german/phonetics.ts",
     "lib/german/compound.ts",
@@ -42,6 +41,9 @@
     "lib/audio/proxy.ts",
     "lib/audio/capture.ts",
     "lib/export.ts",
-    "lib/server/range.ts"
+    "lib/server/range.ts",
+    "lib/audio/timeline.ts",
+    "lib/audio/wordtime.ts",
+    "lib/audio/chunks.ts"
   ]
 }

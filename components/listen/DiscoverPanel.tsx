@@ -18,7 +18,6 @@ import { Art } from "./Art";
 export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
   const { t } = useUi();
   const [topic, setTopic] = useState("");
-  const [medium, setMedium] = useState<"all" | "video" | "audio">("all");
   const [charts, setCharts] = useState<ChartEntry[] | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
 
@@ -39,12 +38,8 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
     void loadCharts();
   }, [loadCharts]);
 
-  const pool =
-    medium === "all"
-      ? ALL_SUGGESTIONS
-      : ALL_SUGGESTIONS.filter((item) => (medium === "video" ? item.video : !item.video));
-  const topics = topicsOf(pool);
-  const filtered = byTopic(pool, topic);
+  const topics = topicsOf(ALL_SUGGESTIONS);
+  const filtered = byTopic(ALL_SUGGESTIONS, topic);
 
   return (
     <div className="mt-8 space-y-9">
@@ -97,26 +92,6 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
             <span className="text-[12px] text-[var(--ink-faint)]">
               {filtered.length} {filtered.length === 1 ? "show" : "shows"}
             </span>
-            <div className="flex overflow-hidden rounded-full border border-[var(--rule)] sm:ml-auto">
-              {(["all", "video", "audio"] as const).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  data-active={medium === option}
-                  onClick={() => {
-                    setMedium(option);
-                    setTopic("");
-                  }}
-                  className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-1 text-[12px] last:border-r-0"
-                >
-                  {option === "all"
-                    ? t("common.all")
-                    : option === "video"
-                      ? t("listen.videoOnly")
-                      : t("listen.audioOnly")}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/*

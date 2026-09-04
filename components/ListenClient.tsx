@@ -8,7 +8,6 @@ import type { Segment, TargetLang } from "@/lib/types";
 import { useUi } from "@/lib/i18n";
 import { isFollowing, listSubscriptions, toggleFollow, type Subscription } from "@/lib/subscriptions";
 import { isMixedContent } from "@/lib/media";
-import { loadVault } from "@/lib/vault";
 import { usePlayer, useVideoStage, type Track } from "./player/PlayerProvider";
 import { Transport } from "./player/Transport";
 import { StreamControls } from "./StreamControls";
@@ -17,6 +16,8 @@ import { useCaptions, type CaptionLine, type CaptionMode } from "./captions/useC
 import { CaptionPanel } from "./captions/CaptionPanel";
 import { SubtitleButton, SubtitleOverlay, type SubtitleMode } from "./captions/SubtitleOverlay";
 import { SubtitleExport } from "./captions/SubtitleExport";
+import { TranscribePanel } from "./captions/TranscribePanel";
+import { useEpisodeTranscript } from "./captions/useEpisodeTranscript";
 import { QuickLookup, type QuickSelection } from "./QuickLookup";
 import { DiscoverPanel } from "./listen/DiscoverPanel";
 import { Art } from "./listen/Art";
@@ -37,7 +38,6 @@ const PAGE_SIZE = 40;
 
 const ORIGIN_LABEL: Record<DiscoverResult["origin"], string> = {
   apple: "Apple Podcasts",
-  youtube: "YouTube",
   spotify: "Spotify",
   rss: "RSS",
   web: "Website",
@@ -104,24 +104,22 @@ export function ListenClient() {
   const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>("off");
 
   const [selection, setSelection] = useState<QuickSelection | null>(null);
-  const [savedWords, setSavedWords] = useState<Set<string>>(new Set());
   /** Everything but the player recedes right after you press play. */
   const [focusMode, setFocusMode] = useState(false);
 
   const playing = player.track;
-  const isYouTubeEpisode = playing?.kind === "youtube";
   const isVideo = playing?.kind === "video";
-  const stageRef = useVideoStage(Boolean(playing) && (isYouTubeEpisode || isVideo));
+  const stageRef = useVideoStage(Boolean(playing) && isVideo);
   const playerRef = useRef<HTMLDivElement | null>(null);
 
   const captions = useCaptions({
     handle: player.handle,
-    // YouTube plays inside an iframe whose audio the page cannot reach, so
-    // there is nothing to tap there; the microphone path still is.
-    mediaUrl: playing && playing.kind !== "youtube" ? (playing.url ?? null) : null,
+    mediaUrl: playing?.url ?? null,
     targetLang,
     translate: dual,
   });
+
+  const generated = useEpisodeTranscript();
 
   /**
    * Subtitles read from the finished transcript when there is one, and from the
@@ -138,8 +136,9 @@ export function ListenClient() {
         translation: targetLang === "vi" ? segment.vi : segment.en,
       }));
     }
+    if (generated.state.lines.length > 0) return generated.state.lines;
     return captions.state.lines;
-  }, [transcript, targetLang, captions.state.lines]);
+  }, [transcript, targetLang, captions.state.lines, generated.state.lines]);
 
   // Subtitles over a video with no transcript need the recogniser running.
   const startCaptions = captions.start;
@@ -167,14 +166,6 @@ export function ListenClient() {
   }, [trackId, stopCaptions, clearCaptions]);
 
   const refreshFollows = useCallback(() => setFollows(listSubscriptions()), []);
-  const refreshSaved = useCallback(() => {
-    const set = new Set<string>();
-    for (const entry of loadVault()) {
-      set.add(entry.surface.toLowerCase());
-      set.add(entry.lemma.toLowerCase());
-    }
-    setSavedWords(set);
-  }, []);
 
   useEffect(() => {
     try {
@@ -194,14 +185,11 @@ export function ListenClient() {
       // A corrupt convenience list is not worth surfacing.
     }
     refreshFollows();
-    refreshSaved();
     window.addEventListener("hoerbar:follows-changed", refreshFollows);
-    window.addEventListener("hoerbar:vault-changed", refreshSaved);
     return () => {
       window.removeEventListener("hoerbar:follows-changed", refreshFollows);
-      window.removeEventListener("hoerbar:vault-changed", refreshSaved);
     };
-  }, [refreshFollows, refreshSaved]);
+  }, [refreshFollows]);
 
   useEffect(() => {
     setFollowing(show?.feedUrl ? isFollowing(show.feedUrl) : false);
@@ -294,7 +282,7 @@ export function ListenClient() {
       const response = await fetch("/api/transcript", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: episode.url, youtubeId: episode.youtubeId, title: episode.title }),
+        body: JSON.stringify({ url: episode.url, title: episode.title }),
       });
       const data = (await response.json()) as { found?: boolean; segments?: Segment[] };
       setTranscript(data.found ? (data.segments ?? []) : []);
@@ -308,8 +296,7 @@ export function ListenClient() {
    * scroll past forty audio episodes to find the three with pictures. The
    * toggle only appears when the feed actually has some of each.
    */
-  const isVideoEpisode = (episode: FeedEpisode) =>
-    Boolean(episode.youtubeId) || episode.type.startsWith("video/");
+  const isVideoEpisode = (episode: FeedEpisode) => episode.type.startsWith("video/");
   const hasVideo = Boolean(feed?.episodes.some(isVideoEpisode));
   const episodes = useMemo(() => {
     const all = feed?.episodes ?? [];
@@ -385,9 +372,8 @@ export function ListenClient() {
         showTitle: feed?.title ?? show?.title ?? "",
         artwork: episode.image ?? show?.artwork ?? feed?.image ?? null,
         description: episode.description,
-        kind: episode.youtubeId ? "youtube" : episode.type.startsWith("video/") ? "video" : "audio",
+        kind: episode.type.startsWith("video/") ? "video" : "audio",
         url: episode.url || undefined,
-        youtubeId: episode.youtubeId,
         pageUrl: episode.pageUrl,
         durationSec: episode.durationSec,
         publishedAt: episode.publishedAt,
@@ -434,15 +420,55 @@ export function ListenClient() {
             layout={columns ? "columns" : "stacked"}
             maxHeight={sidePanel ? "calc(100vh - 210px)" : 420}
             onWord={onWord}
-            savedWords={savedWords}
           />
           <SubtitleExport lines={subtitleLines} title={playing.title} />
         </div>
       );
     }
+    // A transcript generated here is a real transcript: it has timings, it is
+    // clickable, and it exports. So it takes the place of the live captions
+    // once it exists rather than sitting beside them.
+    if (generated.state.lines.length > 0) {
+      return (
+        <div>
+          <TranscribePanel
+            state={generated.state}
+            onRun={() => void generated.run(playing.url ?? "")}
+            onCancel={generated.cancel}
+            disabled={!playing.url}
+          />
+          <div className="mt-3">
+            <CaptionPanel
+              state={{ ...captions.state, lines: generated.state.lines }}
+              mode={captionMode}
+              onMode={setCaptionMode}
+              onStart={() => captions.start(captionMode)}
+              onStop={captions.stop}
+              onClear={captions.clear}
+              onSeek={(seconds) => {
+                player.handle.seekTo(seconds, true);
+                player.handle.play();
+              }}
+              showTranslation={dual}
+              onWord={onWord}
+              hideControls
+            />
+          </div>
+          <SubtitleExport lines={generated.state.lines} title={playing.title} />
+        </div>
+      );
+    }
+
     return (
       <div>
         <p className="mb-3 text-[12.5px] text-[var(--ink-faint)]">{t("listen.noTranscriptYet")}</p>
+        <TranscribePanel
+          state={generated.state}
+          onRun={() => void generated.run(playing.url ?? "")}
+          onCancel={generated.cancel}
+          disabled={!playing.url}
+        />
+        <div className="mt-3" />
         <CaptionPanel
           state={captions.state}
           mode={captionMode}
@@ -453,7 +479,6 @@ export function ListenClient() {
           onSeek={(seconds) => player.handle.seekTo(seconds, true)}
           showTranslation={dual}
           onWord={onWord}
-          savedWords={savedWords}
         />
         <SubtitleExport lines={captions.state.lines} title={playing.title} />
       </div>
@@ -467,11 +492,11 @@ export function ListenClient() {
     columns,
     sidePanel,
     onWord,
-    savedWords,
     t,
     captions,
     captionMode,
     subtitleLines,
+    generated,
   ]);
 
   const textControls = (
@@ -627,27 +652,6 @@ export function ListenClient() {
                           player.videoLayer,
                         )
                       : null}
-                    {isYouTubeEpisode && player.youtubeUnavailable ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-[var(--paper-raised)] p-4 text-center">
-                        <p className="max-w-sm text-[13px] leading-relaxed text-[var(--ink-soft)]">
-                          {player.youtubeReason === "embedding"
-                            ? t("listen.ytNoEmbed")
-                            : player.youtubeReason === "unavailable"
-                              ? t("listen.ytGone")
-                              : player.youtubeReason === "playback"
-                                ? t("listen.ytPlayback")
-                                : t("listen.playerBlocked")}
-                        </p>
-                        <a
-                          href={playing.pageUrl ?? `https://www.youtube.com/watch?v=${playing.youtubeId}`}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className="btn"
-                        >
-                          {t("listen.openOnYouTube")}
-                        </a>
-                      </div>
-                    ) : null}
                   </div>
                 ) : null}
 
@@ -672,11 +676,9 @@ export function ListenClient() {
                   </div>
                 ) : null}
 
-                {!isYouTubeEpisode ? (
-                  <div className="mt-3">
-                    <Transport handle={player.handle} state={player.mediaState} onRetry={player.retry} compact />
-                  </div>
-                ) : null}
+                <div className="mt-3">
+                  <Transport handle={player.handle} state={player.mediaState} onRetry={player.retry} compact />
+                </div>
 
                 {playing.description ? (
                   <div className="mt-3 text-[12.5px] leading-relaxed text-[var(--ink-soft)]">
@@ -771,7 +773,7 @@ export function ListenClient() {
                 <h2 className="truncate text-[18px] font-semibold">{feed.title}</h2>
                 <p className="text-[12.5px] text-[var(--ink-faint)]">
                   {feed.episodes.length}{" "}
-                  {feed.format === "youtube" ? t("common.videos") : t("common.episodes")}
+                  {t("common.episodes")}
                   {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
                 </p>
               </div>
@@ -859,7 +861,7 @@ export function ListenClient() {
                         {formatDuration(episode.durationSec, t("common.min")) ? (
                           <span>{formatDuration(episode.durationSec, t("common.min"))}</span>
                         ) : null}
-                        <span>{episode.youtubeId ? "YouTube" : episode.type}</span>
+                        <span>{episode.type}</span>
                       </span>
                     </span>
                   </button>
@@ -951,7 +953,6 @@ export function ListenClient() {
           lang={targetLang}
           context={{ episodeSlug: `stream:${playing.id}`, episodeTitle: playing.title }}
           onClose={() => setSelection(null)}
-          onSaved={refreshSaved}
         />
       ) : null}
     </div>

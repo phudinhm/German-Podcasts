@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUi } from "@/lib/i18n";
 import { CaptionWord, splitLine } from "../CaptionWord";
+import { wordTime } from "@/lib/audio/wordtime";
 import type { CaptionMode, CaptionState } from "./useCaptions";
 
 /**
@@ -24,7 +25,7 @@ export function CaptionPanel({
   onSeek,
   showTranslation,
   onWord,
-  savedWords,
+  hideControls,
 }: {
   state: CaptionState;
   mode: CaptionMode;
@@ -35,7 +36,8 @@ export function CaptionPanel({
   onSeek: (seconds: number) => void;
   showTranslation: boolean;
   onWord?: (word: string, sentence: string, anchor: HTMLElement) => void;
-  savedWords?: Set<string>;
+  /** True when the lines come from a finished run rather than live capture. */
+  hideControls?: boolean;
 }) {
   const { t } = useUi();
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -58,6 +60,8 @@ export function CaptionPanel({
 
   return (
     <div>
+      {hideControls ? null : (
+        <>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex overflow-hidden rounded-full border border-[var(--rule)]">
           {(["mic", "internal"] as const).map((option) => (
@@ -137,6 +141,9 @@ export function CaptionPanel({
         {onWord ? ` ${t("caption.saveWord")} ${t("caption.selectHint")}` : ""}
       </p>
 
+        </>
+      )}
+
       {state.error ? <p className="mt-2 text-[12.5px] text-rose-600">{state.error}</p> : null}
 
       {state.lines.length > 0 || state.interim ? (
@@ -166,23 +173,38 @@ export function CaptionPanel({
               >
                 {Math.floor(line.at / 60)}:{String(Math.floor(line.at % 60)).padStart(2, "0")}
               </button>
-              <span className="caption-line">
+              <span
+                className="caption-line cursor-pointer"
+                onClick={(event) => {
+                  // Clicking the line itself, rather than a word in it, plays
+                  // from its start. Scrubbing to a sentence you can see is the
+                  // thing people actually want and the slider cannot give.
+                  if ((event.target as HTMLElement).closest(".word")) return;
+                  onSeek(Math.max(0, line.at));
+                }}
+                title={t("caption.playFromHere")}
+              >
                 {onWord
-                  ? splitLine(line.de).map((piece, index) =>
-                      /^\s+$/.test(piece) ? (
-                        <span key={index}>{piece}</span>
-                      ) : (
-                        <CaptionWord
-                          key={index}
-                          word={piece}
-                          saved={Boolean(savedWords?.has(piece.replace(/[^\p{L}]/gu, "").toLowerCase()))}
-                          onSelect={(word, anchor) => {
-                            const selected = window.getSelection()?.toString().trim() ?? "";
-                            onWord(selected.length > word.length ? selected : word, line.de, anchor);
-                          }}
-                        />
-                      ),
-                    )
+                  ? (() => {
+                      const tokens = splitLine(line.de);
+                      return tokens.map((piece, index) =>
+                        /^\s+$/.test(piece) ? (
+                          <span key={index}>{piece}</span>
+                        ) : (
+                          <CaptionWord
+                            key={index}
+                            word={piece}
+                            onSelect={(word, anchor) => {
+                              // A click on a word means both things at once:
+                              // play from there, and tell me what it means.
+                              onSeek(wordTime(tokens, index, line.at, line.until));
+                              const selected = window.getSelection()?.toString().trim() ?? "";
+                              onWord(selected.length > word.length ? selected : word, line.de, anchor);
+                            }}
+                          />
+                        ),
+                      );
+                    })()
                   : line.de}
               </span>
               {showTranslation && line.translation ? (

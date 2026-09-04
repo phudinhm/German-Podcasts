@@ -127,6 +127,38 @@ self.onmessage = async (event) => {
     return;
   }
 
+  // A whole episode rather than a live window: the model is asked for
+  // timestamps, which it gives relative to the clip, so the caller adds the
+  // clip's own offset to get a position in the episode.
+  if (message.type === "transcribe_timed") {
+    try {
+      const pipe = await load(message.preferWebGpu !== false);
+      const output = await pipe(message.samples, {
+        language: "german",
+        task: "transcribe",
+        return_timestamps: true,
+        chunk_length_s: 28,
+        stride_length_s: 4,
+      });
+      const raw = (output && output.chunks) || [];
+      const pieces = raw
+        .map((c) => ({
+          text: (c.text || "").trim(),
+          from: Array.isArray(c.timestamp) ? c.timestamp[0] : null,
+          to: Array.isArray(c.timestamp) ? c.timestamp[1] : null,
+        }))
+        .filter((c) => c.text && c.from !== null);
+      self.postMessage({ type: "timed", id: message.id, offset: message.offset, pieces });
+    } catch (error) {
+      self.postMessage({
+        type: "error",
+        id: message.id,
+        error: String(error && error.message ? error.message : error),
+      });
+    }
+    return;
+  }
+
   if (message.type === "info") {
     self.postMessage({ type: "info", model: currentModel, loaded: Boolean(transcriber) });
   }

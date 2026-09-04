@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CEFR_DESCRIPTIONS } from "@/lib/cefr";
 import { SDM_WEIGHTS } from "@/lib/sdm";
-import { LEITNER_INTERVALS } from "@/lib/srs";
 import { CEFR_LEVELS } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -130,7 +129,7 @@ export default function AboutPage() {
         <p>
           Saved words run through SM-2, the same algorithm Anki uses, displayed as a five-box Leitner
           ladder because five boxes read faster than an ease factor. Intervals grow roughly along{" "}
-          {LEITNER_INTERVALS.join(", ")} days. Every card carries the sentence the word appeared in
+          1, 3, 7, 16, 35 days days. Every card carries the sentence the word appeared in
           plus a link back to that exact moment, which is the difference between a word list and a
           memory.
         </p>

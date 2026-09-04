@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import { useMediaElement, type MediaElementState } from "./useMediaElement";
-import { useYouTube, type YouTubeFailure } from "./useYouTube";
 import { NOOP_PLAYER, type PlayerHandle } from "./types";
 
 export interface Track {
@@ -37,9 +36,6 @@ interface PlayerContextValue {
   retry: () => void;
   /** URL actually handed to the element, after the https upgrade. */
   src: string | null;
-  youtubeUnavailable: boolean;
-  /** Why YouTube refused, when it said. */
-  youtubeReason: YouTubeFailure | null;
   /**
    * Registers the element the video should appear over on the current page.
    * Pass null when the page unmounts and the video docks into the mini bar.
@@ -79,13 +75,11 @@ export function usePlayer(): PlayerContextValue {
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [track, setTrack] = useState<Track | null>(null);
   const [stage, setStageElement] = useState<HTMLElement | null>(null);
-  const isYouTube = track?.kind === "youtube";
   // Playback always streams from the publisher. Transcription keeps its own
   // silent copy of the episode, so nothing it does can reach this element.
-  const media = useMediaElement(isYouTube ? null : (track?.url ?? null));
-  const youtube = useYouTube(track?.youtubeId ?? null);
+  const media = useMediaElement(track?.url ?? null);
 
-  const handle = isYouTube ? youtube.handle : track ? media.handle : NOOP_PLAYER;
+  const handle = track ? media.handle : NOOP_PLAYER;
 
   const layerRef = useRef<HTMLDivElement | null>(null);
   const [videoLayer, setVideoLayer] = useState<HTMLDivElement | null>(null);
@@ -102,7 +96,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       });
       // Let the element pick up the new source before asking it to play.
       window.setTimeout(() => {
-        if (next.kind !== "youtube") media.handle.play();
+        media.handle.play();
       }, 80);
     },
     [media.handle],
@@ -126,8 +120,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       mediaState: media.state,
       retry: media.retry,
       src: media.src,
-      youtubeUnavailable: youtube.unavailable,
-      youtubeReason: youtube.reason,
       setStage,
       mediaElement: () => media.mediaRef.current,
       videoLayer,
@@ -141,8 +133,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       media.retry,
       media.src,
       media.mediaRef,
-      youtube.unavailable,
-      youtube.reason,
       setStage,
       videoLayer,
     ],
@@ -179,15 +169,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      {track && track.kind === "youtube" ? (
-        <div
-          ref={attachLayer}
-          className="fixed z-[60] overflow-hidden bg-black shadow-lg"
-          style={{ top: 0, left: 0, width: 0, height: 0 }}
-        >
-          <div ref={youtube.containerRef} className="h-full w-full [&_iframe]:h-full [&_iframe]:w-full" />
-        </div>
-      ) : null}
     </PlayerContext.Provider>
   );
 }

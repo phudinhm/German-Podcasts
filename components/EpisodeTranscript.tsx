@@ -5,6 +5,7 @@ import { useUi } from "@/lib/i18n";
 import type { Segment, TargetLang } from "@/lib/types";
 import type { PlayerHandle } from "./player/types";
 import { CaptionWord, splitLine } from "./CaptionWord";
+import { wordTime } from "@/lib/audio/wordtime";
 
 /**
  * Transcript for a streamed episode, opened on demand.
@@ -23,7 +24,6 @@ export function EpisodeTranscript({
   layout = "stacked",
   maxHeight = 420,
   onWord,
-  savedWords,
 }: {
   segments: Segment[];
   handle: PlayerHandle;
@@ -33,7 +33,6 @@ export function EpisodeTranscript({
   layout?: TranscriptLayout;
   maxHeight?: number | string;
   onWord?: (word: string, sentence: string, anchor: HTMLElement) => void;
-  savedWords?: Set<string>;
 }) {
   const { t } = useUi();
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -94,21 +93,32 @@ export function EpisodeTranscript({
         const german = (
           <p className="de-line cursor-pointer text-[15px] leading-[1.6]" onClick={seek}>
             {onWord
-              ? splitLine(segment.de).map((piece, pieceIndex) =>
-                  /^\s+$/.test(piece) ? (
-                    <span key={pieceIndex}>{piece}</span>
-                  ) : (
-                    <CaptionWord
-                      key={pieceIndex}
-                      word={piece}
-                      saved={Boolean(savedWords?.has(piece.replace(/[^\p{L}]/gu, "").toLowerCase()))}
-                      onSelect={(word, anchor) => {
-                        const selected = window.getSelection()?.toString().trim() ?? "";
-                        onWord(selected.length > word.length ? selected : word, segment.de, anchor);
-                      }}
-                    />
-                  ),
-                )
+              ? (() => {
+                  const tokens = splitLine(segment.de);
+                  // Word-level timings exist once an episode has been aligned;
+                  // until then the position is estimated from the sentence.
+                  let spoken = 0;
+                  return tokens.map((piece, pieceIndex) => {
+                    if (/^\s+$/.test(piece)) return <span key={pieceIndex}>{piece}</span>;
+                    const exact = segment.words?.[spoken];
+                    spoken += 1;
+                    const at = exact
+                      ? Math.max(segment.start, exact.s - 0.1)
+                      : wordTime(tokens, pieceIndex, segment.start, segment.end);
+                    return (
+                      <CaptionWord
+                        key={pieceIndex}
+                        word={piece}
+                        onSelect={(word, anchor) => {
+                          handle.seekTo(at, true);
+                          handle.play();
+                          const selected = window.getSelection()?.toString().trim() ?? "";
+                          onWord(selected.length > word.length ? selected : word, segment.de, anchor);
+                        }}
+                      />
+                    );
+                  });
+                })()
               : segment.de}
           </p>
         );

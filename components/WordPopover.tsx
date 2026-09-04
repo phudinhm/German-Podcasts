@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import type { LookupResult, Segment, TargetLang, Cefr } from "@/lib/types";
 import type { RenderedWord } from "@/lib/german/render";
 import { HAZARD_LABEL } from "@/lib/german/render";
-import { addEntry, hasEntry } from "@/lib/vault";
 import { useUi } from "@/lib/i18n";
 
 export interface WordSelection {
@@ -19,16 +18,14 @@ interface Props {
   lang: TargetLang;
   episode: { slug: string; title: string; cefr: Cefr };
   onClose: () => void;
-  onSaved: () => void;
 }
 
 const LANG_LABEL: Record<TargetLang, string> = { en: "English", vi: "Vietnamese" };
 
-export function WordPopover({ selection, lang, episode, onClose, onSaved }: Props) {
+export function WordPopover({ selection, lang, episode, onClose }: Props) {
   const { t } = useUi();
   const [result, setResult] = useState<LookupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -53,7 +50,6 @@ export function WordPopover({ selection, lang, episode, onClose, onSaved }: Prop
       })
       .then((data) => {
         setResult(data);
-        setSaved(hasEntry(data.lemma, episode.slug));
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
@@ -80,30 +76,6 @@ export function WordPopover({ selection, lang, episode, onClose, onSaved }: Prop
     };
   }, [onClose]);
 
-  function save() {
-    if (!result) return;
-    addEntry({
-      surface: result.surface,
-      lemma: result.lemma,
-      pos: result.pos,
-      article: result.noun?.gender,
-      plural: result.noun?.plural,
-      translations: result.translations,
-      context: {
-        de: selection.segment.de,
-        en: selection.segment.en || result.sentence?.en,
-        vi: selection.segment.vi || result.sentence?.vi,
-        episodeSlug: episode.slug,
-        episodeTitle: episode.title,
-        segmentId: selection.segment.id,
-        start: selection.segment.start,
-        end: selection.segment.end,
-        cefr: episode.cefr,
-      },
-    });
-    setSaved(true);
-    onSaved();
-  }
 
   const { top, left, width } = selection.anchor;
   const style: React.CSSProperties = {
@@ -187,10 +159,7 @@ export function WordPopover({ selection, lang, episode, onClose, onSaved }: Prop
 
           <PhoneticNote rendered={selection.rendered} />
 
-          <div className="mt-3 flex items-center gap-2">
-            <button type="button" className="btn btn-primary flex-1" onClick={save} disabled={saved}>
-              {saved ? t("word.saved") : t("word.save")}
-            </button>
+          <div className="mt-3 flex justify-end">
             <span className="text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">
               {result.source}
             </span>

@@ -49,8 +49,6 @@ export interface EpisodeMetrics {
 }
 
 export type MediaSource =
-  /** Streamed from YouTube through the IFrame Player API. */
-  | { kind: "youtube"; youtubeId: string; pageUrl?: string }
   /** Streamed straight from a podcast CDN as an <audio> element. */
   | { kind: "audio"; audioUrl: string; pageUrl?: string; poster?: string }
   /** A direct video stream (mp4, webm, or an HLS playlist where supported). */

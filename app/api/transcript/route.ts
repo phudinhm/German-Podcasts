@@ -15,12 +15,10 @@ export const runtime = "nodejs";
  */
 export async function POST(request: Request) {
   let url: string;
-  let youtubeId: string;
   let title: string;
   try {
-    const body = (await request.json()) as { url?: string; youtubeId?: string; title?: string };
+    const body = (await request.json()) as { url?: string; title?: string };
     url = (body.url ?? "").trim();
-    youtubeId = (body.youtubeId ?? "").trim();
     title = (body.title ?? "").trim().toLowerCase();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -34,7 +32,6 @@ export async function POST(request: Request) {
   const match = episodes.find((episode) => {
     if (episode.transcript.length === 0) return false;
     const source = episode.source;
-    if (youtubeId && source.kind === "youtube" && source.youtubeId === youtubeId) return true;
     if (target && source.kind === "audio" && normalise(source.audioUrl) === target) return true;
     if (target && source.kind === "video" && normalise(source.videoUrl) === target) return true;
     if (title && episode.title.toLowerCase() === title) return true;

@@ -7,7 +7,6 @@ export function Footer() {
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 text-[12px] leading-relaxed text-[var(--ink-faint)]">
       <p>{t("footer.media")}</p>
-      <p className="mt-1">{t("footer.vault")}</p>
     </div>
   );
 }

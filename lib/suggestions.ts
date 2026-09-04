@@ -213,48 +213,6 @@ export const NATIVE_SOURCES: Suggestion[] = [
 ];
 
 /**
- * YouTube channels.
- *
- * A channel's public Atom feed lists its recent uploads without a key, so
- * these behave like any other subscription. Video matters for a learner in a
- * way it does not for a native listener: lip movement, gesture and the scene
- * itself carry meaning the ear has not yet learned to take from the sound.
- *
- * Named rather than linked, for the same reason as every other entry here. A
- * handle written into this file is a guess about someone else's URL, and a
- * guess that is even slightly wrong fails as a bare 404. A name goes through
- * the same resolution as anything typed into the search box, which tries the
- * obvious addresses and then simply searches.
- */
-export const YOUTUBE_SOURCES: Suggestion[] = [
-  { query: "Easy German", label: "Easy German", publisher: "Easy German", cefr: "A2", why: "Street interviews with German and English subtitles burnt in.", topics: ["Interviews", "Colloquial"], video: true },
-  { query: "DW Deutsch lernen", label: "DW Deutsch lernen", publisher: "Deutsche Welle", cefr: "A1", why: "The full A1 to C2 course library, free and structured.", topics: ["Learners", "Course"], video: true },
-  { query: "Learn German with Anja", label: "Learn German with Anja", publisher: "Anja", cefr: "A1", why: "Grammar taught slowly and very deliberately.", topics: ["Learners", "Grammar"], video: true },
-  { query: "Deutsch mit Marija", label: "Deutsch mit Marija", publisher: "Marija", cefr: "A2", why: "Grammar and everyday phrasing, spoken clearly throughout.", topics: ["Learners", "Grammar"], video: true },
-  { query: "Deutsch mit Benjamin", label: "Deutsch mit Benjamin", publisher: "Benjamin", cefr: "B1", why: "Explanations entirely in German at a manageable pace.", topics: ["Learners"], video: true },
-  { query: "Get Germanized", label: "Get Germanized", publisher: "Dominik Hammes", cefr: "B1", why: "Language and culture, bilingual where it helps.", topics: ["Learners", "Culture"], video: true },
-  { query: "Dinge Erklärt – Kurzgesagt", label: "Dinge Erklärt – Kurzgesagt", publisher: "Kurzgesagt", cefr: "B1", why: "Big questions animated. Pictures carry half the meaning.", topics: ["Science", "Explainers"], video: true },
-  { query: "MrWissen2go", label: "MrWissen2go", publisher: "Mirko Drotschmann", cefr: "B2", why: "Current affairs explained by a former news journalist.", topics: ["News", "Explainers"], video: true },
-  { query: "MrWissen2go Geschichte", label: "MrWissen2go Geschichte", publisher: "Mirko Drotschmann", cefr: "B2", why: "History with maps and archive footage to lean on.", topics: ["History"], video: true },
-  { query: "maiLab", label: "maiLab", publisher: "Mai Thi Nguyen-Kim", cefr: "C1", why: "Science argued carefully. Fast, precise, technical.", topics: ["Science"], video: true },
-  { query: "Simplicissimus", label: "Simplicissimus", publisher: "Simplicissimus", cefr: "C1", why: "Well-researched essays on how things actually work.", topics: ["Explainers", "Society"], video: true },
-  { query: "STRG_F", label: "STRG_F", publisher: "NDR / funk", cefr: "C1", why: "Investigative reporting, on location and unscripted.", topics: ["Documentary"], video: true },
-  { query: "Y-Kollektiv", label: "Y-Kollektiv", publisher: "funk", cefr: "C1", why: "First-person documentaries from inside the story.", topics: ["Documentary"], video: true },
-  { query: "Doktor Whatson", label: "Doktor Whatson", publisher: "Cedric Engels", cefr: "B2", why: "Technology and science explained without jargon.", topics: ["Science", "Tech"], video: true },
-  { query: "Breaking Lab", label: "Breaking Lab", publisher: "Jacob Beautemps", cefr: "B2", why: "Energy and climate technology, numbers on screen.", topics: ["Science"], video: true },
-  { query: "tagesschau", label: "tagesschau", publisher: "ARD", cefr: "B2", why: "The evening bulletin, with the pictures that go with it.", topics: ["News"], video: true },
-  { query: "ZDFheute Nachrichten", label: "ZDFheute Nachrichten", publisher: "ZDF", cefr: "B1", why: "News clips short enough to shadow one at a time.", topics: ["News"], video: true },
-  { query: "logo!", label: "logo!", publisher: "ZDF", cefr: "A2", why: "The news written for children. The gentlest real news in German.", topics: ["News", "Children"], video: true },
-  { query: "Sendung mit der Maus", label: "Sendung mit der Maus", publisher: "WDR", cefr: "A2", why: "How things are made, shown as well as said.", topics: ["Children", "Explainers"], video: true },
-  { query: "Terra X", label: "Terra X", publisher: "ZDF", cefr: "B2", why: "Documentary narration over documentary pictures.", topics: ["Documentary", "History"], video: true },
-  { query: "Quarks", label: "Quarks", publisher: "WDR", cefr: "B2", why: "Science television, clearly narrated.", topics: ["Science"], video: true },
-  { query: "DW Dokumentation", label: "DW Dokumentation", publisher: "Deutsche Welle", cefr: "B2", why: "Full-length documentaries, often with German subtitles.", topics: ["Documentary"], video: true },
-  { query: "Auf Klo", label: "Auf Klo", publisher: "funk", cefr: "B2", why: "Personal conversations in the smallest room. Unfiltered speech.", topics: ["Interviews", "Colloquial"], video: true },
-  { query: "Die Da Oben!", label: "Die Da Oben!", publisher: "funk", cefr: "B2", why: "Politics explained for people who find politics tiring.", topics: ["Politics"], video: true },
-  { query: "Wissen macht Ah!", label: "Wissen macht Ah!", publisher: "WDR", cefr: "A2", why: "Small questions answered with a demonstration.", topics: ["Children", "Explainers"], video: true },
-];
-
-/**
  * Everything, with duplicates folded away.
  *
  * The lists overlap deliberately - a show can be both a news source and a good
@@ -264,7 +222,7 @@ export const YOUTUBE_SOURCES: Suggestion[] = [
 export const ALL_SUGGESTIONS: Suggestion[] = (() => {
   const seen = new Set<string>();
   const all: Suggestion[] = [];
-  for (const item of [...SUGGESTIONS, ...NEWS_SOURCES, ...NATIVE_SOURCES, ...YOUTUBE_SOURCES]) {
+  for (const item of [...SUGGESTIONS, ...NEWS_SOURCES, ...NATIVE_SOURCES]) {
     const key = `${item.label.toLowerCase()}|${item.video ? "v" : "a"}`;
     if (seen.has(key)) continue;
     seen.add(key);

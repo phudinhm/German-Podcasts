@@ -8,7 +8,7 @@ import { useUi } from "@/lib/i18n";
 /**
  * Attach a real stream to an episode.
  *
- * Three ways in, because the sources a learner actually has differ: a YouTube
+ * Three ways in, because the sources a learner actually has differ: a podcast
  * link, a direct audio or video URL from a podcast feed, or a file already on
  * their machine. All three end up in the same player.
  */

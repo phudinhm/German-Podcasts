@@ -9,7 +9,6 @@ const ITEMS: Array<{ href: string; key: UiKey }> = [
   { href: "/", key: "nav.listen" },
   { href: "/catalog", key: "nav.catalog" },
   { href: "/drills", key: "nav.drills" },
-  { href: "/vault", key: "nav.vault" },
   { href: "/about", key: "nav.about" },
 ];
 

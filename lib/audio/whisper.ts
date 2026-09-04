@@ -32,6 +32,13 @@ export interface WhisperResult {
   until: number;
 }
 
+/** One window of a whole-episode transcription, with the model's own timings. */
+export interface WhisperTimed {
+  id: number;
+  offset: number;
+  pieces: Array<{ text: string; from: number; to: number | null }>;
+}
+
 /** WebGPU is what makes a base model keep up with real time. */
 export function hasWebGpu(): boolean {
   return typeof navigator !== "undefined" && "gpu" in navigator;
@@ -45,6 +52,7 @@ let status: WhisperStatus = { state: "idle" };
 let nextId = 1;
 const statusListeners = new Set<StatusListener>();
 const resultListeners = new Set<ResultListener>();
+const timedListeners = new Set<(timed: WhisperTimed) => void>();
 
 function publish(next: WhisperStatus): void {
   status = next;
@@ -97,6 +105,15 @@ function ensureWorker(): Worker | null {
           for (const listener of resultListeners) listener(result);
         }
         break;
+      case "timed": {
+        const timed: WhisperTimed = {
+          id: Number(message.id ?? 0),
+          offset: Number(message.offset ?? 0),
+          pieces: (message.pieces as WhisperTimed["pieces"]) ?? [],
+        };
+        for (const listener of timedListeners) listener(timed);
+        break;
+      }
       case "error":
         publish({ state: "error", error: String(message.error ?? "Transcription failed") });
         break;
@@ -171,6 +188,45 @@ export class WhisperEngine {
   getStatus(): WhisperStatus {
     return status;
   }
+}
+
+/**
+ * Transcribes a whole episode window by window, off the playback clock.
+ *
+ * Separate from WhisperEngine because it is a different job: not "keep up with
+ * what is playing" but "read the whole thing as fast as the machine can", and
+ * the caller wants each window's own timings rather than a running feed.
+ */
+export function transcribeWindow(
+  samples: Float32Array,
+  offset: number,
+  id: number,
+  onTimed: (timed: WhisperTimed) => void,
+): void {
+  const active = ensureWorker();
+  if (!active) return;
+  timedListeners.add(onTimed);
+  const buffer = samples.slice();
+  active.postMessage(
+    { type: "transcribe_timed", id, offset, samples: buffer, preferWebGpu: hasWebGpu() },
+    [buffer.buffer],
+  );
+}
+
+export function offTimed(onTimed: (timed: WhisperTimed) => void): void {
+  timedListeners.delete(onTimed);
+}
+
+/** Brings the worker up and starts the model download without a session. */
+export function warmWhisper(onStatus: StatusListener): () => void {
+  statusListeners.add(onStatus);
+  const active = ensureWorker();
+  if (active) {
+    if (status.state === "ready" || status.state === "error") onStatus(status);
+    else publish({ ...status, state: "loading" });
+    active.postMessage({ type: "load", preferWebGpu: hasWebGpu() });
+  }
+  return () => statusListeners.delete(onStatus);
 }
 
 /** Current shared state, for a component that wants it before starting. */
