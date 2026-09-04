@@ -36,7 +36,12 @@ export interface CaptionState {
   covered: number;
   error: string | null;
   whisper: WhisperStatus;
-  micSupported: boolean;
+  /**
+   * null until the check has run. The difference matters: a component that
+   * treats "not yet known" as "not supported" will switch away from the
+   * microphone on the very first render and never switch back.
+   */
+  micSupported: boolean | null;
   webGpu: boolean;
   /** Where the transcriber is reading the audio from, once it is reading. */
   route: CaptureRoute | null;
@@ -80,7 +85,7 @@ export function useCaptions({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [whisper, setWhisper] = useState<WhisperStatus>({ state: "idle" });
-  const [micSupported, setMicSupported] = useState(false);
+  const [micSupported, setMicSupported] = useState<boolean | null>(null);
   const [firstResultMs, setFirstResultMs] = useState<number | null>(null);
   const startedAtRef = useRef(0);
   // Destructured deliberately. Depending on the hook's returned object would

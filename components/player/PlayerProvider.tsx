@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { useMediaElement, type MediaElementState } from "./useMediaElement";
-import { useYouTube } from "./useYouTube";
+import { useYouTube, type YouTubeFailure } from "./useYouTube";
 import { NOOP_PLAYER, type PlayerHandle } from "./types";
 
 export interface Track {
@@ -38,6 +38,8 @@ interface PlayerContextValue {
   /** URL actually handed to the element, after the https upgrade. */
   src: string | null;
   youtubeUnavailable: boolean;
+  /** Why YouTube refused, when it said. */
+  youtubeReason: YouTubeFailure | null;
   /**
    * Registers the element the video should appear over on the current page.
    * Pass null when the page unmounts and the video docks into the mini bar.
@@ -125,6 +127,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       retry: media.retry,
       src: media.src,
       youtubeUnavailable: youtube.unavailable,
+      youtubeReason: youtube.reason,
       setStage,
       mediaElement: () => media.mediaRef.current,
       videoLayer,
@@ -139,6 +142,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       media.src,
       media.mediaRef,
       youtube.unavailable,
+      youtube.reason,
       setStage,
       videoLayer,
     ],

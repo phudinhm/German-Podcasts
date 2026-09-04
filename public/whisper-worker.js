@@ -47,6 +47,11 @@ async function load(preferWebGpu) {
     const { pipeline, env } = await loadLibrary();
     // Models come from the Hugging Face CDN; nothing is served from our origin.
     env.allowLocalModels = false;
+    // Weights are a hundred megabytes or so. Caching them in the browser is
+    // what makes the second visit instant, and it only works if a download is
+    // allowed to finish - which is why this worker is never terminated
+    // mid-flight any more.
+    env.useBrowserCache = true;
 
     let device = "wasm";
     if (preferWebGpu && typeof navigator !== "undefined" && navigator.gpu) {

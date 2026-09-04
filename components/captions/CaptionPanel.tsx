@@ -60,12 +60,12 @@ export function CaptionPanel({
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex overflow-hidden rounded-full border border-[var(--rule)]">
-          {(["internal", "mic"] as const).map((option) => (
+          {(["mic", "internal"] as const).map((option) => (
             <button
               key={option}
               type="button"
               data-active={mode === option}
-              disabled={state.running || (option === "mic" && !state.micSupported)}
+              disabled={state.running || (option === "mic" && state.micSupported === false)}
               onClick={() => onMode(option)}
               className="btn rounded-none border-0 border-r border-[var(--rule)] px-3 py-1 text-[12px] last:border-r-0"
             >

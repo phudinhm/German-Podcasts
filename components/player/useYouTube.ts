@@ -27,6 +27,23 @@ declare global {
   }
 }
 
+/**
+ * Why a YouTube video will not play here.
+ *
+ * "embedding" is by far the most common and the least obvious: German
+ * broadcasters routinely disable embedding, so the video exists, the API
+ * works, and nothing happens - the player simply sits there black. YouTube
+ * reports it as error 101 or 150, and without handling that the app looks
+ * broken when in fact the publisher made a choice we cannot override.
+ */
+export type YouTubeFailure = "embedding" | "unavailable" | "playback" | "api";
+
+function failureFor(code: number): YouTubeFailure {
+  if (code === 101 || code === 150) return "embedding";
+  if (code === 100) return "unavailable";
+  return "playback";
+}
+
 const API_SRC = "https://www.youtube.com/iframe_api";
 let apiPromise: Promise<void> | null = null;
 
@@ -64,18 +81,22 @@ export function useYouTube(videoId: string | null): {
   ready: boolean;
   /** True once the IFrame API has clearly failed to load. */
   unavailable: boolean;
+  /** Why the video will not play, when YouTube says so. */
+  reason: YouTubeFailure | null;
 } {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const [reason, setReason] = useState<YouTubeFailure | null>(null);
 
   useEffect(() => {
     if (!videoId || !containerRef.current) return;
     let cancelled = false;
     const mount = containerRef.current;
     setUnavailable(false);
+    setReason(null);
 
     // A blocked network, a corporate proxy or an ad blocker all end the same
     // way: the script never arrives. Say so rather than showing a black box.
@@ -87,6 +108,7 @@ export function useYouTube(videoId: string | null): {
       if (cancelled) return;
       if (!window.YT?.Player) {
         setUnavailable(true);
+        setReason("api");
         return;
       }
       const host = document.createElement("div");
@@ -99,6 +121,10 @@ export function useYouTube(videoId: string | null): {
           modestbranding: 1,
           playsinline: 1,
           cc_load_policy: 0,
+          enablejsapi: 1,
+          // Without an explicit origin some browsers reject the API's own
+          // postMessage traffic, and the player never reports ready.
+          origin: window.location.origin,
         },
         events: {
           onReady: () => {
@@ -106,6 +132,16 @@ export function useYouTube(videoId: string | null): {
             readyRef.current = true;
             setReady(true);
             setUnavailable(false);
+            setReason(null);
+          },
+          onError: (event: { data?: number }) => {
+            if (cancelled) return;
+            // A video that cannot be embedded still fires onReady first, so
+            // this has to override a ready player rather than only fill a gap.
+            readyRef.current = false;
+            setReady(false);
+            setReason(failureFor(Number(event?.data ?? 0)));
+            setUnavailable(true);
           },
         },
       });
@@ -117,6 +153,7 @@ export function useYouTube(videoId: string | null): {
       readyRef.current = false;
       setReady(false);
       setUnavailable(false);
+      setReason(null);
       try {
         playerRef.current?.destroy();
       } catch {
@@ -138,5 +175,5 @@ export function useYouTube(videoId: string | null): {
     isReady: () => readyRef.current,
   });
 
-  return { handle: handleRef.current, containerRef, ready, unavailable };
+  return { handle: handleRef.current, containerRef, ready, unavailable, reason };
 }

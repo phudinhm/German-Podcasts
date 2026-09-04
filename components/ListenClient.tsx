@@ -92,7 +92,15 @@ export function ListenClient() {
   /** Narrows a mixed feed to the episodes that have a picture to watch. */
   const [videoOnly, setVideoOnly] = useState(false);
 
-  const [captionMode, setCaptionMode] = useState<CaptionMode>("internal");
+  /**
+   * The microphone is the default because it is the one that just works: it
+   * starts in a second and downloads nothing. Reading the stream is better
+   * once it is running - headphones, a noisy room, no microphone permission -
+   * but it costs a model download of around a hundred megabytes, and making
+   * every new listener pay that before hearing a single caption was the wrong
+   * trade. It is one click away for anyone who wants it.
+   */
+  const [captionMode, setCaptionMode] = useState<CaptionMode>("mic");
   const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>("off");
 
   const [selection, setSelection] = useState<QuickSelection | null>(null);
@@ -141,6 +149,13 @@ export function ListenClient() {
     if (captions.state.running) return;
     startCaptions(captionMode);
   }, [subtitleMode, transcript, captions.state.running, startCaptions, captionMode]);
+
+  // Safari and Firefox have no speech recognition, so the default would be a
+  // mode they cannot run. Those users get the stream reader instead.
+  const micSupported = captions.state.micSupported;
+  useEffect(() => {
+    if (micSupported === false) setCaptionMode("internal");
+  }, [micSupported]);
 
   // A new episode is new ground: drop the old lines and release the tap.
   const stopCaptions = captions.stop;
@@ -614,7 +629,15 @@ export function ListenClient() {
                       : null}
                     {isYouTubeEpisode && player.youtubeUnavailable ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-[var(--paper-raised)] p-4 text-center">
-                        <p className="text-[13px] text-[var(--ink-soft)]">{t("listen.playerBlocked")}</p>
+                        <p className="max-w-sm text-[13px] leading-relaxed text-[var(--ink-soft)]">
+                          {player.youtubeReason === "embedding"
+                            ? t("listen.ytNoEmbed")
+                            : player.youtubeReason === "unavailable"
+                              ? t("listen.ytGone")
+                              : player.youtubeReason === "playback"
+                                ? t("listen.ytPlayback")
+                                : t("listen.playerBlocked")}
+                        </p>
                         <a
                           href={playing.pageUrl ?? `https://www.youtube.com/watch?v=${playing.youtubeId}`}
                           target="_blank"
