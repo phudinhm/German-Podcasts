@@ -2,7 +2,7 @@
   "name": "hoerbar",
   "version": "0.1.0",
   "private": true,
-  "description": "Hörbar - a podcast player with a library that syncs through your own Google Drive",
+  "description": "A podcast player with a library that syncs through your own Google Drive",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

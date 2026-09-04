@@ -23,12 +23,15 @@ export function LibraryPanel({
   onOpenShow,
   onPlayRecent,
   onForget,
+  onUnfollow,
 }: {
   shows: SavedShow[];
   recents: RecentEpisode[];
   onOpenShow: (show: SavedShow) => void;
   onPlayRecent: (entry: RecentEpisode) => void;
   onForget: (id: string) => void;
+  /** Only offered where removing a show makes sense, which is the library. */
+  onUnfollow?: (show: SavedShow) => void;
 }) {
   const { t } = useUi();
   const unfinished = recents.filter((entry) => !entry.finished);
@@ -92,7 +95,7 @@ export function LibraryPanel({
           <h2 className="mb-2 text-[15px] font-semibold">{t("library.shows")}</h2>
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {shows.map((show) => (
-              <li key={show.feedUrl}>
+              <li key={show.feedUrl} className="relative">
                 <button
                   type="button"
                   className="row-hover flex w-full items-center gap-3 p-2.5 text-left"
@@ -100,12 +103,23 @@ export function LibraryPanel({
                 >
                   <Art src={show.artwork} alt="" size={48} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-medium">{show.title}</span>
+                    <span className="block truncate pr-5 text-[14px] font-medium">{show.title}</span>
                     <span className="block truncate text-[12px] text-[var(--ink-faint)]">
                       {show.publisher}
                     </span>
                   </span>
                 </button>
+                {onUnfollow ? (
+                  <button
+                    type="button"
+                    aria-label={t("library.unfollowTitle", { name: show.title })}
+                    title={t("library.unfollowTitle", { name: show.title })}
+                    className="absolute right-1.5 top-1.5 px-1.5 text-[13px] leading-none text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                    onClick={() => onUnfollow(show)}
+                  >
+                    ×
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>

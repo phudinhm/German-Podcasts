@@ -7,6 +7,7 @@ import { UiLangSwitch } from "./UiLangProvider";
 
 const ITEMS: Array<{ href: string; key: UiKey }> = [
   { href: "/", key: "nav.listen" },
+  { href: "/library", key: "nav.library" },
   { href: "/about", key: "nav.about" },
 ];
 

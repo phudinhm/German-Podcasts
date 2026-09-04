@@ -8,11 +8,11 @@ import { MiniPlayer } from "@/components/player/MiniPlayer";
 
 export const metadata: Metadata = {
   title: {
-    default: "Hörbar - German listening and shadowing",
+    default: "Hörbar - podcasts, and where you left off",
     template: "%s - Hörbar",
   },
   description:
-    "Find German podcasts and video from Apple Podcasts, Spotify and YouTube, listen with side-by-side transcripts in English or Vietnamese, shadow sentence by sentence, and keep what you learn in a spaced-repetition vault.",
+    "Find podcasts from Apple Podcasts, Spotify or any RSS feed, follow the shows you like, and pick up every episode where you left it. Your library can sync through your own Google Drive.",
 };
 
 export const viewport: Viewport = {

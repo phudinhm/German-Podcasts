@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedEpisode, FeedResult } from "@/lib/server/feed";
 import type { DiscoverResult } from "@/lib/server/discover";
 import { useUi } from "@/lib/i18n";
@@ -58,6 +59,8 @@ export function ListenClient() {
   const { t, lang } = useUi();
   const locale = lang === "de" ? "de-DE" : lang === "vi" ? "vi-VN" : "en-GB";
   const player = usePlayer();
+  const params = useSearchParams();
+  const router = useRouter();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DiscoverResult[] | null>(null);
@@ -77,6 +80,7 @@ export function ListenClient() {
 
   const playing = player.track;
   const playerRef = useRef<HTMLDivElement | null>(null);
+  const openedFeedRef = useRef<string | null>(null);
 
   const refreshLibrary = useCallback(() => {
     setShows(listShows());
@@ -236,6 +240,38 @@ export function ListenClient() {
     return () => window.clearInterval(timer);
   }, [playing, player.handle]);
 
+  /** Returns to browsing without disturbing whatever is playing. */
+  const browse = useCallback(() => {
+    setFeed(null);
+    setShow(null);
+    setResults(null);
+    setError(null);
+    setVisible(PAGE_SIZE);
+    // Drop ?feed= as well, otherwise the URL still claims a show is open and
+    // picking that same show from the library again would be a dead click.
+    openedFeedRef.current = null;
+    if (params.get("feed")) router.replace("/", { scroll: false });
+  }, [params, router]);
+
+  // The library links here with the feed to open, so following a saved show
+  // lands on its episodes rather than on a search box.
+  const requestedFeed = params.get("feed");
+  useEffect(() => {
+    if (!requestedFeed || openedFeedRef.current === requestedFeed) return;
+    openedFeedRef.current = requestedFeed;
+    const saved = listShows().find((item) => item.feedUrl === requestedFeed);
+    void openFeed({
+      id: `rss:${requestedFeed}`,
+      title: saved?.title ?? requestedFeed,
+      publisher: saved?.publisher ?? "",
+      description: "",
+      artwork: saved?.artwork ?? null,
+      feedUrl: requestedFeed,
+      origin: (saved?.origin as DiscoverResult["origin"]) ?? "rss",
+      pageUrl: saved?.pageUrl ?? null,
+    });
+  }, [requestedFeed, openFeed]);
+
   const episodes = feed?.episodes ?? [];
   const mixed = Boolean(playing && playing.url && isMixedContent(playing.url));
 
@@ -348,9 +384,18 @@ export function ListenClient() {
       {/* ---------------- results ---------------- */}
       {results && results.length > 0 && !feed ? (
         <section className="mt-6">
-          <h2 className="mb-3 text-[13px] font-medium text-[var(--ink-soft)]">
-            {t("listen.results", { count: results.length })}
-          </h2>
+          <div className="mb-3 flex items-center gap-3">
+            <h2 className="text-[13px] font-medium text-[var(--ink-soft)]">
+              {t("listen.results", { count: results.length })}
+            </h2>
+            <button
+              type="button"
+              className="ml-auto btn px-2.5 py-1 text-[12px]"
+              onClick={browse}
+            >
+              {t("listen.backToBrowse")}
+            </button>
+          </div>
           <ul className="grid gap-2 sm:grid-cols-2">
             {results.map((result) => (
               <li key={result.id}>
@@ -414,18 +459,13 @@ export function ListenClient() {
                 {saved ? `★ ${t("library.saved")}` : `☆ ${t("library.save")}`}
               </button>
             ) : null}
-            {results && results.length > 1 ? (
-              <button
-                type="button"
-                className="text-[12px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
-                onClick={() => {
-                  setFeed(null);
-                  setShow(null);
-                }}
-              >
-                {t("listen.backToResults")}
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="btn text-[12.5px]"
+              onClick={browse}
+            >
+              {results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
+            </button>
           </div>
 
           <ul>

@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useUi } from "@/lib/i18n";
-import { ALL_SUGGESTIONS, byLang, byTopic, topicsOf, type SourceLang, type Suggestion } from "@/lib/suggestions";
+import {
+  ALL_SUGGESTIONS,
+  byLang,
+  byLevel,
+  byTopic,
+  LEVEL_HINTS,
+  topicsOf,
+  type SourceLang,
+  type Suggestion,
+} from "@/lib/suggestions";
+import { CEFR_LEVELS, type Cefr } from "@/lib/types";
 import type { ChartEntry } from "@/app/api/charts/route";
 import { Art } from "./Art";
 
@@ -18,6 +28,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
   const { t } = useUi();
   const [lang, setLang] = useState<SourceLang | "">("");
   const [topic, setTopic] = useState("");
+  const [level, setLevel] = useState<Cefr | "">("");
   const [charts, setCharts] = useState<ChartEntry[] | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
 
@@ -40,7 +51,10 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
 
   const pool = byLang(ALL_SUGGESTIONS, lang);
   const topics = topicsOf(pool);
-  const filtered = byTopic(pool, topic);
+  // Levels only mean something for German, so the filter only appears when
+  // German shows are in view at all.
+  const levelsApply = lang !== "en" && pool.some((item) => item.cefr);
+  const filtered = byLevel(byTopic(pool, topic), levelsApply ? level : "");
 
   return (
     <div className="mt-8 space-y-9">
@@ -104,6 +118,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
                     onClick={() => {
                       setLang(value);
                       setTopic("");
+                      if (value === "en") setLevel("");
                     }}
                     className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-1 text-[12px] last:border-r-0"
                   >
@@ -113,6 +128,38 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
               })}
             </div>
           </div>
+
+          {levelsApply ? (
+            <div className="-mx-4 mt-2 flex items-center gap-1 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+              <span className="shrink-0 pr-1 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">
+                {t("listen.level")}
+              </span>
+              <button
+                type="button"
+                className="btn shrink-0 px-2.5 py-1 text-[12px]"
+                data-active={level === ""}
+                onClick={() => setLevel("")}
+              >
+                {t("common.all")}
+              </button>
+              {CEFR_LEVELS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className="btn shrink-0 px-2.5 py-1 text-[12px]"
+                  data-active={level === item}
+                  title={LEVEL_HINTS[item]}
+                  onClick={() => setLevel(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {level ? (
+            <p className="mt-1.5 text-[12px] text-[var(--ink-faint)]">{LEVEL_HINTS[level]}</p>
+          ) : null}
 
           {/* One scrolling row on a phone: wrapped, these topics take the whole
               screen and push every actual show below the fold. */}
@@ -153,6 +200,11 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
                 <span className="flex items-baseline gap-1.5">
                   <span className="text-[14px] font-medium">{item.label}</span>
                   <span className="chip text-[10px]">{item.lang === "de" ? "DE" : "EN"}</span>
+                  {item.cefr ? (
+                    <span className="chip border-[var(--accent-ring)] text-[10px] text-[var(--accent)]">
+                      {item.cefr}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="block text-[12px] text-[var(--ink-soft)]">{item.publisher}</span>
                 <span className="mt-1 block text-[12px] leading-snug text-[var(--ink-faint)]">

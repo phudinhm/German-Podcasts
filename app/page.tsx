@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { ListenClient } from "@/components/ListenClient";
 
 /**
@@ -18,5 +19,12 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return <ListenClient />;
+  // ListenClient reads ?feed= so the library can link straight to a show's
+  // episodes. Reading search params opts a page out of static prerendering
+  // unless the boundary is here to say what to show meanwhile.
+  return (
+    <Suspense fallback={<p className="text-[13px] text-[var(--ink-faint)]">Loading…</p>}>
+      <ListenClient />
+    </Suspense>
+  );
 }
