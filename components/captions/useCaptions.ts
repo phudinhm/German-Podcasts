@@ -14,6 +14,7 @@ import {
 } from "@/lib/audio/captions";
 import { splitUtterance } from "@/lib/audio/segment";
 import { findActive, insertSorted } from "@/lib/audio/timeline";
+import { isNearDuplicate } from "@/lib/audio/stabilise";
 import { captureFromElement, rms, SILENCE_THRESHOLD, type CaptureHandle } from "@/lib/audio/capture";
 import { useCaptureElement, type CaptureRoute } from "./useCaptureElement";
 import { WhisperEngine, hasWebGpu, type WhisperStatus } from "@/lib/audio/whisper";
@@ -127,9 +128,18 @@ export function useCaptions({
 
     setLines((previous) => {
       const additions = chunks
-        .filter(
-          (chunk) => !previous.some((line) => Math.abs(line.at - chunk.at) < 0.2 && line.de === chunk.text),
-        )
+        .filter((chunk) => {
+          // An exact match only catches an identical repeat. The overlap
+          // between windows produces near-identical ones instead: the same
+          // words with a comma moved or a full stop added, which read as
+          // stuttering when both are printed.
+          const recent = previous.slice(-3);
+          return !recent.some(
+            (line) =>
+              (Math.abs(line.at - chunk.at) < 0.2 && line.de === chunk.text) ||
+              (Math.abs(line.at - chunk.at) < 2.5 && isNearDuplicate(line.de, chunk.text)),
+          );
+        })
         .map((chunk, index) => ({
           id: `c${Math.round(chunk.at * 1000)}-${index}`,
           at: chunk.at,
@@ -169,8 +179,20 @@ export function useCaptions({
     pendingRef.current = true;
     void (async () => {
       // One at a time: the keyless provider is rate limited, and a burst of
-      // requests is the quickest way to be cut off.
+      // requests is the quickest way to be cut off. A line that is nearly the
+      // same as one already translated reuses that translation instead of
+      // spending a request on saying the same thing again.
+      const done = linesRef.current.filter((line) => line.translation);
       for (const line of pending.slice(-20)) {
+        const twin = done.find((other) => isNearDuplicate(other.de, line.de));
+        if (twin?.translation) {
+          setLines((previous) =>
+            previous.map((item) =>
+              item.id === line.id ? { ...item, translation: twin.translation } : item,
+            ),
+          );
+          continue;
+        }
         await translateLine(line.id, line.de, targetLang);
       }
       pendingRef.current = false;

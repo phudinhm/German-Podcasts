@@ -44,6 +44,7 @@
     "lib/server/range.ts",
     "lib/audio/timeline.ts",
     "lib/audio/wordtime.ts",
-    "lib/audio/chunks.ts"
+    "lib/audio/chunks.ts",
+    "lib/audio/stabilise.ts"
   ]
 }
