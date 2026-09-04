@@ -111,3 +111,46 @@ test("decodes entities without mangling ampersands", () => {
   assert.equal(decodeXmlText("Wirtschaft &amp; Wandel"), "Wirtschaft & Wandel");
   assert.equal(decodeXmlText("&lt;b&gt;fett&lt;/b&gt;"), "<b>fett</b>");
 });
+
+// --- oversized feeds ---------------------------------------------------------
+
+const { truncateToLastEntry } = await import("../.scripts-out/lib/server/feed.js");
+
+test("a feed cut mid-episode is trimmed back to the last whole one", () => {
+  const xml =
+    "<rss><channel><title>Show</title>" +
+    "<item><title>Eins</title></item>" +
+    "<item><title>Zwei</title></item>" +
+    "<item><title>Drei ist abgeschni";
+  const out = truncateToLastEntry(xml);
+  assert.ok(out.endsWith("</item>"), "must end on a closed entry");
+  assert.ok(out.includes("Zwei"));
+  assert.ok(!out.includes("abgeschni"), "the half-read entry must be gone");
+});
+
+test("a complete feed is left exactly as it is", () => {
+  const xml = "<rss><channel><item><title>Eins</title></item></channel></rss>";
+  // The tail after the last </item> is dropped, which the parser does not need.
+  assert.ok(truncateToLastEntry(xml).endsWith("</item>"));
+});
+
+test("an Atom feed is cut on its own tag", () => {
+  const xml = "<feed><entry><title>Eins</title></entry><entry><title>halb";
+  assert.ok(truncateToLastEntry(xml).endsWith("</entry>"));
+});
+
+test("markup with no entries at all survives untouched", () => {
+  const xml = "<html><body>not a feed</body></html>";
+  assert.equal(truncateToLastEntry(xml), xml);
+});
+
+test("a truncated feed still parses into the episodes it kept", () => {
+  const xml =
+    '<rss><channel><title>Show</title>' +
+    '<item><title>Eins</title><enclosure url="https://x/1.mp3" type="audio/mpeg"/></item>' +
+    '<item><title>Zwei</title><enclosure url="https://x/2.mp3" type="audio/mpeg"/></item>' +
+    '<item><title>Halb</title><enclosur';
+  const result = parseFeed(truncateToLastEntry(xml), "x");
+  assert.equal(result.episodes.length, 2);
+  assert.equal(result.episodes[0].title, "Eins");
+});

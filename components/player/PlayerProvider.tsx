@@ -25,6 +25,12 @@ export interface Track {
   pageUrl?: string;
   durationSec?: number | null;
   publishedAt?: string | null;
+  /**
+   * Where to start, in seconds. Applied once the element knows how long the
+   * episode is: seeking before then is silently ignored, which is why resuming
+   * used to drop you back at the beginning.
+   */
+  startAt?: number;
 }
 
 interface PlayerContextValue {
@@ -74,6 +80,7 @@ export function usePlayer(): PlayerContextValue {
  */
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [track, setTrack] = useState<Track | null>(null);
+  const pendingSeekRef = useRef<number | null>(null);
   const [stage, setStageElement] = useState<HTMLElement | null>(null);
   // Playback always streams from the publisher. Transcription keeps its own
   // silent copy of the episode, so nothing it does can reach this element.
@@ -94,6 +101,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (current?.id === next.id) return current;
         return next;
       });
+      pendingSeekRef.current = next.startAt && next.startAt > 0 ? next.startAt : null;
       // Let the element pick up the new source before asking it to play.
       window.setTimeout(() => {
         media.handle.play();
@@ -101,6 +109,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     },
     [media.handle],
   );
+
+  /**
+   * Applies a requested start position as soon as the element is ready.
+   *
+   * A media element ignores a seek before it has metadata, so resuming an
+   * episode has to wait for it rather than guess at a delay.
+   */
+  useEffect(() => {
+    const at = pendingSeekRef.current;
+    if (at === null || !media.state.ready) return;
+    pendingSeekRef.current = null;
+    media.handle.seekTo(at, true);
+    // track?.id is in the dependencies because a new episode can start while
+    // the element already reports ready, and without it the effect would never
+    // re-run for the second episode of a session.
+  }, [media.state.ready, media.handle, track?.id]);
 
   const stop = useCallback(() => {
     handle.pause();

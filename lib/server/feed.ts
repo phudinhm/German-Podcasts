@@ -105,6 +105,23 @@ export function parseDuration(value: string | null): number | null {
   return trimmed.split(":").map(Number).reduce((total, part) => total * 60 + part, 0);
 }
 
+/**
+ * Cuts a partly-read feed back to its last complete <item> or <entry>.
+ *
+ * A feed read only as far as a byte limit usually stops in the middle of an
+ * episode. Handing the parser half an entry gives a broken row; cutting at the
+ * last closing tag gives a shorter but honest document, and since feeds are
+ * ordered newest first, what survives is what a listener wants anyway.
+ */
+export function truncateToLastEntry(xml: string): string {
+  let cut = -1;
+  for (const tag of ["</item>", "</entry>"]) {
+    const at = xml.lastIndexOf(tag);
+    if (at !== -1) cut = Math.max(cut, at + tag.length);
+  }
+  return cut > 0 ? xml.slice(0, cut) : xml;
+}
+
 export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
   const channelMatch = xml.match(/<channel[\s\S]*?>([\s\S]*)<\/channel>/i);
   const channel = channelMatch ? channelMatch[1] : xml;
