@@ -468,12 +468,3 @@ h3 {
     height: 40px;
   }
 }
-
-/*
- * The home indicator on a modern iPhone sits over the bottom of the viewport.
- * Anything docked there needs to clear it, or the last few pixels of the mini
- * player are behind a system gesture area and the pause button stops working.
- */
-.dock-safe {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}

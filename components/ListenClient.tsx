@@ -240,6 +240,30 @@ export function ListenClient() {
     return () => window.clearInterval(timer);
   }, [playing, player.handle]);
 
+  // Tells the docked player whether the full one is already on screen. An
+  // observer rather than a scroll handler: the card's position changes when the
+  // description expands or a feed loads above it, not only when you scroll.
+  const { setInlineVisible } = player;
+  useEffect(() => {
+    const node = playerRef.current;
+    if (!node) {
+      setInlineVisible(false);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => setInlineVisible(entry.isIntersecting),
+      // A sliver of the card counts as visible, but the last few pixels of its
+      // bottom edge do not: the controls are what matters, and they are gone
+      // well before the card is.
+      { rootMargin: "-120px 0px 0px 0px", threshold: 0 },
+    );
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      setInlineVisible(false);
+    };
+  }, [playing, setInlineVisible]);
+
   /** Returns to browsing without disturbing whatever is playing. */
   const browse = useCallback(() => {
     setFeed(null);
