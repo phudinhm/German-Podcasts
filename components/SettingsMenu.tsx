@@ -59,7 +59,10 @@ export function SettingsMenu() {
         <span aria-hidden className="text-[13px] leading-none text-[var(--ink-soft)]">
           {THEME_GLYPH[resolved]}
         </span>
-        {lang.toUpperCase()}
+        {/* The code is dropped on a phone. With the mark now in the header too,
+            it was the least valuable thing competing for the width, and the
+            language is still named in full one tap away inside the menu. */}
+        <span className="hidden sm:inline">{lang.toUpperCase()}</span>
       </button>
 
       {open ? (

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUi, type UiKey } from "@/lib/i18n";
 import { SettingsMenu } from "./SettingsMenu";
+import { Logo } from "./Logo";
 
 /**
  * `short` is the label used below the sm breakpoint. At 390px the full set plus
@@ -34,8 +35,14 @@ export function Nav() {
     // than the nav wrapping to a second line, which cost forty pixels of every
     // phone screen for no information at all.
     <div className="mx-auto flex max-w-6xl items-center gap-x-3 px-4 py-2 sm:gap-x-5 sm:px-5">
-      <Link href="/" className="mr-auto flex shrink-0 items-baseline gap-2">
-        <span className="text-[18px] font-semibold tracking-[-0.03em] sm:text-[20px]">Hörbar</span>
+      <Link href="/" className="mr-auto flex shrink-0 items-center gap-2">
+        <Logo size={26} />
+        {/* Below 360px the mark carries the brand on its own: at that width the
+            word and the nav cannot both fit, and a clipped nav item reads as a
+            bug where a bare mark reads as a logo. */}
+        <span className="hidden text-[18px] font-semibold tracking-[-0.03em] min-[360px]:inline sm:text-[20px]">
+          Hörbar
+        </span>
         <span className="hidden truncate text-[12px] text-[var(--ink-faint)] lg:inline">
           {t("nav.tagline")}
         </span>

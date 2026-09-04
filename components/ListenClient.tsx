@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedEpisode, FeedResult } from "@/lib/server/feed";
 import type { DiscoverResult } from "@/lib/server/discover";
@@ -24,6 +24,8 @@ import { StreamControls } from "./StreamControls";
 import { DiscoverPanel } from "./listen/DiscoverPanel";
 import { Art } from "./listen/Art";
 import { LibraryPanel } from "./listen/LibraryPanel";
+import { EpisodeSort } from "./listen/EpisodeSort";
+import { sortEpisodes, type SortKey } from "@/lib/episodeSort";
 
 const RECENT_KEY = "hoerbar.discover.v2";
 const PAGE_SIZE = 40;
@@ -77,6 +79,7 @@ export function ListenClient() {
   const [recents, setRecents] = useState<RecentEpisode[]>([]);
   const [saved, setSaved] = useState(false);
   const [expandedDescription, setExpandedDescription] = useState(false);
+  const [sort, setSort] = useState<SortKey>("newest");
 
   const playing = player.track;
   const playerRef = useRef<HTMLDivElement | null>(null);
@@ -113,6 +116,7 @@ export function ListenClient() {
     setShow(target);
     setFeed(null);
     setVisible(PAGE_SIZE);
+    setSort("newest");
     setLoadingFeed(true);
     setError(null);
     try {
@@ -296,7 +300,10 @@ export function ListenClient() {
     });
   }, [requestedFeed, openFeed]);
 
-  const episodes = feed?.episodes ?? [];
+  const episodes = useMemo(
+    () => sortEpisodes(feed?.episodes ?? [], sort, recents),
+    [feed, sort, recents],
+  );
   const mixed = Boolean(playing && playing.url && isMixedContent(playing.url));
 
   // The lede explains what the app is, which is worth a screen exactly once.
@@ -496,7 +503,7 @@ export function ListenClient() {
                 </p>
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {show?.feedUrl ? (
                 <button
                   type="button"
@@ -522,6 +529,11 @@ export function ListenClient() {
               <button type="button" className="btn text-[12.5px]" onClick={browse}>
                 {results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
               </button>
+              {episodes.length > 1 ? (
+                <span className="sm:ml-auto">
+                  <EpisodeSort value={sort} onChange={setSort} />
+                </span>
+              ) : null}
             </div>
           </div>
 
