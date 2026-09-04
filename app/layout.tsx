@@ -15,6 +15,15 @@ export const metadata: Metadata = {
   },
   description:
     "Find podcasts from Apple Podcasts, Spotify or any RSS feed, follow the shows you like, and pick up every episode where you left it. Your library can sync through your own Google Drive.",
+  applicationName: "Hörbar",
+  appleWebApp: { capable: true, title: "Hörbar", statusBarStyle: "black-translucent" },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {

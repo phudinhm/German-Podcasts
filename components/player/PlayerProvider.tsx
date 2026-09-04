@@ -50,6 +50,17 @@ interface PlayerContextValue {
   /** The live media element, for anything that needs the real clock. */
   mediaElement: () => HTMLMediaElement | null;
   /**
+   * True while a page is showing the full player inline and on screen.
+   *
+   * The docked player watches this rather than the route: the question is not
+   * "which page is this" but "can the listener already see the controls". On
+   * the listening page the full card scrolls away, and the moment it does the
+   * docked one should take over.
+   */
+  inlineVisible: boolean;
+  /** Called by the inline player as it enters and leaves the viewport. */
+  setInlineVisible: (visible: boolean) => void;
+  /**
    * The persistent video layer, once mounted. Pages portal subtitles into it
    * so they travel with the picture instead of with the page.
    */
@@ -135,6 +146,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setStageElement(element);
   }, []);
 
+  // Defaults to false so a page with no inline player, such as the library,
+  // gets the docked one straight away.
+  const [inlineVisible, setInlineVisible] = useState(false);
+
   const value = useMemo<PlayerContextValue>(
     () => ({
       track,
@@ -147,6 +162,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setStage,
       mediaElement: () => media.mediaRef.current,
       videoLayer,
+      inlineVisible,
+      setInlineVisible,
     }),
     [
       track,
@@ -159,6 +176,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       media.mediaRef,
       setStage,
       videoLayer,
+      inlineVisible,
     ],
   );
 
