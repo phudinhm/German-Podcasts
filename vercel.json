@@ -1,12 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "npm run build-catalog && next build",
   "functions": {
-    "app/api/lookup/route.ts": { "maxDuration": 15 },
-    "app/api/breakdown/route.ts": { "maxDuration": 20 },
-    "app/api/quiz/route.ts": { "maxDuration": 30 },
-    "app/api/translate/route.ts": { "maxDuration": 20 }
+    "app/api/translate/route.ts": { "maxDuration": 20 },
+    "app/api/discover/route.ts": { "maxDuration": 25 },
+    "app/api/feed/route.ts": { "maxDuration": 25 }
   },
   "headers": [
     {
