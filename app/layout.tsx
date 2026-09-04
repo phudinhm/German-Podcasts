@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { UiLangProvider } from "@/components/UiLangProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { THEME_SCRIPT } from "@/lib/theme";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { PlayerProvider } from "@/components/player/PlayerProvider";
@@ -26,6 +28,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        {/*
+          Runs before the first paint so a dark-mode reader never sees a white
+          flash. It only reads localStorage and sets one attribute, and it is
+          inline because an external file would be fetched after paint, which
+          is the flash it exists to prevent.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+
         {/* Roboto, the typeface YouTube uses. Loaded from Google Fonts rather
             than bundled so the build needs no network; the stack in globals.css
             keeps metrics close if it never arrives. */}
@@ -37,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="flex min-h-screen flex-col antialiased">
+        <ThemeProvider>
         <UiLangProvider>
           <PlayerProvider>
           <header className="sticky top-0 z-40 border-b border-[var(--rule)] bg-[color-mix(in_oklab,var(--paper)_92%,transparent)] backdrop-blur">
@@ -52,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <MiniPlayer />
           </PlayerProvider>
         </UiLangProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

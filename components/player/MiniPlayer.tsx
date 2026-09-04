@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useUi } from "@/lib/i18n";
 import { usePlayer } from "./PlayerProvider";
+import { Art } from "../listen/Art";
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -66,14 +67,7 @@ export function MiniPlayer() {
         {hasVideoLayer ? <span className="h-[58px] w-[104px] shrink-0" aria-hidden /> : null}
 
         {!hasVideoLayer ? (
-          track.artwork ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={track.artwork} alt="" className="art h-11 w-11 shrink-0" />
-          ) : (
-            <span className="art flex h-11 w-11 shrink-0 items-center justify-center text-[var(--ink-faint)]">
-              ♪
-            </span>
-          )
+          <Art src={track.artwork} alt="" size={44} seed={track.showTitle || track.title} />
         ) : null}
 
         <button

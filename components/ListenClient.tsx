@@ -353,10 +353,10 @@ export function ListenClient() {
           <div className="p-4">
             <div className="flex items-start gap-3">
               <span className="hidden sm:block">
-                <Art src={playing.artwork} alt="" size={88} />
+                <Art src={playing.artwork} alt="" size={88} seed={playing.showTitle || playing.title} />
               </span>
               <span className="sm:hidden">
-                <Art src={playing.artwork} alt="" size={56} />
+                <Art src={playing.artwork} alt="" size={56} seed={playing.showTitle || playing.title} />
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="line-clamp-3 text-[16px] font-semibold leading-snug">{playing.title}</h2>
@@ -435,7 +435,7 @@ export function ListenClient() {
                   onClick={() => void openFeed(result)}
                   disabled={!result.feedUrl}
                 >
-                  <Art src={result.artwork} alt="" size={56} />
+                  <Art src={result.artwork} alt="" size={56} seed={result.title} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[14.5px] font-medium leading-snug">{result.title}</span>
                     <span className="block truncate text-[12.5px] text-[var(--ink-faint)]">
@@ -463,7 +463,7 @@ export function ListenClient() {
               nine characters before the two buttons took the rest. */}
           <div className="mb-3">
             <div className="flex items-center gap-3">
-              <Art src={show?.artwork ?? feed.image} alt="" size={56} />
+              <Art src={show?.artwork ?? feed.image} alt="" size={56} seed={feed.title} />
               <div className="min-w-0 flex-1">
                 <h2 className="truncate text-[17px] font-semibold sm:text-[18px]">{feed.title}</h2>
                 <p className="truncate text-[12.5px] text-[var(--ink-faint)]">
@@ -519,7 +519,7 @@ export function ListenClient() {
                     data-active={current}
                     aria-current={current ? "true" : undefined}
                   >
-                    <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={56} />
+                    <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={56} seed={feed.title} />
                     <span className="min-w-0 flex-1">
                       <span className="flex items-start gap-2">
                         {current ? (

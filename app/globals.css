@@ -1,22 +1,27 @@
 @import "tailwindcss";
 
 /*
- * Palette. Warm paper in light mode, deep slate in dark, with a single amber
- * accent that carries every "active sentence" and "saved word" signal so the
- * eye only ever has to learn one colour.
+ * Palette.
+ *
+ * One amber accent carries every "this is the one" signal - the row playing,
+ * the level in force, the filter you chose - so the eye only has to learn one
+ * colour. Everything else is a neutral ramp.
+ *
+ * Light used to paint the page and the cards both pure white, which meant a
+ * card was visible only by its hairline border. The ground is now a shade off
+ * white so raised things read as raised. Dark is a touch blue rather than pure
+ * grey, which keeps a screen of warm artwork from looking sepia.
  */
 @theme {
-  --color-paper: #ffffff;
+  --color-paper: #fbfaf9;
   --color-paper-raised: #ffffff;
-  --color-ink: #0f0f0f;
-  --color-ink-soft: #606060;
-  --color-ink-faint: #909090;
-  --color-rule: #e5e5e5;
-  --color-accent: #b45309;
-  --color-accent-soft: #fff4e0;
-  --color-accent-ring: #f59e0b;
-  --color-de: #0f0f0f;
-  --color-gloss: #606060;
+  --color-ink: #14140f;
+  --color-ink-soft: #55544f;
+  --color-ink-faint: #6f6e69;
+  --color-rule: #e4e2dd;
+  --color-accent: #a1520a;
+  --color-accent-soft: #fdf1de;
+  --color-accent-ring: #e0870f;
 
   /* Roboto is the typeface YouTube uses; the stack degrades to the platform UI
      font when the webfont has not arrived, which keeps metrics close. */
@@ -25,8 +30,19 @@
   --font-mono: "Roboto Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
+/*
+ * Three appearance states, in the order they must cascade.
+ *
+ *   :root                                  light, and the default
+ *   prefers-color-scheme + no data-theme   dark, when following the system
+ *   [data-theme="dark"] / ["light"]        dark or light, chosen explicitly
+ *
+ * The middle rule is guarded on the attribute being absent. Without that guard
+ * someone who picks Light on a dark laptop gets the system rule applied anyway
+ * on any property the explicit block does not restate.
+ */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --paper: var(--color-paper);
   --paper-raised: var(--color-paper-raised);
   --ink: var(--color-ink);
@@ -36,27 +52,50 @@
   --accent: var(--color-accent);
   --accent-soft: var(--color-accent-soft);
   --accent-ring: var(--color-accent-ring);
-  --gloss: var(--color-gloss);
-  --surface: #f9f9f9;
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 20px -12px rgb(0 0 0 / 0.16);
-  --radius: 12px;
+  --surface: #f2f0ec;
+  /* The playing row. Separate from --accent-soft because the two themes need
+     different strengths: a tint that reads as a gentle highlight on paper is a
+     muddy brown behind grey text on a dark ground. */
+  --row-active: #fdf1de;
+  --shadow-card: 0 1px 2px rgb(20 20 15 / 0.05), 0 8px 24px -14px rgb(20 20 15 / 0.22);
+  --shadow-pop: 0 2px 6px rgb(20 20 15 / 0.08), 0 16px 40px -18px rgb(20 20 15 / 0.34);
+  --radius: 14px;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0f0f0f;
-    --paper-raised: #1c1c1c;
-    --ink: #f1f1f1;
-    --ink-soft: #aaaaaa;
-    --ink-faint: #7a7a7a;
-    --rule: #303030;
-    --accent: #fbbf24;
-    --accent-soft: #3a2f13;
-    --accent-ring: #f59e0b;
-    --gloss: #aaaaaa;
-    --surface: #181818;
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 20px -12px rgb(0 0 0 / 0.7);
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #0d0e11;
+    --paper-raised: #17191d;
+    --ink: #f0efec;
+    --ink-soft: #a8a7a2;
+    --ink-faint: #85847d;
+    --rule: #2a2d33;
+    --accent: #f6b44a;
+    --accent-soft: #38290f;
+    --accent-ring: #e0870f;
+    --surface: #1d2025;
+    --row-active: #241f14;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.6), 0 8px 24px -14px rgb(0 0 0 / 0.8);
+    --shadow-pop: 0 2px 8px rgb(0 0 0 / 0.7), 0 18px 44px -18px rgb(0 0 0 / 0.9);
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0d0e11;
+  --paper-raised: #17191d;
+  --ink: #f0efec;
+  --ink-soft: #a8a7a2;
+  --ink-faint: #85847d;
+  --rule: #2a2d33;
+  --accent: #f6b44a;
+  --accent-soft: #38290f;
+  --accent-ring: #e0870f;
+  --surface: #1d2025;
+  --row-active: #241f14;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.6), 0 8px 24px -14px rgb(0 0 0 / 0.8);
+  --shadow-pop: 0 2px 8px rgb(0 0 0 / 0.7), 0 18px 44px -18px rgb(0 0 0 / 0.9);
 }
 
 html {
@@ -104,6 +143,13 @@ h3 {
     border: 1px solid var(--rule);
     border-radius: var(--radius);
     box-shadow: var(--shadow-card);
+  }
+
+  /* A menu floating over the page needs more separation than a card sitting in
+     it, or it reads as part of whatever it happens to be covering. */
+  [role="menu"].card,
+  [role="listbox"].card {
+    box-shadow: var(--shadow-pop);
   }
 
   /* A flat, borderless surface, the way modern video interfaces group content. */
@@ -308,13 +354,27 @@ h3 {
     border-radius: 10px;
     object-fit: cover;
     background: var(--surface);
+    /* Podcast artwork is often near-white at the edges, which dissolves into a
+       light page. A hairline of the ink colour holds its shape in both themes
+       without reading as a border. */
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+  }
+
+  /* The CEFR level on a card. Outlined rather than filled: a page of a hundred
+     shows with a hundred filled amber badges is a page of amber. */
+  .chip-level {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent-ring) 55%, transparent);
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
   }
 
   /* The row you are listening to. It is the only thing on the page allowed to
      carry the accent as a background, so the eye can find it in a list of sixty
      without reading a word. */
   .row-hover[data-active="true"] {
-    background: color-mix(in oklab, var(--accent-soft) 75%, transparent);
+    background: var(--row-active);
+    box-shadow: inset 2px 0 0 var(--accent-ring);
   }
 
   /* A steady bar rather than an animated equaliser: this sits beside a title

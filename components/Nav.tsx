@@ -3,17 +3,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUi, type UiKey } from "@/lib/i18n";
-import { UiLangSwitch } from "./UiLangProvider";
+import { SettingsMenu } from "./SettingsMenu";
 
 /**
  * `short` is the label used below the sm breakpoint. At 390px the full set plus
  * the wordmark and the language button came to more than the screen, and the
  * nav simply sat on top of "Hörbar".
  */
-const ITEMS: Array<{ href: string; key: UiKey; short?: UiKey }> = [
-  { href: "/", key: "nav.listen" },
+/**
+ * `short` is the label used below the sm breakpoint.
+ *
+ * `wideOnly` items are dropped from the header on a phone and offered in the
+ * settings menu instead. Only "How it works" qualifies: it is read once, where
+ * Listen and Library are the whole app. Keeping all three cut the last one in
+ * half at 360px in every language, and a sliced nav item reads as a bug rather
+ * than as something you can scroll to.
+ */
+const ITEMS: Array<{ href: string; key: UiKey; short?: UiKey; wideOnly?: boolean }> = [
+  { href: "/", key: "nav.listen", short: "nav.listenShort" },
   { href: "/library", key: "nav.library" },
-  { href: "/about", key: "nav.about", short: "nav.aboutShort" },
+  { href: "/about", key: "nav.about", wideOnly: true },
 ];
 
 export function Nav() {
@@ -32,7 +41,14 @@ export function Nav() {
         </span>
       </Link>
 
-      <nav className="-mx-1 flex shrink-0 items-center gap-0.5 px-1 text-[13.5px] sm:gap-1 sm:text-[14px]">
+      {/*
+        The links scroll rather than push the page wide. Short labels keep them
+        on one screen in English, but "Direkt hören" and "Wie es funktioniert"
+        are half again as long, and no amount of padding tuning survives a
+        translation. Settings sits outside the scroller so it stays reachable
+        whatever the labels do.
+      */}
+      <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto text-[13.5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-1 sm:text-[14px]">
         {ITEMS.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
@@ -41,6 +57,8 @@ export function Nav() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={`shrink-0 rounded-full px-2.5 py-1.5 transition-colors sm:px-3 ${
+                item.wideOnly ? "hidden sm:inline-flex " : ""
+              }${
                 active
                   ? "bg-[var(--surface)] font-medium text-[var(--ink)]"
                   : "text-[var(--ink-soft)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"
@@ -57,10 +75,11 @@ export function Nav() {
             </Link>
           );
         })}
-        <span className="ml-0.5 shrink-0 sm:ml-1">
-          <UiLangSwitch />
-        </span>
       </nav>
+
+      <span className="shrink-0">
+        <SettingsMenu />
+      </span>
     </div>
   );
 }

@@ -62,7 +62,7 @@ export function LibraryPanel({
                   className="row-hover flex w-full items-start gap-3 p-2.5 pr-10 text-left"
                   onClick={() => onPlayRecent(entry)}
                 >
-                  <Art src={entry.artwork} alt="" size={56} />
+                  <Art src={entry.artwork} alt="" size={56} seed={entry.showTitle || entry.title} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] font-medium">{entry.title}</span>
                     <span className="block truncate text-[12px] text-[var(--ink-faint)]">
@@ -104,7 +104,7 @@ export function LibraryPanel({
                   className={`row-hover flex w-full items-center gap-3 p-2.5 text-left ${onUnfollow ? "pr-10" : ""}`}
                   onClick={() => onOpenShow(show)}
                 >
-                  <Art src={show.artwork} alt="" size={48} />
+                  <Art src={show.artwork} alt="" size={48} seed={show.title} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] font-medium">{show.title}</span>
                     <span className="block truncate text-[12px] text-[var(--ink-faint)]">

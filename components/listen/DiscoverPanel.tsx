@@ -65,7 +65,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
   const filtered = byLevel(byTopic(pool, topic), levelsApply ? level : "");
 
   return (
-    <div className="mt-8 space-y-9">
+    <div className="mt-7 space-y-7">
       {charts && charts.length > 0 ? (
         <section>
           <div className="mb-2 flex items-baseline gap-x-3">
@@ -95,7 +95,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
                     onPick(entry.pageUrl ?? `https://podcasts.apple.com/de/podcast/id${entry.appleId}`)
                   }
                 >
-                  <Art src={entry.artwork} alt="" size={132} />
+                  <Art src={entry.artwork} alt="" size={132} seed={entry.title} />
                   <span className="mt-1.5 flex items-baseline gap-1">
                     <span className="text-[11px] text-[var(--ink-faint)]">{index + 1}</span>
                     <span className="line-clamp-2 text-[12.5px] font-medium leading-snug">{entry.title}</span>
@@ -230,9 +230,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
                   <span className="text-[14px] font-medium">{item.label}</span>
                   <span className="chip text-[10px]">{item.lang === "de" ? "DE" : "EN"}</span>
                   {item.cefr ? (
-                    <span className="chip border-[var(--accent-ring)] text-[10px] text-[var(--accent)]">
-                      {item.cefr}
-                    </span>
+                    <span className="chip chip-level text-[10px]">{item.cefr}</span>
                   ) : null}
                 </span>
                 <span className="mt-0.5 block truncate text-[12px] text-[var(--ink-soft)]">{item.publisher}</span>
