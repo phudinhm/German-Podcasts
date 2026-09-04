@@ -60,8 +60,8 @@ export function MiniPlayer() {
   const hasVideoLayer = track.kind !== "audio";
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--rule)] bg-[color-mix(in_oklab,var(--paper)_95%,transparent)] backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-3 py-2 sm:px-5">
+    <div className="dock-safe fixed inset-x-0 bottom-0 z-50 border-t border-[var(--rule)] bg-[color-mix(in_oklab,var(--paper)_95%,transparent)] backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center gap-2.5 px-3 py-2 sm:gap-3 sm:px-5">
         {/* Space reserved for the docked video layer, which is fixed-positioned. */}
         {hasVideoLayer ? <span className="h-[58px] w-[104px] shrink-0" aria-hidden /> : null}
 
@@ -79,7 +79,7 @@ export function MiniPlayer() {
         <button
           type="button"
           onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
-          className="btn h-9 w-9 shrink-0 rounded-full p-0 text-[12px]"
+          className="btn btn-primary h-10 w-10 shrink-0 rounded-full p-0 text-[13px]"
           aria-label={playing ? t("common.pause") : t("common.play")}
         >
           {playing ? "❚❚" : "▶"}
@@ -91,7 +91,7 @@ export function MiniPlayer() {
             {track.showTitle}
             {mediaState.loading ? ` · ${t("player.buffering")}` : ""}
           </p>
-          <div className="mt-1 h-1 overflow-hidden rounded-full bg-[var(--rule)]">
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--rule)]">
             <div ref={fillRef} className="h-full bg-[var(--accent-ring)]" style={{ width: 0 }} />
           </div>
         </div>
@@ -100,14 +100,25 @@ export function MiniPlayer() {
           0:00
         </span>
 
-        <Link href="/" className="btn shrink-0 px-2.5 py-1 text-[12px]">
-          {t("player.miniOpen")}
+        {/* On a phone the label is dropped for the glyph: at 390px "Open" and
+            "x" together left the episode title about half a word. */}
+        <Link
+          href="/"
+          className="btn h-10 w-10 shrink-0 rounded-full p-0 text-[14px] sm:h-auto sm:w-auto sm:px-2.5 sm:py-1 sm:text-[12px]"
+          aria-label={t("player.miniOpen")}
+          title={t("player.miniOpen")}
+        >
+          <span aria-hidden className="sm:hidden">
+            ⌃
+          </span>
+          <span className="hidden sm:inline">{t("player.miniOpen")}</span>
         </Link>
         <button
           type="button"
           onClick={stop}
-          className="shrink-0 px-1 text-[16px] leading-none text-[var(--ink-faint)] hover:text-[var(--ink)]"
+          className="icon-btn shrink-0 text-[18px]"
           aria-label={t("player.miniClose")}
+          title={t("player.miniClose")}
         >
           ×
         </button>

@@ -23,6 +23,7 @@ const en = {
   "nav.listen": "Listen",
   "nav.drills": "Drills",
   "nav.about": "How it works",
+  "nav.aboutShort": "About",
   "nav.tagline": "Podcasts, and where you left off",
   "footer.media": "Hörbar streams nothing itself. Audio comes straight from each publisher's own servers, so they get the download.",
 
@@ -48,7 +49,7 @@ const en = {
 
   "listen.title": "Listen now",
   "listen.lede": "Type a show's name or paste a link from Apple Podcasts, Spotify, or a podcast's own site. Hörbar finds the feed, plays it, and remembers where you got to.",
-  "listen.placeholder": "e.g. Easy German, @easygerman, an Apple Podcasts or Spotify link",
+  "listen.placeholder": "A show's name, or a link",
   "listen.examples": "Try",
   "listen.recent": "Recent",
   "listen.suggested": "Worth a listen",
@@ -76,6 +77,7 @@ const en = {
   "player.hotkeyMarks": "Set A/B marks",
   "player.hotkeyLoop": "Loop",
   "player.hotkeySkip": "Back/forward 10s",
+  "player.options": "Speed and loop",
 
 
   "controls.freeplay": "continuous",
@@ -166,6 +168,8 @@ const en = {
   "listen.videoEpisodes": "Video only",
   "listen.topic": "Topic",
   "listen.level": "Level",
+  "listen.moreTopics": "+{count} more",
+  "listen.fewerTopics": "Fewer",
 } as const;
 
 export type UiKey = keyof typeof en;
@@ -176,7 +180,11 @@ const de: Record<UiKey, string> = {
   "nav.listen": "Direkt hören",
   "nav.drills": "Drills",
   "nav.about": "Wie es funktioniert",
+  "nav.aboutShort": "Info",
   "nav.tagline": "Podcasts, und wo du warst",
+  "player.options": "Tempo und Schleife",
+  "listen.moreTopics": "+{count} weitere",
+  "listen.fewerTopics": "Weniger",
   "footer.media": "Hörbar streamt nichts selbst. Der Ton kommt direkt von den Servern der Anbieter, der Download zählt also für sie.",
   "common.play": "Abspielen",
   "common.pause": "Pause",
@@ -198,7 +206,7 @@ const de: Record<UiKey, string> = {
   "common.uiLanguage": "Oberfläche",
   "listen.title": "Direkt hören",
   "listen.lede": "Namen einer Sendung eintippen oder einen Link einfügen: Apple Podcasts, Spotify oder die Website eines Podcasts. Hörbar sucht den Feed, spielt ihn ab und merkt sich, wo du warst.",
-  "listen.placeholder": "z. B. Easy German, @easygerman, ein Apple-Podcasts- oder Spotify-Link",
+  "listen.placeholder": "Name der Sendung oder ein Link",
   "listen.examples": "Beispiele",
   "listen.recent": "Zuletzt",
   "listen.suggested": "Empfohlen für Lernende",
@@ -315,7 +323,11 @@ const vi: Record<UiKey, string> = {
   "nav.listen": "Nghe ngay",
   "nav.drills": "Luyện nhanh",
   "nav.about": "Cách hoạt động",
+  "nav.aboutShort": "Giới thiệu",
   "nav.tagline": "Podcast, và chỗ bạn nghe dở",
+  "player.options": "Tốc độ và vòng lặp",
+  "listen.moreTopics": "+{count} nữa",
+  "listen.fewerTopics": "Thu gọn",
   "footer.media": "Hörbar không tự phát nội dung. Âm thanh đến thẳng từ máy chủ của nhà cung cấp, nên lượt tải tính cho họ.",
   "common.play": "Phát",
   "common.pause": "Tạm dừng",
@@ -337,7 +349,7 @@ const vi: Record<UiKey, string> = {
   "common.uiLanguage": "Giao diện",
   "listen.title": "Nghe ngay",
   "listen.lede": "Gõ tên một chương trình hoặc dán liên kết từ Apple Podcasts, Spotify hay trang web của podcast. Hörbar tìm nguồn phát, bật lên và nhớ chỗ bạn đang nghe dở.",
-  "listen.placeholder": "ví dụ Easy German, @easygerman, liên kết Apple Podcasts hoặc Spotify",
+  "listen.placeholder": "Tên chương trình hoặc một liên kết",
   "listen.examples": "Thử",
   "listen.recent": "Gần đây",
   "listen.suggested": "Đáng nghe",

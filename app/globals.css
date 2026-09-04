@@ -87,236 +87,254 @@ h3 {
   color: var(--ink);
 }
 
-/* --- transcript ------------------------------------------------------- */
-
-.segment {
-  border-left: 2px solid transparent;
-  transition: background-color 120ms ease, border-color 120ms ease;
-}
-
-.segment[data-active="true"] {
-  background: color-mix(in oklab, var(--accent-soft) 70%, transparent);
-  border-left-color: var(--accent-ring);
-}
-
-.segment[data-drill="true"] .segment-index::after {
-  content: "";
-  display: block;
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--accent-ring);
-  margin: 3px auto 0;
-}
-
-.word {
-  border-radius: 3px;
-  padding: 0 1px;
-  cursor: pointer;
-  transition: background-color 90ms ease, color 90ms ease;
-  text-underline-offset: 3px;
-}
-
-.word:hover {
-  background: var(--accent-soft);
-}
-
-.word[data-spoken="true"] {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.word[data-saved="true"] {
-  box-shadow: inset 0 -2px 0 var(--accent-ring);
-}
-
-/* Phonetic hazard underlines. Each hazard family gets its own decoration so
-   the transcript stays readable in black and white as well as in colour. */
-.hz {
-  border-radius: 2px;
-}
-.hz-ich {
-  background: color-mix(in oklab, #38bdf8 22%, transparent);
-}
-.hz-ach {
-  background: color-mix(in oklab, #f472b6 24%, transparent);
-}
-.hz-devoice {
-  text-decoration: underline dotted currentColor 2px;
-}
-.hz-cluster {
-  background: color-mix(in oklab, #a78bfa 26%, transparent);
-  letter-spacing: 0.03em;
-}
-.hz-onset {
-  text-decoration: underline wavy color-mix(in oklab, #22c55e 70%, transparent) 1.5px;
-}
-.hz-r {
-  opacity: 0.62;
-}
-
-/* --- small chrome ----------------------------------------------------- */
-
-.card {
-  background: var(--paper-raised);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
-}
-
-/* A flat, borderless surface, the way modern video interfaces group content. */
-.surface {
-  background: var(--surface);
-  border-radius: var(--radius);
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--surface);
-  padding: 5px 11px;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.35;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--ink);
-  white-space: nowrap;
-}
-
-.chip-quiet {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-soft);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  background: var(--paper-raised);
-  color: var(--ink);
-  cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
-}
-
-.btn:hover:not(:disabled) {
-  background: var(--surface);
-  border-color: var(--ink-faint);
-}
-
-.btn:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.btn[data-active="true"] {
-  background: var(--accent-soft);
-  border-color: var(--accent-ring);
-  color: var(--ink);
-}
-
-.btn-primary {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--ink);
-  border-color: var(--ink);
-}
-
-.btn-primary:hover:not(:disabled) {
-  opacity: 0.88;
-}
-
-kbd {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  border: 1px solid var(--rule);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 1px 5px;
-  color: var(--ink-soft);
-  background: var(--paper);
-}
-
-input[type="range"] {
-  accent-color: var(--accent-ring);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* --- discovery and episode rows ---------------------------------------- */
-
-.row-hover {
-  border-radius: 10px;
-  transition: background-color 120ms ease;
-}
-
-.row-hover:hover {
-  background: var(--surface);
-}
-
-.art {
-  border-radius: 10px;
-  object-fit: cover;
-  background: var(--surface);
-}
-
-/* Live caption line, kept large enough to read from across a desk. */
-.caption-line {
-  font-size: 17px;
-  line-height: 1.6;
-}
-
-/* --- focus mode --------------------------------------------------------- */
-
 /*
- * While an episode is starting, everything that is not the player recedes.
- * The dimming lifts on the first scroll, because scrolling is the signal that
- * you have finished with the player and want the page back.
+ * Component classes live in Tailwind's components layer on purpose.
+ *
+ * Outside a layer they beat every utility, whatever the source order: unlayered
+ * CSS always outranks layered CSS. That silently broke things that looked
+ * correct in the markup - `btn ... p-0` kept .btn's padding, and `btn sm:hidden`
+ * stayed visible on desktop, because .btn's own display won. Inside the layer,
+ * a utility on the element does what it says.
  */
-[data-dim="true"] {
-  opacity: 0.28;
-  filter: saturate(0.6);
-  transition: opacity 420ms ease, filter 420ms ease;
-  pointer-events: none;
-}
+@layer components {
+  /* --- small chrome ----------------------------------------------------- */
 
-[data-dim="false"] {
-  opacity: 1;
-  filter: none;
-  transition: opacity 260ms ease, filter 260ms ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-dim="true"] {
-    opacity: 0.6;
-    filter: none;
+  .card {
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
   }
+
+  /* A flat, borderless surface, the way modern video interfaces group content. */
+  .surface {
+    background: var(--surface);
+    border-radius: var(--radius);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--surface);
+    padding: 5px 11px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--paper-raised);
+    color: var(--ink);
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: var(--surface);
+    border-color: var(--ink-faint);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn[data-active="true"] {
+    background: var(--accent-soft);
+    border-color: var(--accent-ring);
+    color: var(--ink);
+  }
+
+  .btn-primary {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+
+  /*
+   * A visible focus ring, on every interactive thing, in one place.
+   *
+   * The pills here have no default outline that reads well: the browser draws a
+   * rectangle around a rounded shape. Keyboard users were getting a ring that
+   * looked like a rendering fault, so they get a proper one, and only they do -
+   * :focus-visible leaves the mouse alone.
+   */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+
+  /*
+   * The small dismissals: x on a saved show, x on a history row.
+   *
+   * Drawn small because they must not compete with the thing they sit on, but
+   * given a real hit area, because a 13px glyph is not something a thumb can
+   * hit and the cost of missing is opening the episode you meant to remove.
+   */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    color: var(--ink-faint);
+    line-height: 1;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  .icon-btn:hover {
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  /*
+   * The search field. It used to borrow .btn, which meant it inherited a button's
+   * centred text and hover, and behaved like something you press rather than
+   * something you type into.
+   */
+  .field {
+    width: 100%;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--paper-raised);
+    padding: 10px 16px;
+    font-size: 14px;
+    color: var(--ink);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .field::placeholder {
+    color: var(--ink-faint);
+  }
+
+  .field:focus {
+    outline: none;
+    border-color: var(--accent-ring);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-ring) 22%, transparent);
+  }
+
+  /*
+   * A horizontal strip of cards or chips.
+   *
+   * The fade on the right edge is the only thing that tells a phone user there is
+   * more to the side; without it a row of filters looks like it simply ends at
+   * the screen edge, and half the chips are never found.
+   */
+  .scroll-row {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
+
+  .scroll-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Deliberately no scroll-snap. With snapping on, the browser aligned the first
+     card to the snapport on load, which scrolled the row by exactly the padding
+     and left the first card flush against the edge of the phone. A gutter that
+     disappears on load is worse than no snapping. */
+
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    border: 1px solid var(--rule);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--ink-soft);
+    background: var(--paper);
+  }
+
+  input[type="range"] {
+    accent-color: var(--accent-ring);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* --- discovery and episode rows ---------------------------------------- */
+
+  .row-hover {
+    border-radius: 10px;
+    transition: background-color 120ms ease;
+  }
+
+  .row-hover:hover {
+    background: var(--surface);
+  }
+
+  .art {
+    border-radius: 10px;
+    object-fit: cover;
+    background: var(--surface);
+  }
+
+  /* The row you are listening to. It is the only thing on the page allowed to
+     carry the accent as a background, so the eye can find it in a list of sixty
+     without reading a word. */
+  .row-hover[data-active="true"] {
+    background: color-mix(in oklab, var(--accent-soft) 75%, transparent);
+  }
+
+  /* A steady bar rather than an animated equaliser: this sits beside a title
+     people are trying to read, and motion there is a distraction, not a signal. */
+  .now-playing {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 10px;
+  }
+
+  .now-playing span {
+    width: 2px;
+    border-radius: 1px;
+    background: var(--accent);
+  }
+
+  .now-playing span:nth-child(1) { height: 60%; }
+  .now-playing span:nth-child(2) { height: 100%; }
+  .now-playing span:nth-child(3) { height: 40%; }
 }
 
 /* --- reading on a phone -------------------------------------------------
@@ -362,22 +380,11 @@ input[type="range"] {
     font-size: 16px;
   }
 
-  /* The transcript is the one surface people read rather than scan, so it gets
-     a full reading size and the line spacing to go with it. */
-  .caption-line,
-  .de-line {
-    font-size: 18px;
-    line-height: 1.65;
-  }
-
-  /* Touch targets. A word span is the smallest thing anyone taps here, and a
-     mistap in a transcript looks up the wrong word. */
-  .word {
-    padding: 1px 2px;
-  }
-
+  /* Touch targets. Apple and Google both land on roughly 44px as the size a
+     thumb hits reliably; 40 is the compromise that keeps a row of speed
+     buttons on one line without forcing a mistap. */
   .btn {
-    min-height: 38px;
+    min-height: 40px;
   }
 
   /* A checkbox at its native 13px is hard to hit accurately with a thumb, and
@@ -391,6 +398,22 @@ input[type="range"] {
      sitting on its own as an action needs room around it. */
   nav a,
   a.btn {
-    min-height: 38px;
+    min-height: 40px;
   }
+
+  /* The dismissals get the full recommended target on touch, where there is no
+     cursor to aim with. */
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/*
+ * The home indicator on a modern iPhone sits over the bottom of the viewport.
+ * Anything docked there needs to clear it, or the last few pixels of the mini
+ * player are behind a system gesture area and the pause button stops working.
+ */
+.dock-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

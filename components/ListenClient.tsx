@@ -275,32 +275,55 @@ export function ListenClient() {
   const episodes = feed?.episodes ?? [];
   const mixed = Boolean(playing && playing.url && isMixedContent(playing.url));
 
+  // The lede explains what the app is, which is worth a screen exactly once.
+  // Once something is playing or open, it is a banner sitting between a phone
+  // user and the thing they came back for.
+  const idle = !playing && !feed && !results;
+
   return (
     <div>
-      <header className="mb-5 max-w-2xl">
-        <h1 className="text-[27px] font-semibold">{t("listen.title")}</h1>
-        <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">{t("listen.lede")}</p>
-      </header>
+      {idle ? (
+        <header className="mb-4 max-w-2xl">
+          <h1 className="text-[24px] font-semibold sm:text-[27px]">{t("listen.title")}</h1>
+          <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">{t("listen.lede")}</p>
+        </header>
+      ) : (
+        <h1 className="sr-only">{t("listen.title")}</h1>
+      )}
 
-      <div className="flex flex-wrap gap-2">
+      <form
+        role="search"
+        className="flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void search(query);
+        }}
+      >
         <input
+          type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void search(query);
-          }}
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          aria-label={t("listen.title")}
           placeholder={t("listen.placeholder")}
-          className="btn min-w-[240px] flex-1 justify-start font-normal"
+          className="field min-w-0 flex-1"
         />
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={!query.trim() || searching}
-          onClick={() => void search(query)}
-        >
+        {/* Not disabled on an empty box: a greyed-out primary button beside an
+            empty field is the first thing on the page and reads as broken.
+            search() ignores an empty term anyway. */}
+        <button type="submit" className="btn btn-primary shrink-0" disabled={searching}>
           {searching ? t("common.searching") : t("common.search")}
         </button>
-      </div>
+      </form>
+
+      {/* Screen readers otherwise get no word about a search that found nothing
+          or is still running, because both only change things further down. */}
+      <p aria-live="polite" className="sr-only">
+        {searching ? t("common.searching") : results ? t("listen.results", { count: results.length }) : ""}
+      </p>
 
       {searches.length > 0 ? (
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--ink-faint)]">
@@ -329,20 +352,27 @@ export function ListenClient() {
         <section ref={playerRef} className="card mt-6 overflow-hidden">
           <div className="p-4">
             <div className="flex items-start gap-3">
-              <Art src={playing.artwork} alt="" size={72} />
+              <span className="hidden sm:block">
+                <Art src={playing.artwork} alt="" size={88} />
+              </span>
+              <span className="sm:hidden">
+                <Art src={playing.artwork} alt="" size={56} />
+              </span>
               <div className="min-w-0 flex-1">
-                <h2 className="text-[16px] font-semibold leading-snug">{playing.title}</h2>
-                <p className="mt-0.5 text-[12.5px] text-[var(--ink-faint)]">
+                <h2 className="line-clamp-3 text-[16px] font-semibold leading-snug">{playing.title}</h2>
+                <p className="mt-0.5 truncate text-[12.5px] text-[var(--ink-faint)]">
                   {playing.showTitle}
                   {playing.publishedAt ? ` · ${formatDate(playing.publishedAt, locale)}` : ""}
                 </p>
               </div>
               <button
                 type="button"
-                className="text-[12px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                className="icon-btn -mr-1 -mt-1 shrink-0 text-[18px]"
+                aria-label={t("common.close")}
+                title={t("common.close")}
                 onClick={() => player.stop()}
               >
-                {t("common.close")}
+                ×
               </button>
             </div>
 
@@ -396,9 +426,9 @@ export function ListenClient() {
               {t("listen.backToBrowse")}
             </button>
           </div>
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul className="grid gap-1 sm:grid-cols-2">
             {results.map((result) => (
-              <li key={result.id}>
+              <li key={result.id} className="min-w-0">
                 <button
                   type="button"
                   className="row-hover flex w-full items-start gap-3 p-2.5 text-left"
@@ -408,7 +438,7 @@ export function ListenClient() {
                   <Art src={result.artwork} alt="" size={56} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[14.5px] font-medium leading-snug">{result.title}</span>
-                    <span className="block text-[12.5px] text-[var(--ink-faint)]">
+                    <span className="block truncate text-[12.5px] text-[var(--ink-faint)]">
                       {result.publisher} · {ORIGIN_LABEL[result.origin]}
                     </span>
                     {result.note ? (
@@ -429,43 +459,46 @@ export function ListenClient() {
       {/* ---------------- episodes ---------------- */}
       {feed ? (
         <section className="card mt-6 p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <Art src={show?.artwork ?? feed.image} alt="" size={56} />
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate text-[18px] font-semibold">{feed.title}</h2>
-              <p className="text-[12.5px] text-[var(--ink-faint)]">
-                {feed.episodes.length} {t("common.episodes")}
-                {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
-              </p>
+          {/* Two rows on a phone. Squeezed onto one, the show title got about
+              nine characters before the two buttons took the rest. */}
+          <div className="mb-3">
+            <div className="flex items-center gap-3">
+              <Art src={show?.artwork ?? feed.image} alt="" size={56} />
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-[17px] font-semibold sm:text-[18px]">{feed.title}</h2>
+                <p className="truncate text-[12.5px] text-[var(--ink-faint)]">
+                  {feed.episodes.length} {t("common.episodes")}
+                  {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
+                </p>
+              </div>
             </div>
-            {show?.feedUrl ? (
-              <button
-                type="button"
-                className="btn text-[12.5px]"
-                data-active={saved}
-                onClick={() => {
-                  setSaved(
-                    toggleShow({
-                      feedUrl: show.feedUrl!,
-                      title: show.title,
-                      publisher: show.publisher,
-                      artwork: show.artwork,
-                      origin: show.origin,
-                      pageUrl: show.pageUrl ?? undefined,
-                    }),
-                  );
-                }}
-              >
-                {saved ? `★ ${t("library.saved")}` : `☆ ${t("library.save")}`}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {show?.feedUrl ? (
+                <button
+                  type="button"
+                  className="btn text-[12.5px]"
+                  data-active={saved}
+                  aria-pressed={saved}
+                  onClick={() => {
+                    setSaved(
+                      toggleShow({
+                        feedUrl: show.feedUrl!,
+                        title: show.title,
+                        publisher: show.publisher,
+                        artwork: show.artwork,
+                        origin: show.origin,
+                        pageUrl: show.pageUrl ?? undefined,
+                      }),
+                    );
+                  }}
+                >
+                  {saved ? `★ ${t("library.saved")}` : `☆ ${t("library.save")}`}
+                </button>
+              ) : null}
+              <button type="button" className="btn text-[12.5px]" onClick={browse}>
+                {results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
               </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn text-[12.5px]"
-              onClick={browse}
-            >
-              {results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
-            </button>
+            </div>
           </div>
 
           <ul>
@@ -476,17 +509,31 @@ export function ListenClient() {
                 remembered && episode.durationSec
                   ? Math.min(100, Math.round((remembered.position / episode.durationSec) * 100))
                   : 0;
+              const current = playing?.id === id;
               return (
-                <li key={id}>
+                <li key={id} className="min-w-0">
                   <button
                     type="button"
                     onClick={() => playEpisode(episode)}
                     className="row-hover flex w-full items-start gap-3 p-2.5 text-left"
-                    data-active={playing?.id === id}
+                    data-active={current}
+                    aria-current={current ? "true" : undefined}
                   >
                     <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={56} />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[14.5px] font-medium leading-snug">{episode.title}</span>
+                      <span className="flex items-start gap-2">
+                        {current ? (
+                          // Aligned to the first line rather than centred: on a
+                          // phone a title runs to three lines and a centred
+                          // marker lands in the middle of a word.
+                          <span className="now-playing mt-[5px] shrink-0" aria-hidden>
+                            <span />
+                            <span />
+                            <span />
+                          </span>
+                        ) : null}
+                        <span className="min-w-0 text-[14.5px] font-medium leading-snug">{episode.title}</span>
+                      </span>
                       {episode.description ? (
                         <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-relaxed text-[var(--ink-faint)]">
                           {episode.description}
@@ -505,6 +552,17 @@ export function ListenClient() {
                           <span className="text-[var(--accent)]">{t("library.resumeAt", { percent: progress })}</span>
                         ) : null}
                       </span>
+                      {/* Part-heard episodes get the bar as well as the wording:
+                          in a list of sixty, "41% in" is something you read, a
+                          bar is something you see. */}
+                      {!remembered?.finished && progress > 0 ? (
+                        <span className="mt-1.5 block h-1 w-full max-w-[220px] overflow-hidden rounded-full bg-[var(--rule)]">
+                          <span
+                            className="block h-full rounded-full bg-[var(--accent-ring)]"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </span>
+                      ) : null}
                     </span>
                   </button>
                 </li>

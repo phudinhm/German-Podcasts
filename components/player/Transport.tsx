@@ -18,10 +18,16 @@ function formatTime(seconds: number): string {
 /**
  * Transport bar for a streamed audio or video element.
  *
- * The browser's own controls are hidden because they fight the shadowing
- * engine: their play button does not know about loop mode, and their speed menu
- * does not know about the tempo ramp. This one shows what a stream actually
- * needs - how much is buffered ahead, whether it is stalled, and where you are.
+ * The browser's own controls are hidden because they do not know about the A-B
+ * loop or the speed ramp sitting beside them. This one shows what a stream
+ * actually needs: how much is buffered ahead, whether it is stalled, and where
+ * you are.
+ *
+ * The layout stacks rather than shrinks. Squeezed onto one row at 390px the
+ * scrubber came out about thirty pixels wide, between two skip buttons, which
+ * is not a control so much as a dare. So the bar gets its own full-width row
+ * and the buttons sit under it, centred, at a size a thumb can hit. On a wide
+ * screen both rows fit side by side and it collapses back to one line.
  *
  * The playhead is written straight to the DOM from a rAF loop rather than held
  * in state, so a moving progress bar costs no React renders.
@@ -90,6 +96,86 @@ export function Transport({
 
   const duration = state.duration || handle.getDuration();
 
+  const scrubber = (
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <span
+        ref={timeRef}
+        className="w-[44px] shrink-0 text-right font-mono text-[11px] tabular-nums text-[var(--ink-soft)]"
+      >
+        0:00
+      </span>
+      <div
+        ref={barRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={t("player.position")}
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration)}
+        aria-valuenow={Math.round(handle.getTime())}
+        onPointerDown={scrub}
+        onPointerMove={(event) => {
+          if (event.buttons === 1) seekFromEvent(event.clientX);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft") handle.seekTo(Math.max(0, handle.getTime() - 5), true);
+          if (event.key === "ArrowRight") handle.seekTo(handle.getTime() + 5, true);
+        }}
+        /* The padding is invisible but doubles the height a finger has to land
+           in, which is the difference between scrubbing and scrolling the page. */
+        className="group relative -my-2 flex min-w-0 flex-1 cursor-pointer touch-none items-center py-2"
+      >
+        <span className="relative h-1.5 w-full overflow-hidden rounded-full bg-[var(--rule)]">
+          <span
+            ref={bufferRef}
+            className="absolute inset-y-0 left-0 bg-[var(--ink-faint)] opacity-30"
+            style={{ width: 0 }}
+          />
+          <span ref={fillRef} className="absolute inset-y-0 left-0 bg-[var(--accent-ring)]" style={{ width: 0 }} />
+        </span>
+      </div>
+      <span className="w-[44px] shrink-0 font-mono text-[11px] tabular-nums text-[var(--ink-faint)]">
+        {duration > 0 ? formatTime(duration) : "--:--"}
+      </span>
+    </div>
+  );
+
+  const buttons = (
+    <div className="flex shrink-0 items-center justify-center gap-2">
+      <button
+        type="button"
+        className="btn h-11 w-11 shrink-0 rounded-full p-0 text-[12px] sm:h-9 sm:w-auto sm:px-2.5"
+        onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
+        aria-label={t("player.back10")}
+        title={t("player.back10")}
+      >
+        <span aria-hidden>−10</span>
+        <span aria-hidden className="hidden sm:inline">
+          s
+        </span>
+      </button>
+      <button
+        type="button"
+        className="btn btn-primary h-12 w-12 shrink-0 rounded-full p-0 text-[15px] sm:h-10 sm:w-10 sm:text-[13px]"
+        onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
+        aria-label={playing ? t("common.pause") : t("common.play")}
+      >
+        {playing ? "❚❚" : "▶"}
+      </button>
+      <button
+        type="button"
+        className="btn h-11 w-11 shrink-0 rounded-full p-0 text-[12px] sm:h-9 sm:w-auto sm:px-2.5"
+        onClick={() => handle.seekTo(handle.getTime() + 30, true)}
+        aria-label={t("player.forward30")}
+        title={t("player.forward30")}
+      >
+        <span aria-hidden>+30</span>
+        <span aria-hidden className="hidden sm:inline">
+          s
+        </span>
+      </button>
+    </div>
+  );
+
   return (
     <div className={compact ? "" : "card p-3"}>
       {state.error ? (
@@ -103,67 +189,16 @@ export function Transport({
         </div>
       ) : null}
 
-      <div className="flex items-center gap-2.5">
-        <button
-          type="button"
-          className="btn btn-primary h-9 w-9 shrink-0 rounded-full p-0 text-[13px]"
-          onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
-          aria-label={playing ? t("common.pause") : t("common.play")}
-        >
-          {playing ? "❚❚" : "▶"}
-        </button>
-        <button
-          type="button"
-          className="btn shrink-0 px-2 py-1 text-[11px]"
-          onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
-          title={t("player.back10")}
-        >
-          −10s
-        </button>
-
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span ref={timeRef} className="w-[46px] shrink-0 text-right font-mono text-[11px] tabular-nums text-[var(--ink-soft)]">
-            0:00
-          </span>
-          <div
-            ref={barRef}
-            role="slider"
-            tabIndex={0}
-            aria-label={t("player.position")}
-            aria-valuemin={0}
-            aria-valuemax={Math.round(duration)}
-            aria-valuenow={Math.round(handle.getTime())}
-            onPointerDown={scrub}
-            onPointerMove={(event) => {
-              if (event.buttons === 1) seekFromEvent(event.clientX);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowLeft") handle.seekTo(Math.max(0, handle.getTime() - 5), true);
-              if (event.key === "ArrowRight") handle.seekTo(handle.getTime() + 5, true);
-            }}
-            className="relative h-2 flex-1 cursor-pointer overflow-hidden rounded-full bg-[var(--rule)]"
-          >
-            <div ref={bufferRef} className="absolute inset-y-0 left-0 bg-[var(--ink-faint)] opacity-30" style={{ width: 0 }} />
-            <div ref={fillRef} className="absolute inset-y-0 left-0 bg-[var(--accent-ring)]" style={{ width: 0 }} />
-          </div>
-          <span className="w-[46px] shrink-0 font-mono text-[11px] tabular-nums text-[var(--ink-faint)]">
-            {duration > 0 ? formatTime(duration) : "--:--"}
-          </span>
-        </div>
-
-        <button
-          type="button"
-          className="btn shrink-0 px-2 py-1 text-[11px]"
-          onClick={() => handle.seekTo(handle.getTime() + 30, true)}
-          title={t("player.forward30")}
-        >
-          +30s
-        </button>
-
-        {state.loading && !state.error ? (
-          <span className="shrink-0 text-[10px] uppercase tracking-wider text-[var(--ink-faint)]">{t("player.buffering")}</span>
-        ) : null}
+      <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-center sm:gap-3">
+        {scrubber}
+        {buttons}
       </div>
+
+      {state.loading && !state.error ? (
+        <p className="mt-1.5 text-center text-[10px] uppercase tracking-wider text-[var(--ink-faint)] sm:text-left">
+          {t("player.buffering")}
+        </p>
+      ) : null}
     </div>
   );
 }
