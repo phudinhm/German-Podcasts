@@ -119,7 +119,7 @@ export function ListenClient() {
     translate: dual,
   });
 
-  const generated = useEpisodeTranscript();
+  const generated = useEpisodeTranscript({ targetLang, translate: dual });
 
   /**
    * Subtitles read from the finished transcript when there is one, and from the

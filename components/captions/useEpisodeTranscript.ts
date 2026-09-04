@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { TargetLang } from "@/lib/types";
 import { canReadDirectly, resample, toMono, TARGET_SAMPLE_RATE } from "@/lib/audio/capture";
 import { proxied } from "@/lib/audio/proxy";
 import { mergePieces, planChunks, type TimedPiece } from "@/lib/audio/chunks";
@@ -43,9 +44,71 @@ const IDLE: TranscribeState = {
  * timestamps come from the model itself, offset by each window's position, so
  * clicking a sentence lands on that sentence rather than near it.
  */
-export function useEpisodeTranscript() {
+export function useEpisodeTranscript({
+  targetLang,
+  translate,
+}: {
+  targetLang: TargetLang;
+  translate: boolean;
+}) {
   const [state, setState] = useState<TranscribeState>(IDLE);
   const cancelRef = useRef(false);
+  const busyRef = useRef(false);
+
+  /**
+   * Translates the generated lines in the background.
+   *
+   * Separate from the live-caption translator because these lines arrive in a
+   * burst rather than one at a time: a whole episode can be a few hundred
+   * sentences, and firing that many requests at a keyless provider is the
+   * fastest way to be cut off. So they go out steadily, oldest first, and only
+   * while the user is actually asking to see translations.
+   */
+  useEffect(() => {
+    if (!translate || busyRef.current) return;
+    const pending = state.lines.filter((line) => !line.translation);
+    if (pending.length === 0) return;
+    busyRef.current = true;
+    let stopped = false;
+
+    void (async () => {
+      for (const line of pending) {
+        if (stopped) break;
+        try {
+          const response = await fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: line.de, lang: targetLang }),
+          });
+          const data = (await response.json()) as { text?: string | null };
+          if (!data.text || stopped) continue;
+          setState((previous) => ({
+            ...previous,
+            lines: previous.lines.map((item) =>
+              item.id === line.id ? { ...item, translation: data.text ?? undefined } : item,
+            ),
+          }));
+        } catch {
+          // A missing translation never interrupts the transcript itself.
+        }
+      }
+      busyRef.current = false;
+    })();
+
+    return () => {
+      stopped = true;
+      busyRef.current = false;
+    };
+  }, [translate, targetLang, state.lines]);
+
+  // Changing the gloss language invalidates every translation already fetched.
+  useEffect(() => {
+    setState((previous) =>
+      previous.lines.some((line) => line.translation)
+        ? { ...previous, lines: previous.lines.map((line) => ({ ...line, translation: undefined })) }
+        : previous,
+    );
+  }, [targetLang]);
 
   const cancel = useCallback(() => {
     cancelRef.current = true;
