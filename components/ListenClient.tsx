@@ -688,10 +688,15 @@ export function ListenClient() {
           <div className="border-t border-[var(--rule)] bg-[var(--surface)] px-4 py-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
+                {/* Live capture needs a microphone or a shared browser tab,
+                    neither of which is a good fit on a phone - and it's the
+                    thing that kept prompting for mic access on iPhone Chrome.
+                    Desktop web only; the running transcript below stays
+                    available everywhere. */}
                 <button
                   type="button"
                   onClick={toggleLiveCaption}
-                  className="btn text-[12px]"
+                  className="btn hidden text-[12px] md:inline-flex"
                   data-active={showCaption}
                   title={`${t("caption.toggle")} (C)`}
                 >

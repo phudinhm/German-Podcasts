@@ -569,43 +569,37 @@ export function MiniPlayer() {
               </button>
             </div>
 
-            {/* Current live caption */}
-            <div className="my-3 rounded-xl bg-[var(--surface)] p-3.5">
-              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-                {t("caption.toggle")}
-              </span>
-              <p className="mt-1 text-[15px] font-medium leading-relaxed text-[var(--ink)]">
-                {currentCaption?.text || t("caption.waiting")}
-              </p>
-              {currentCaption?.translation && (
-                <p className="mt-1 text-[13px] text-[var(--ink-soft)]">{currentCaption.translation}</p>
-              )}
-            </div>
-
-            {/* Running transcript */}
-            <div className="mt-2 space-y-2">
+            {/* Running transcript. Live caption itself is desktop-only - it
+                needs a microphone or a shared browser tab, neither of which
+                is a good fit here, and it was the thing that kept prompting
+                for mic access on iPhone Chrome. */}
+            <div className="mt-3 space-y-2">
               <h5 className="text-[12.5px] font-semibold text-[var(--ink)]">
                 {t("caption.transcript")} ({transcriptList.length})
               </h5>
               <div className="max-h-48 overflow-y-auto space-y-2 rounded-xl border border-[var(--rule)] p-2">
-                {transcriptList.map((s) => (
-                  <div
-                    key={s.id}
-                    onClick={() => {
-                      handle.seekTo(s.start, true);
-                      setMobileDrawerOpen(false);
-                    }}
-                    className="p-2 rounded-lg hover:bg-[var(--surface)] text-[12.5px] cursor-pointer"
-                  >
-                    <span className="font-mono text-[11px] font-semibold text-[var(--accent)] mr-2">
-                      ▶ {formatTime(s.start)}
-                    </span>
-                    <span className="font-medium text-[var(--ink)]">{s.text}</span>
-                    {s.translation && (
-                      <p className="text-[11.5px] text-[var(--ink-faint)] mt-0.5">{s.translation}</p>
-                    )}
-                  </div>
-                ))}
+                {transcriptList.length === 0 ? (
+                  <p className="p-2 text-[12px] text-[var(--ink-faint)]">{t("caption.desktopOnly")}</p>
+                ) : (
+                  transcriptList.map((s) => (
+                    <div
+                      key={s.id}
+                      onClick={() => {
+                        handle.seekTo(s.start, true);
+                        setMobileDrawerOpen(false);
+                      }}
+                      className="p-2 rounded-lg hover:bg-[var(--surface)] text-[12.5px] cursor-pointer"
+                    >
+                      <span className="font-mono text-[11px] font-semibold text-[var(--accent)] mr-2">
+                        ▶ {formatTime(s.start)}
+                      </span>
+                      <span className="font-medium text-[var(--ink)]">{s.text}</span>
+                      {s.translation && (
+                        <p className="text-[11.5px] text-[var(--ink-faint)] mt-0.5">{s.translation}</p>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

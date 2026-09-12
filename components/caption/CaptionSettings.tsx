@@ -1,12 +1,82 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useUi } from "@/lib/i18n";
+
+/**
+ * A reading surface, independent of the site's own light/dark appearance.
+ *
+ * "modern" is the default and applies no override - it is whatever the site's
+ * own theme already paints. The other three exist for reading comfort during
+ * a long episode, the way an e-reader offers its own page colour separate
+ * from the device's system theme.
+ */
+export type CaptionTheme = "modern" | "white" | "sepia" | "blackInk";
+
+export const CAPTION_THEMES: CaptionTheme[] = ["modern", "white", "sepia", "blackInk"];
+
+// Overrides the same custom properties the app's own theme sets, so every
+// descendant styled with var(--paper-raised) / var(--ink) / etc. picks this
+// up for free - no per-element restyling needed.
+export const CAPTION_THEME_VARS: Record<CaptionTheme, Record<string, string>> = {
+  modern: {},
+  white: {
+    "--paper-raised": "#ffffff",
+    "--surface": "#f4f4f4",
+    "--ink": "#141414",
+    "--ink-soft": "#55544f",
+    "--ink-faint": "#82817b",
+    "--rule": "#e4e2dd",
+  },
+  sepia: {
+    "--paper-raised": "#f4ecd8",
+    "--surface": "#ece0c4",
+    "--ink": "#3a2f1f",
+    "--ink-soft": "#6b5c40",
+    "--ink-faint": "#8a7a5c",
+    "--rule": "#e0d3ae",
+  },
+  blackInk: {
+    "--paper-raised": "#000000",
+    "--surface": "#121212",
+    "--ink": "#f2f2f2",
+    "--ink-soft": "#b3b2ad",
+    "--ink-faint": "#82817b",
+    "--rule": "#2a2a2a",
+  },
+};
+
+export function captionThemeStyle(theme: CaptionTheme): CSSProperties {
+  return CAPTION_THEME_VARS[theme] as CSSProperties;
+}
+
+const CAPTION_THEME_LABEL: Record<
+  CaptionTheme,
+  "caption.themeModern" | "caption.themeWhite" | "caption.themeSepia" | "caption.themeBlackInk"
+> = {
+  modern: "caption.themeModern",
+  white: "caption.themeWhite",
+  sepia: "caption.themeSepia",
+  blackInk: "caption.themeBlackInk",
+};
+
+// A small swatch preview for the picker button itself - independent of
+// CAPTION_THEME_VARS, which restyles the whole caption surface once applied.
+const CAPTION_THEME_SWATCH: Record<CaptionTheme, CSSProperties> = {
+  modern: { background: "linear-gradient(135deg, var(--paper-raised) 50%, var(--accent) 50%)" },
+  white: { background: "#ffffff", boxShadow: "inset 0 0 0 1px #e4e2dd" },
+  sepia: { background: "#f4ecd8" },
+  blackInk: { background: "#000000" },
+};
 
 export interface CaptionSettingsState {
   fontSize: number; // in pixels, e.g. 14, 16, 18, 22, 26, 32
   lineHeight: number; // e.g. 1.4, 1.7, 2.0
   showTranslation: boolean;
   autoScroll: boolean;
+  captionTheme: CaptionTheme;
+  /** Fades the floating caption bar after a few quiet seconds. */
+  autoHide: boolean;
 }
 
 const STORAGE_KEY = "hoerbar.caption.settings.v1";
@@ -16,6 +86,8 @@ export const DEFAULT_CAPTION_SETTINGS: CaptionSettingsState = {
   lineHeight: 1.6,
   showTranslation: true,
   autoScroll: true,
+  captionTheme: "modern",
+  autoHide: true,
 };
 
 export function loadCaptionSettings(): CaptionSettingsState {
@@ -99,6 +171,38 @@ export function CaptionSettings({ settings, onChange, compact = false }: Caption
       >
         <span>{t("caption.bilingual")}</span>
       </button>
+
+      {/* Auto-hide toggle for the floating caption bar */}
+      <button
+        type="button"
+        onClick={() => update({ autoHide: !settings.autoHide })}
+        className={`btn px-2.5 py-1 text-[11.5px] ${
+          settings.autoHide ? "border-[var(--accent)] text-[var(--accent)] font-medium" : "text-[var(--ink-faint)]"
+        }`}
+        title={t("caption.autoHide")}
+      >
+        <span>{t("caption.autoHide")}</span>
+      </button>
+
+      {/* Reading surface swatches */}
+      <div className="flex items-center gap-1 rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-0.5">
+        {CAPTION_THEMES.map((themeOption) => (
+          <button
+            key={themeOption}
+            type="button"
+            onClick={() => update({ captionTheme: themeOption })}
+            title={t(CAPTION_THEME_LABEL[themeOption])}
+            aria-label={t(CAPTION_THEME_LABEL[themeOption])}
+            aria-pressed={settings.captionTheme === themeOption}
+            className={`grid h-6 w-6 place-items-center rounded border transition ${
+              settings.captionTheme === themeOption ? "border-[var(--accent)]" : "border-transparent"
+            }`}
+            style={CAPTION_THEME_SWATCH[themeOption]}
+          >
+            <span className="sr-only">{t(CAPTION_THEME_LABEL[themeOption])}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -98,6 +98,109 @@
   --shadow-pop: 0 2px 8px rgb(0 0 0 / 0.7), 0 18px 44px -18px rgb(0 0 0 / 0.9);
 }
 
+/*
+ * Accent hues.
+ *
+ * Amber is the default and needs no rule of its own - it is what the tokens
+ * above already paint. Each alternative only ever touches the four tokens
+ * that carry the "this is the one" signal, following the same light/system-
+ * dark/explicit-dark cascade as the appearance rules above: a plain rule for
+ * light, a prefers-color-scheme rule guarded against an explicit "light"
+ * choice, and an explicit [data-theme="dark"] rule for someone who picked
+ * dark by hand.
+ */
+:root[data-accent="blue"] {
+  --accent: #1f5f8b;
+  --accent-soft: #e8f2f8;
+  --accent-ring: #2f83b8;
+  --row-active: #e8f2f8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="blue"]:not([data-theme="light"]) {
+    --accent: #6db8e8;
+    --accent-soft: #17293a;
+    --accent-ring: #2f83b8;
+    --row-active: #13212e;
+  }
+}
+
+:root[data-theme="dark"][data-accent="blue"] {
+  --accent: #6db8e8;
+  --accent-soft: #17293a;
+  --accent-ring: #2f83b8;
+  --row-active: #13212e;
+}
+
+:root[data-accent="green"] {
+  --accent: #4a6e3f;
+  --accent-soft: #edf3e7;
+  --accent-ring: #5f8f3e;
+  --row-active: #edf3e7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="green"]:not([data-theme="light"]) {
+    --accent: #8fc16f;
+    --accent-soft: #1e2b17;
+    --accent-ring: #5f8f3e;
+    --row-active: #172010;
+  }
+}
+
+:root[data-theme="dark"][data-accent="green"] {
+  --accent: #8fc16f;
+  --accent-soft: #1e2b17;
+  --accent-ring: #5f8f3e;
+  --row-active: #172010;
+}
+
+:root[data-accent="purple"] {
+  --accent: #6b4a8a;
+  --accent-soft: #f2ecf7;
+  --accent-ring: #8659b3;
+  --row-active: #f2ecf7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="purple"]:not([data-theme="light"]) {
+    --accent: #b98fe0;
+    --accent-soft: #2a1f38;
+    --accent-ring: #8659b3;
+    --row-active: #21182c;
+  }
+}
+
+:root[data-theme="dark"][data-accent="purple"] {
+  --accent: #b98fe0;
+  --accent-soft: #2a1f38;
+  --accent-ring: #8659b3;
+  --row-active: #21182c;
+}
+
+:root[data-accent="rose"] {
+  --accent: #a13d5a;
+  --accent-soft: #fbe9ee;
+  --accent-ring: #c1466a;
+  --row-active: #fbe9ee;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="rose"]:not([data-theme="light"]) {
+    --accent: #e88fa8;
+    --accent-soft: #3a1720;
+    --accent-ring: #c1466a;
+    --row-active: #2c1219;
+  }
+}
+
+:root[data-theme="dark"][data-accent="rose"] {
+  --accent: #e88fa8;
+  --accent-soft: #3a1720;
+  --accent-ring: #c1466a;
+  --row-active: #2c1219;
+}
+
 html {
   scroll-behavior: smooth;
   /* iOS otherwise inflates text on rotation, which breaks the scale below. */

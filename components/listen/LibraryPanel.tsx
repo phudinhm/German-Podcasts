@@ -189,7 +189,13 @@ export function LibraryPanel({
               return (
                 <div
                   key={source.feedUrl}
-                  className="group relative flex items-center gap-3 rounded-xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-2.5 shadow-xs transition hover:border-[var(--accent)]/50 hover:bg-[var(--surface)]/40"
+                  // min-w-0: this is a grid item, whose default minimum width
+                  // is its content's size. The title below is .truncate, which
+                  // sets white-space: nowrap - without min-w-0 breaking that
+                  // chain, "nowrap" content has no width to truncate against,
+                  // so it renders as one full-length unbroken line instead and
+                  // drags the whole page into horizontal scroll.
+                  className="group relative flex min-w-0 items-center gap-3 rounded-xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-2.5 shadow-xs transition hover:border-[var(--accent)]/50 hover:bg-[var(--surface)]/40"
                 >
                   <button
                     type="button"
@@ -260,7 +266,10 @@ export function LibraryPanel({
             {favoriteEpisodes.map((fav) => (
               <li
                 key={fav.id}
-                className="group relative flex items-start gap-3 rounded-xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-2.5 pr-10 shadow-xs transition hover:border-rose-400/50 hover:bg-[var(--surface)]/40"
+                // Same fix as the recently-played card above: a grid item
+                // needs min-w-0 of its own before a .truncate descendant can
+                // actually truncate rather than force the row to full width.
+                className="group relative flex min-w-0 items-start gap-3 rounded-xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-2.5 pr-10 shadow-xs transition hover:border-rose-400/50 hover:bg-[var(--surface)]/40"
               >
                 <button
                   type="button"

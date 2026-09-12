@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useUi } from "@/lib/i18n";
 import {
   liveCaptionService,
@@ -8,8 +8,13 @@ import {
 } from "@/lib/liveCaption";
 import {
   CaptionSettings,
+  captionThemeStyle,
   type CaptionSettingsState,
 } from "./CaptionSettings";
+
+// How long the collapsed floating bar stays fully visible after the last
+// caption update or interaction before fading, when auto-hide is on.
+const AUTO_HIDE_DELAY_MS = 4000;
 
 interface LiveTranscriptPanelProps {
   currentTime: number;
@@ -61,6 +66,19 @@ export function LiveTranscriptPanel({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const activeItemRef = useRef<HTMLDivElement | null>(null);
 
+  const [dimmed, setDimmed] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const resetHideTimer = useCallback(() => {
+    window.clearTimeout(hideTimerRef.current);
+    if (!settings.autoHide) {
+      setDimmed(false);
+      return;
+    }
+    setDimmed(false);
+    hideTimerRef.current = setTimeout(() => setDimmed(true), AUTO_HIDE_DELAY_MS);
+  }, [settings.autoHide]);
+
   useEffect(() => {
     setSegments(liveCaptionService.getTranscript());
     const unsub = liveCaptionService.onTranscript((items) => {
@@ -83,6 +101,17 @@ export function LiveTranscriptPanel({
     });
   }, [activeSegmentId, autoScroll, userScrolledUp]);
 
+  // A live session appends lines faster than currentTime can catch up to
+  // them, so the "active" segment above can lag behind the newest one by a
+  // few lines. This keeps the newest line in view regardless, which is what
+  // "follow along live" actually means while captioning is running.
+  useEffect(() => {
+    if (!autoScroll || userScrolledUp) return;
+    const container = containerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+  }, [segments.length, autoScroll, userScrolledUp]);
+
   // Handle scroll events to detect user manual scrolling
   const handleScroll = () => {
     const container = containerRef.current;
@@ -95,6 +124,14 @@ export function LiveTranscriptPanel({
       setUserScrolledUp(false);
     }
   };
+
+  // Only the collapsed floating bar auto-hides - the expanded panel is
+  // something someone opened on purpose and reading it shouldn't fight back.
+  useEffect(() => {
+    if (!isCollapsed) return;
+    resetHideTimer();
+    return () => window.clearTimeout(hideTimerRef.current);
+  }, [isCollapsed, activeSegmentId, resetHideTimer]);
 
   const resumeAutoScroll = () => {
     setUserScrolledUp(false);
@@ -212,7 +249,14 @@ export function LiveTranscriptPanel({
   if (isCollapsed) {
     const activeSeg = segments.find((s) => s.id === activeSegmentId) ?? segments[segments.length - 1];
     return (
-      <div className="card flex items-center gap-3 px-3.5 py-2">
+      <div
+        className={`card flex items-center gap-3 px-3.5 py-2 transition-opacity duration-500 ${
+          dimmed ? "opacity-35 hover:opacity-100" : "opacity-100"
+        }`}
+        style={captionThemeStyle(settings.captionTheme)}
+        onMouseEnter={resetHideTimer}
+        onFocus={resetHideTimer}
+      >
         <span className="shrink-0 text-[12px] font-semibold text-[var(--accent)]">{formatTime(currentTime)}</span>
         <p className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--ink)]">
           {activeSeg?.text || t("caption.waiting")}
@@ -242,7 +286,7 @@ export function LiveTranscriptPanel({
   }
 
   return (
-    <section className="card mt-4 flex flex-col overflow-hidden">
+    <section className="card mt-4 flex flex-col overflow-hidden" style={captionThemeStyle(settings.captionTheme)}>
       <div className="border-b border-[var(--rule)] bg-[var(--surface)] p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
