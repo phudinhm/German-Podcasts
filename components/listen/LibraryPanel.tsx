@@ -1,7 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useUi } from "@/lib/i18n";
-import type { RecentEpisode, SavedShow } from "@/lib/library";
+import {
+  isSaved,
+  toggleShow,
+  type RecentEpisode,
+  type RecentSource,
+  type FavoriteEpisode,
+  type SavedShow,
+} from "@/lib/library";
 import { Art } from "./Art";
 import { GoogleSync } from "./GoogleSync";
 
@@ -10,33 +18,50 @@ function percent(entry: RecentEpisode): number {
   return Math.min(100, Math.round((entry.position / entry.durationSec) * 100));
 }
 
-/**
- * The listener's own shelf: shows they keep, and where they got to.
- *
- * This is the first thing a returning listener should see, ahead of anything
- * we suggest, because the most likely reason someone opened the app is to
- * carry on with what they were already listening to.
- */
+function formatDuration(seconds: number | null, unit: string): string {
+  if (!seconds || seconds <= 0) return "";
+  const mins = Math.round(seconds / 60);
+  return `${mins} ${unit}`;
+}
+
+type LibraryTab = "all" | "sources" | "favorites" | "continue" | "finished";
+
 export function LibraryPanel({
   shows,
   recents,
+  recentSources = [],
+  favoriteEpisodes = [],
   onOpenShow,
+  onOpenRecentSource,
   onPlayRecent,
   onForget,
   onUnfollow,
+  onToggleFavoriteEpisode,
 }: {
   shows: SavedShow[];
   recents: RecentEpisode[];
+  recentSources?: RecentSource[];
+  favoriteEpisodes?: FavoriteEpisode[];
   onOpenShow: (show: SavedShow) => void;
+  onOpenRecentSource?: (source: RecentSource) => void;
   onPlayRecent: (entry: RecentEpisode) => void;
   onForget: (id: string) => void;
   /** Only offered where removing a show makes sense, which is the library. */
   onUnfollow?: (show: SavedShow) => void;
+  onToggleFavoriteEpisode?: (episode: FavoriteEpisode) => void;
 }) {
   const { t } = useUi();
+  const [activeTab, setActiveTab] = useState<LibraryTab>("all");
   const unfinished = recents.filter((entry) => !entry.finished);
+  const finished = recents.filter((entry) => entry.finished);
 
-  if (shows.length === 0 && recents.length === 0) {
+  const empty =
+    shows.length === 0 &&
+    recents.length === 0 &&
+    recentSources.length === 0 &&
+    favoriteEpisodes.length === 0;
+
+  if (empty) {
     return (
       <section className="mt-6">
         <GoogleSync />
@@ -44,18 +69,268 @@ export function LibraryPanel({
     );
   }
 
+  const handleOpenSource = (source: RecentSource) => {
+    if (onOpenRecentSource) {
+      onOpenRecentSource(source);
+    } else {
+      onOpenShow({
+        feedUrl: source.feedUrl,
+        title: source.title,
+        publisher: source.publisher,
+        artwork: source.artwork,
+        origin: source.origin ?? "rss",
+        pageUrl: source.pageUrl,
+        savedAt: source.lastPlayedAt,
+      });
+    }
+  };
+
   return (
-    <section className="mt-6 space-y-7">
+    <section className="mt-6 space-y-6">
       <GoogleSync />
 
-      {unfinished.length > 0 ? (
+      {/* Library Navigation Filter Tabs */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[12.5px] scrollbar-none">
+        <button
+          type="button"
+          onClick={() => setActiveTab("all")}
+          className={`rounded-full px-3 py-1 font-medium transition shrink-0 ${
+            activeTab === "all"
+              ? "bg-[var(--ink)] text-[var(--paper)] shadow-xs"
+              : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
+          }`}
+        >
+          {t("library.all")}
+        </button>
+
+        {recentSources.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("sources")}
+            className={`rounded-full px-3 py-1 font-medium transition shrink-0 flex items-center gap-1.5 ${
+              activeTab === "sources"
+                ? "bg-[var(--accent)] text-white shadow-xs"
+                : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
+            }`}
+          >
+            <span>🎙️</span>
+            <span>{t("library.recentSources")}</span>
+            <span className="rounded-full bg-black/10 px-1.5 py-0.2 text-[10.5px]">
+              {recentSources.length}
+            </span>
+          </button>
+        )}
+
+        {(favoriteEpisodes.length > 0 || shows.length > 0) && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("favorites")}
+            className={`rounded-full px-3 py-1 font-medium transition shrink-0 flex items-center gap-1.5 ${
+              activeTab === "favorites"
+                ? "bg-rose-500 text-white shadow-xs"
+                : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
+            }`}
+          >
+            <span>❤️</span>
+            <span>{t("library.favorites")}</span>
+            <span className="rounded-full bg-black/10 px-1.5 py-0.2 text-[10.5px]">
+              {favoriteEpisodes.length + shows.length}
+            </span>
+          </button>
+        )}
+
+        {unfinished.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("continue")}
+            className={`rounded-full px-3 py-1 font-medium transition shrink-0 ${
+              activeTab === "continue"
+                ? "bg-[var(--ink)] text-[var(--paper)] shadow-xs"
+                : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
+            }`}
+          >
+            {t("library.continue")} ({unfinished.length})
+          </button>
+        )}
+
+        {finished.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("finished")}
+            className={`rounded-full px-3 py-1 font-medium transition shrink-0 ${
+              activeTab === "finished"
+                ? "bg-[var(--ink)] text-[var(--paper)] shadow-xs"
+                : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
+            }`}
+          >
+            {t("library.finished")} ({finished.length})
+          </button>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 1. NGUỒN ĐÃ NGHE GẦN ĐÂY (Recently Played Sources / Podcasts)              */}
+      {/* ========================================================================= */}
+      {(activeTab === "all" || activeTab === "sources") && recentSources.length > 0 && (
         <div>
-          <h2 className="mb-2 text-[15px] font-semibold">{t("library.continue")}</h2>
+          <div className="mb-2.5 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--ink)]">
+              <span>🎙️</span>
+              <span>{t("library.recentSources")}</span>
+            </h2>
+            <span className="text-[12px] text-[var(--ink-faint)]">
+              {recentSources.length} podcast
+            </span>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {recentSources.map((source) => {
+              const saved = isSaved(source.feedUrl);
+              return (
+                <div
+                  key={source.feedUrl}
+                  className="group relative flex items-center gap-3 rounded-xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-2.5 shadow-xs transition hover:border-[var(--accent)]/50 hover:bg-[var(--surface)]/40"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleOpenSource(source)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
+                    <Art src={source.artwork} alt="" size={52} seed={source.title} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold leading-tight text-[var(--ink)]">
+                        {source.title}
+                      </p>
+                      {source.lastEpisodeTitle ? (
+                        <p className="mt-0.5 truncate text-[11.5px] text-[var(--ink-soft)]">
+                          ▶ {source.lastEpisodeTitle}
+                        </p>
+                      ) : source.publisher ? (
+                        <p className="mt-0.5 truncate text-[11.5px] text-[var(--ink-faint)]">
+                          {source.publisher}
+                        </p>
+                      ) : null}
+                    </div>
+                  </button>
+
+                  {/* Quick Favorite Star Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleShow({
+                        feedUrl: source.feedUrl,
+                        title: source.title,
+                        publisher: source.publisher,
+                        artwork: source.artwork,
+                        origin: source.origin ?? "rss",
+                        pageUrl: source.pageUrl,
+                      });
+                    }}
+                    className={`icon-btn text-[14px] shrink-0 transition ${
+                      saved ? "text-amber-500 scale-105" : "text-[var(--ink-faint)] hover:text-amber-500"
+                    }`}
+                    title={saved ? t("library.saved") : t("library.save")}
+                    aria-label={saved ? t("library.saved") : t("library.save")}
+                  >
+                    {saved ? "★" : "☆"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. TẬP YÊU THÍCH (Favorite Episodes - ❤️)                                 */}
+      {/* ========================================================================= */}
+      {(activeTab === "all" || activeTab === "favorites") && favoriteEpisodes.length > 0 && (
+        <div>
+          <div className="mb-2.5 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--ink)]">
+              <span>❤️</span>
+              <span>{t("library.favoriteEpisodes")}</span>
+            </h2>
+            <span className="text-[12px] text-[var(--ink-faint)]">
+              {favoriteEpisodes.length} {t("common.episodes")}
+            </span>
+          </div>
+
           <ul className="grid gap-1.5 sm:grid-cols-2">
-            {unfinished.slice(0, 6).map((entry) => (
-              // min-w-0: a grid item's automatic minimum width is its content,
-              // so without this a long episode title stops truncating and runs
-              // off the side of the phone instead.
+            {favoriteEpisodes.map((fav) => (
+              <li
+                key={fav.id}
+                className="group relative flex items-start gap-3 rounded-xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-2.5 pr-10 shadow-xs transition hover:border-rose-400/50 hover:bg-[var(--surface)]/40"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    onPlayRecent({
+                      id: fav.id,
+                      title: fav.title,
+                      showTitle: fav.showTitle,
+                      feedUrl: fav.feedUrl,
+                      url: fav.url,
+                      artwork: fav.artwork,
+                      durationSec: fav.durationSec,
+                      publishedAt: fav.publishedAt,
+                      description: fav.description,
+                      position: 0,
+                      finished: false,
+                      playedAt: new Date().toISOString(),
+                    });
+                  }}
+                  className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                >
+                  <Art src={fav.artwork} alt="" size={52} seed={fav.showTitle || fav.title} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-medium leading-tight text-[var(--ink)]">
+                      {fav.title}
+                    </p>
+                    <p className="mt-0.5 truncate text-[12px] text-[var(--ink-faint)]">
+                      {fav.showTitle}
+                    </p>
+                    {fav.durationSec ? (
+                      <p className="mt-1 text-[11px] text-[var(--ink-faint)]">
+                        {formatDuration(fav.durationSec, t("common.min"))}
+                      </p>
+                    ) : null}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onToggleFavoriteEpisode) {
+                      onToggleFavoriteEpisode(fav);
+                    } else {
+                      window.dispatchEvent(
+                        new CustomEvent("hoerbar:unfavorite", { detail: { id: fav.id } }),
+                      );
+                    }
+                  }}
+                  className="icon-btn absolute right-2 top-3 text-[14px] text-rose-500 hover:scale-110 transition"
+                  title={t("library.unfavoriteEpisode")}
+                  aria-label={t("library.unfavoriteEpisode")}
+                >
+                  ❤️
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. ĐANG NGHE DỞ (Continue Listening)                                      */}
+      {/* ========================================================================= */}
+      {(activeTab === "all" || activeTab === "continue") && unfinished.length > 0 && (
+        <div>
+          <h2 className="mb-2 text-[15px] font-semibold text-[var(--ink)]">
+            {t("library.continue")}
+          </h2>
+          <ul className="grid gap-1.5 sm:grid-cols-2">
+            {unfinished.slice(0, activeTab === "continue" ? undefined : 6).map((entry) => (
               <li key={entry.id} className="relative min-w-0">
                 <button
                   type="button"
@@ -91,17 +366,30 @@ export function LibraryPanel({
             ))}
           </ul>
         </div>
-      ) : null}
+      )}
 
-      {shows.length > 0 ? (
+      {/* ========================================================================= */}
+      {/* 4. NGUỒN YÊU THÍCH (Favorite Shows / Followed Shows)                      */}
+      {/* ========================================================================= */}
+      {(activeTab === "all" || activeTab === "favorites") && shows.length > 0 && (
         <div>
-          <h2 className="mb-2 text-[15px] font-semibold">{t("library.shows")}</h2>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-[15px] font-semibold text-[var(--ink)]">
+              {activeTab === "favorites" ? `⭐ ${t("library.favoriteSources")}` : t("library.shows")}
+            </h2>
+            <span className="text-[12px] text-[var(--ink-faint)]">
+              {shows.length} podcast
+            </span>
+          </div>
+
           <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
             {shows.map((show) => (
               <li key={show.feedUrl} className="relative min-w-0">
                 <button
                   type="button"
-                  className={`row-hover flex w-full items-center gap-3 p-2.5 text-left ${onUnfollow ? "pr-10" : ""}`}
+                  className={`row-hover flex w-full items-center gap-3 p-2.5 text-left ${
+                    onUnfollow ? "pr-10" : ""
+                  }`}
                   onClick={() => onOpenShow(show)}
                 >
                   <Art src={show.artwork} alt="" size={48} seed={show.title} />
@@ -127,41 +415,43 @@ export function LibraryPanel({
             ))}
           </ul>
         </div>
-      ) : null}
+      )}
 
-      {recents.length > unfinished.length ? (
+      {/* ========================================================================= */}
+      {/* 5. ĐÃ NGHE XONG (Finished Episodes)                                       */}
+      {/* ========================================================================= */}
+      {(activeTab === "all" || activeTab === "finished") && finished.length > 0 && (
         <div>
-          <h2 className="mb-2 text-[15px] font-semibold">{t("library.recent")}</h2>
+          <h2 className="mb-2 text-[15px] font-semibold text-[var(--ink)]">
+            {t("library.recent")}
+          </h2>
           <ul className="divide-y divide-[var(--rule)]">
-            {recents
-              .filter((entry) => entry.finished)
-              .slice(0, 8)
-              .map((entry) => (
-                <li key={entry.id} className="flex min-w-0 items-center gap-3 py-1">
-                  <button
-                    type="button"
-                    className="row-hover min-w-0 flex-1 px-1 py-1.5 text-left"
-                    onClick={() => onPlayRecent(entry)}
-                  >
-                    <span className="block truncate text-[13.5px]">{entry.title}</span>
-                    <span className="block truncate text-[12px] text-[var(--ink-faint)]">
-                      {entry.showTitle} · {t("library.finished")}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn shrink-0 text-[16px]"
-                    aria-label={t("library.forget")}
-                    title={t("library.forget")}
-                    onClick={() => onForget(entry.id)}
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
+            {finished.slice(0, activeTab === "finished" ? undefined : 8).map((entry) => (
+              <li key={entry.id} className="flex min-w-0 items-center gap-3 py-1">
+                <button
+                  type="button"
+                  className="row-hover min-w-0 flex-1 px-1 py-1.5 text-left"
+                  onClick={() => onPlayRecent(entry)}
+                >
+                  <span className="block truncate text-[13.5px]">{entry.title}</span>
+                  <span className="block truncate text-[12px] text-[var(--ink-faint)]">
+                    {entry.showTitle} · {t("library.finished")}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn shrink-0 text-[16px]"
+                  aria-label={t("library.forget")}
+                  title={t("library.forget")}
+                  onClick={() => onForget(entry.id)}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
-      ) : null}
+      )}
     </section>
   );
 }

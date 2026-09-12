@@ -65,6 +65,10 @@ interface PlayerContextValue {
    * so they travel with the picture instead of with the page.
    */
   videoLayer: HTMLDivElement | null;
+  showTranscript: boolean;
+  setShowTranscript: React.Dispatch<React.SetStateAction<boolean>>;
+  transcriptCollapsed: boolean;
+  setTranscriptCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -142,6 +146,92 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setTrack(null);
   }, [handle]);
 
+  /**
+   * MediaSession API: powers iPhone Lock Screen, Dynamic Island, Control Center,
+   * Apple Watch, and Bluetooth headphone gestures (-10s / +30s / play / pause).
+   */
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+
+    if (!track) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title,
+      artist: track.showTitle,
+      album: "Hörbar German Podcasts",
+      artwork: track.artwork
+        ? [
+            { src: track.artwork, sizes: "96x96" },
+            { src: track.artwork, sizes: "128x128" },
+            { src: track.artwork, sizes: "256x256" },
+            { src: track.artwork, sizes: "512x512" },
+          ]
+        : [],
+    });
+
+    const setAction = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+      try {
+        navigator.mediaSession.setActionHandler(action, handler);
+      } catch {}
+    };
+
+    setAction("play", () => handle.play());
+    setAction("pause", () => handle.pause());
+    setAction("seekbackward", (details) => {
+      const skip = details.seekOffset || 10;
+      handle.seekTo(Math.max(0, handle.getTime() - skip), true);
+    });
+    setAction("seekforward", (details) => {
+      const skip = details.seekOffset || 30;
+      handle.seekTo(handle.getTime() + skip, true);
+    });
+    setAction("seekto", (details) => {
+      if (details.seekTime !== undefined) {
+        handle.seekTo(details.seekTime, true);
+      }
+    });
+
+    return () => {
+      setAction("play", null);
+      setAction("pause", null);
+      setAction("seekbackward", null);
+      setAction("seekforward", null);
+      setAction("seekto", null);
+    };
+  }, [track, handle]);
+
+  // Sync position state to iOS Lock Screen scrubber bar
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !("mediaSession" in navigator) ||
+      !("setPositionState" in navigator.mediaSession) ||
+      !track ||
+      !media.state.ready
+    ) {
+      return;
+    }
+
+    const duration = handle.getDuration();
+    if (!Number.isFinite(duration) || duration <= 0) return;
+
+    const timer = setInterval(() => {
+      try {
+        const time = handle.getTime();
+        navigator.mediaSession.setPositionState({
+          duration: Math.max(0, duration),
+          playbackRate: 1,
+          position: Math.min(duration, Math.max(0, time)),
+        });
+      } catch {}
+    }, 2000);
+
+    return () => clearInterval(timer);
+  }, [track, media.state.ready, handle]);
+
   const setStage = useCallback((element: HTMLElement | null) => {
     setStageElement(element);
   }, []);
@@ -149,6 +239,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Defaults to false so a page with no inline player, such as the library,
   // gets the docked one straight away.
   const [inlineVisible, setInlineVisible] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
 
   const value = useMemo<PlayerContextValue>(
     () => ({
@@ -164,6 +256,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       videoLayer,
       inlineVisible,
       setInlineVisible,
+      showTranscript,
+      setShowTranscript,
+      transcriptCollapsed,
+      setTranscriptCollapsed,
     }),
     [
       track,
@@ -177,6 +273,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setStage,
       videoLayer,
       inlineVisible,
+      showTranscript,
+      transcriptCollapsed,
     ],
   );
 

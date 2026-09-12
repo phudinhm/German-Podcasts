@@ -2,11 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { UiLangProvider } from "@/components/UiLangProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ZoomProvider, ZOOM_SCRIPT } from "@/lib/zoom";
 import { THEME_SCRIPT } from "@/lib/theme";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { PlayerProvider } from "@/components/player/PlayerProvider";
 import { MiniPlayer } from "@/components/player/MiniPlayer";
+import { GlobalFloatingTranscript } from "@/components/caption/GlobalFloatingTranscript";
 
 export const metadata: Metadata = {
   title: {
@@ -44,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           is the flash it exists to prevent.
         */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: ZOOM_SCRIPT }} />
 
         {/* Roboto, the typeface YouTube uses. Loaded from Google Fonts rather
             than bundled so the build needs no network; the stack in globals.css
@@ -56,6 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="flex min-h-screen flex-col antialiased">
+        <ZoomProvider>
         <ThemeProvider>
         <UiLangProvider>
           <PlayerProvider>
@@ -70,9 +74,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </footer>
 
           <MiniPlayer />
+          <GlobalFloatingTranscript />
           </PlayerProvider>
         </UiLangProvider>
         </ThemeProvider>
+        </ZoomProvider>
       </body>
     </html>
   );

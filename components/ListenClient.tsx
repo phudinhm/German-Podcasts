@@ -15,8 +15,15 @@ import {
   notePosition,
   resumeAt,
   toggleShow,
+  listRecentSources,
+  noteSourcePlayed,
+  listFavoriteEpisodes,
+  isEpisodeFavorited,
+  toggleFavoriteEpisode,
   type RecentEpisode,
   type SavedShow,
+  type RecentSource,
+  type FavoriteEpisode,
 } from "@/lib/library";
 import { usePlayer, type Track } from "./player/PlayerProvider";
 import { Transport } from "./player/Transport";
@@ -87,13 +94,25 @@ export function ListenClient() {
   const [searches, setSearches] = useState<RecentSearch[]>([]);
   const [shows, setShows] = useState<SavedShow[]>([]);
   const [recents, setRecents] = useState<RecentEpisode[]>([]);
+  const [recentSources, setRecentSources] = useState<RecentSource[]>([]);
+  const [favoriteEpisodes, setFavoriteEpisodes] = useState<FavoriteEpisode[]>([]);
   const [saved, setSaved] = useState(false);
   const [expandedDescription, setExpandedDescription] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
   const [showCaption, setShowCaption] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false);
+  const { showTranscript, setShowTranscript } = player;
   const [captionSettings, setCaptionSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
   const [currentTime, setCurrentTime] = useState(0);
+  const [freezePane, setFreezePane] = useState(false);
+  const [scrolledDown, setScrolledDown] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setScrolledDown(window.scrollY > 280);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const playing = player.track;
   const playerRef = useRef<HTMLDivElement | null>(null);
@@ -165,6 +184,8 @@ export function ListenClient() {
   const refreshLibrary = useCallback(() => {
     setShows(listShows());
     setRecents(listRecents());
+    setRecentSources(listRecentSources());
+    setFavoriteEpisodes(listFavoriteEpisodes());
   }, []);
 
   useEffect(() => {
@@ -284,6 +305,18 @@ export function ListenClient() {
         description: episode.description,
       });
 
+      if (show?.feedUrl) {
+        noteSourcePlayed({
+          feedUrl: show.feedUrl,
+          title: feed?.title ?? show.title,
+          publisher: show.publisher,
+          artwork: track.artwork,
+          origin: show.origin,
+          pageUrl: show.pageUrl ?? undefined,
+          lastEpisodeTitle: episode.title,
+        });
+      }
+
       setExpandedDescription(false);
       window.setTimeout(() => playerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
     },
@@ -306,6 +339,15 @@ export function ListenClient() {
         startAt: resumeAt(entry.id),
       });
       noteplayed(entry);
+      if (entry.feedUrl) {
+        noteSourcePlayed({
+          feedUrl: entry.feedUrl,
+          title: entry.showTitle,
+          publisher: "",
+          artwork: entry.artwork,
+          lastEpisodeTitle: entry.title,
+        });
+      }
       window.setTimeout(() => playerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
     },
     [player],
@@ -357,6 +399,20 @@ export function ListenClient() {
     openedFeedRef.current = null;
     if (params.get("feed")) router.replace("/", { scroll: false });
   }, [params, router]);
+
+  /** Returns to search results if they exist, otherwise returns to full browse. */
+  const backToResultsOrBrowse = useCallback(() => {
+    if (results && results.length > 0) {
+      setFeed(null);
+      setShow(null);
+      setError(null);
+      setVisible(PAGE_SIZE);
+      openedFeedRef.current = null;
+      if (params.get("feed")) router.replace("/", { scroll: false });
+    } else {
+      browse();
+    }
+  }, [results, browse, params, router]);
 
   // The library links here with the feed to open, so following a saved show
   // lands on its episodes rather than on a search box.
@@ -457,7 +513,14 @@ export function ListenClient() {
 
       {/* ---------------- player ---------------- */}
       {playing ? (
-        <section ref={playerRef} className="card mt-6 overflow-hidden">
+        <section
+          ref={playerRef}
+          className={`card mt-6 overflow-hidden transition-all duration-300 ${
+            freezePane
+              ? "sticky top-3 z-30 shadow-2xl backdrop-blur-xl bg-[var(--paper-raised)]/95 border border-[var(--accent)]/40 ring-1 ring-[var(--accent)]/20"
+              : ""
+          }`}
+        >
           <div className="p-4">
             <div className="flex items-start gap-3">
               <span className="hidden sm:block">
@@ -473,15 +536,52 @@ export function ListenClient() {
                   {playing.publishedAt ? ` · ${formatDate(playing.publishedAt, locale)}` : ""}
                 </p>
               </div>
-              <button
-                type="button"
-                className="icon-btn -mr-1 -mt-1 shrink-0 text-[18px]"
-                aria-label={t("common.close")}
-                title={t("common.close")}
-                onClick={() => player.stop()}
-              >
-                ×
-              </button>
+              <div className="flex items-center gap-1 shrink-0 -mr-1 -mt-1">
+                <button
+                  type="button"
+                  className={`icon-btn text-[14px] transition ${
+                    isEpisodeFavorited(playing.id) ? "text-rose-500 font-bold scale-105" : "text-[var(--ink-faint)] hover:text-rose-500"
+                  }`}
+                  aria-label={isEpisodeFavorited(playing.id) ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+                  title={isEpisodeFavorited(playing.id) ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+                  onClick={() => {
+                    toggleFavoriteEpisode({
+                      id: playing.id,
+                      title: playing.title,
+                      showTitle: playing.showTitle,
+                      feedUrl: show?.feedUrl ?? null,
+                      url: playing.url ?? "",
+                      artwork: playing.artwork,
+                      durationSec: playing.durationSec ?? null,
+                      publishedAt: playing.publishedAt ?? null,
+                      description: playing.description ?? "",
+                    });
+                    refreshLibrary();
+                  }}
+                >
+                  {isEpisodeFavorited(playing.id) ? "❤️" : "🤍"}
+                </button>
+                <button
+                  type="button"
+                  className={`icon-btn text-[13px] ${
+                    freezePane ? "text-[var(--accent)] font-bold bg-[var(--accent-soft)]" : "text-[var(--ink-faint)]"
+                  }`}
+                  aria-label={freezePane ? t("player.unfreezePane") : t("player.freezePane")}
+                  title={freezePane ? t("player.unfreezePane") : t("player.freezePane")}
+                  onClick={() => setFreezePane((v) => !v)}
+                >
+                  📌
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn text-[18px]"
+                  aria-label={t("common.close")}
+                  title={t("common.close")}
+                  onClick={() => player.stop()}
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
             {mixed ? (
@@ -622,17 +722,18 @@ export function ListenClient() {
       {/* ---------------- results ---------------- */}
       {results && results.length > 0 && !feed ? (
         <section className="mt-6">
-          <div className="mb-3 flex items-center gap-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--accent)] hover:underline"
+              onClick={browse}
+            >
+              <span aria-hidden>←</span>
+              <span>{t("listen.backToBrowse")}</span>
+            </button>
             <h2 className="text-[13px] font-medium text-[var(--ink-soft)]">
               {t("listen.results", { count: results.length })}
             </h2>
-            <button
-              type="button"
-              className="ml-auto btn px-2.5 py-1 text-[12px]"
-              onClick={browse}
-            >
-              {t("listen.backToBrowse")}
-            </button>
           </div>
           <ul className="grid gap-1 sm:grid-cols-2">
             {results.map((result) => (
@@ -659,6 +760,24 @@ export function ListenClient() {
               </li>
             ))}
           </ul>
+          <div className="mt-4 flex items-center justify-between border-t border-[var(--rule)] pt-3">
+            <button
+              type="button"
+              className="btn text-[12.5px] flex items-center gap-1.5"
+              onClick={browse}
+            >
+              <span aria-hidden>←</span>
+              <span>{t("listen.backToBrowse")}</span>
+            </button>
+            <button
+              type="button"
+              className="btn text-[12.5px] flex items-center gap-1"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            >
+              <span aria-hidden>↑</span>
+              <span>{t("common.scrollToTop")}</span>
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -666,53 +785,64 @@ export function ListenClient() {
 
       {/* ---------------- episodes ---------------- */}
       {feed ? (
-        <section className="card mt-6 p-4">
-          {/* Two rows on a phone. Squeezed onto one, the show title got about
-              nine characters before the two buttons took the rest. */}
-          <div className="mb-3">
-            <div className="flex items-center gap-3">
-              <Art src={show?.artwork ?? feed.image} alt="" size={56} seed={feed.title} />
-              <div className="min-w-0 flex-1">
-                <h2 className="truncate text-[17px] font-semibold sm:text-[18px]">{feed.title}</h2>
-                <p className="truncate text-[12.5px] text-[var(--ink-faint)]">
-                  {feed.episodes.length} {t("common.episodes")}
-                  {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
-                </p>
+        <section className="mt-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-[var(--accent)] hover:underline"
+              onClick={backToResultsOrBrowse}
+            >
+              <span aria-hidden>←</span>
+              <span>{results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}</span>
+            </button>
+          </div>
+          <div className="card p-4">
+            {/* Two rows on a phone. Squeezed onto one, the show title got about
+                nine characters before the two buttons took the rest. */}
+            <div className="mb-3">
+              <div className="flex items-center gap-3">
+                <Art src={show?.artwork ?? feed.image} alt="" size={56} seed={feed.title} />
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-[17px] font-semibold sm:text-[18px]">{feed.title}</h2>
+                  <p className="truncate text-[12.5px] text-[var(--ink-faint)]">
+                    {feed.episodes.length} {t("common.episodes")}
+                    {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {show?.feedUrl ? (
+                  <button
+                    type="button"
+                    className="btn text-[12.5px]"
+                    data-active={saved}
+                    aria-pressed={saved}
+                    onClick={() => {
+                      setSaved(
+                        toggleShow({
+                          feedUrl: show.feedUrl!,
+                          title: show.title,
+                          publisher: show.publisher,
+                          artwork: show.artwork,
+                          origin: show.origin,
+                          pageUrl: show.pageUrl ?? undefined,
+                        }),
+                      );
+                    }}
+                  >
+                    {saved ? `★ ${t("library.saved")}` : `☆ ${t("library.save")}`}
+                  </button>
+                ) : null}
+                <button type="button" className="btn text-[12.5px]" onClick={backToResultsOrBrowse}>
+                  {results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
+                </button>
+                {episodes.length > 1 ? (
+                  <span className="sm:ml-auto">
+                    <EpisodeSort value={sort} onChange={setSort} />
+                  </span>
+                ) : null}
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {show?.feedUrl ? (
-                <button
-                  type="button"
-                  className="btn text-[12.5px]"
-                  data-active={saved}
-                  aria-pressed={saved}
-                  onClick={() => {
-                    setSaved(
-                      toggleShow({
-                        feedUrl: show.feedUrl!,
-                        title: show.title,
-                        publisher: show.publisher,
-                        artwork: show.artwork,
-                        origin: show.origin,
-                        pageUrl: show.pageUrl ?? undefined,
-                      }),
-                    );
-                  }}
-                >
-                  {saved ? `★ ${t("library.saved")}` : `☆ ${t("library.save")}`}
-                </button>
-              ) : null}
-              <button type="button" className="btn text-[12.5px]" onClick={browse}>
-                {results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
-              </button>
-              {episodes.length > 1 ? (
-                <span className="sm:ml-auto">
-                  <EpisodeSort value={sort} onChange={setSort} />
-                </span>
-              ) : null}
-            </div>
-          </div>
 
           <ul>
             {episodes.slice(0, visible).map((episode) => {
@@ -723,12 +853,13 @@ export function ListenClient() {
                   ? Math.min(100, Math.round((remembered.position / episode.durationSec) * 100))
                   : 0;
               const current = playing?.id === id;
+              const isFav = isEpisodeFavorited(id);
               return (
-                <li key={id} className="min-w-0">
+                <li key={id} className="relative min-w-0 group/item">
                   <button
                     type="button"
                     onClick={() => playEpisode(episode)}
-                    className="row-hover flex w-full items-start gap-3 p-2.5 text-left"
+                    className="row-hover flex w-full items-start gap-3 p-2.5 pr-11 text-left"
                     data-active={current}
                     aria-current={current ? "true" : undefined}
                   >
@@ -778,6 +909,33 @@ export function ListenClient() {
                       ) : null}
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavoriteEpisode({
+                        id,
+                        title: episode.title,
+                        showTitle: show?.title ?? feed.title,
+                        feedUrl: show?.feedUrl ?? null,
+                        url: episode.url,
+                        artwork: episode.image ?? show?.artwork ?? feed.image,
+                        durationSec: episode.durationSec,
+                        publishedAt: episode.publishedAt,
+                        description: episode.description,
+                      });
+                      refreshLibrary();
+                    }}
+                    className={`icon-btn absolute right-2 top-3 h-8 w-8 text-[14px] transition ${
+                      isFav
+                        ? "text-rose-500 opacity-100 scale-105"
+                        : "text-[var(--ink-faint)] opacity-40 hover:opacity-100 hover:text-rose-500"
+                    }`}
+                    aria-label={isFav ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+                    title={isFav ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+                  >
+                    {isFav ? "❤️" : "🤍"}
+                  </button>
                 </li>
               );
             })}
@@ -790,6 +948,27 @@ export function ListenClient() {
               </button>
             </div>
           ) : null}
+
+          {/* Bottom navigation for episode feed */}
+          <div className="mt-4 flex items-center justify-between border-t border-[var(--rule)] pt-3">
+            <button
+              type="button"
+              className="btn text-[12.5px] flex items-center gap-1.5"
+              onClick={backToResultsOrBrowse}
+            >
+              <span aria-hidden>←</span>
+              <span>{results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}</span>
+            </button>
+            <button
+              type="button"
+              className="btn text-[12.5px] flex items-center gap-1"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            >
+              <span aria-hidden>↑</span>
+              <span>{t("common.scrollToTop")}</span>
+            </button>
+          </div>
+          </div>
         </section>
       ) : null}
 
@@ -798,6 +977,8 @@ export function ListenClient() {
         <LibraryPanel
           shows={shows}
           recents={recents}
+          recentSources={recentSources}
+          favoriteEpisodes={favoriteEpisodes}
           onOpenShow={(saved) =>
             void openFeed({
               id: `rss:${saved.feedUrl}`,
@@ -810,8 +991,24 @@ export function ListenClient() {
               pageUrl: saved.pageUrl ?? null,
             })
           }
+          onOpenRecentSource={(source) =>
+            void openFeed({
+              id: `rss:${source.feedUrl}`,
+              title: source.title,
+              publisher: source.publisher,
+              description: "",
+              artwork: source.artwork,
+              feedUrl: source.feedUrl,
+              origin: (source.origin as DiscoverResult["origin"]) ?? "rss",
+              pageUrl: source.pageUrl ?? null,
+            })
+          }
           onPlayRecent={playRecent}
           onForget={(id) => forgetRecent(id)}
+          onToggleFavoriteEpisode={(fav) => {
+            toggleFavoriteEpisode(fav);
+            refreshLibrary();
+          }}
         />
       ) : null}
 
@@ -824,6 +1021,53 @@ export function ListenClient() {
           }}
         />
       ) : null}
+
+      {/* Floating quick navigation (visible when scrolled down or when in feed/results) */}
+      {(scrolledDown || feed || (results && results.length > 0)) && (
+        <aside
+          aria-label="Quick navigation"
+          className="fixed left-3 z-40 flex items-center gap-1.5 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/90 px-2 py-1 shadow-lg backdrop-blur-md transition-all duration-300 sm:left-6"
+          style={{
+            bottom: playing
+              ? "calc(76px + env(safe-area-inset-bottom, 14px))"
+              : "calc(16px + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
+          {feed ? (
+            <button
+              type="button"
+              onClick={backToResultsOrBrowse}
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
+              title={results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
+            >
+              <span aria-hidden>←</span>
+              <span>{t("common.back")}</span>
+            </button>
+          ) : results && results.length > 0 ? (
+            <button
+              type="button"
+              onClick={browse}
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
+              title={t("listen.backToBrowse")}
+            >
+              <span aria-hidden>←</span>
+              <span>{t("common.back")}</span>
+            </button>
+          ) : null}
+
+          {scrolledDown && (
+            <button
+              type="button"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
+              title={t("common.scrollToTop")}
+            >
+              <span aria-hidden>↑</span>
+              <span>{t("common.scrollToTop")}</span>
+            </button>
+          )}
+        </aside>
+      )}
     </div>
   );
 }

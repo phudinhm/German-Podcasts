@@ -9,19 +9,13 @@ import { usePlayer } from "./PlayerProvider";
 import { usePopout } from "./usePopout";
 import { Art } from "../listen/Art";
 import { AudioVisualizer } from "../caption/AudioVisualizer";
+import { liveCaptionService, type CaptionSegment } from "@/lib/liveCaption";
+import { isEpisodeFavorited, toggleFavoriteEpisode } from "@/lib/library";
 
 const COLLAPSED_KEY = "hoerbar.dock.collapsed.v1";
 const SLOT_KEY = "hoerbar.dock.slot.v1";
+const PINNED_KEY = "hoerbar.dock.pinned.v1";
 
-/**
- * Where the dock sits vertically, on a screen big enough for it to matter.
- *
- * Three slots rather than a free drag: a dragged panel has to be dragged back,
- * remembers a position that may be off screen on the next monitor, and needs a
- * pointer contract that touch does not have. Two buttons that step through
- * three positions cover the actual complaint, which is "it is covering the
- * thing I am reading".
- */
 const SLOTS = ["bottom", "middle", "top"] as const;
 type Slot = (typeof SLOTS)[number];
 
@@ -41,55 +35,84 @@ function formatTime(seconds: number): string {
   return `${minutes}:${String(secs).padStart(2, "0")}`;
 }
 
-/**
- * The player that stays with you once the full one has scrolled away.
- *
- * It used to be hidden on the listening page, on the theory that two sets of
- * controls for one stream is a way to lose track of which one you pressed. The
- * theory was right and the rule was wrong: what matters is not which page you
- * are on but whether you can already see the controls. The provider reports
- * that, and this appears the moment the answer is no.
- *
- * It docks to the right rather than spanning the width, tucks away to a single
- * button, moves between three heights, and on Chromium can leave the browser
- * entirely for a floating always-on-top window. All four of those are stored,
- * because a listener who arranged their screen once meant it.
- */
 export function MiniPlayer() {
   const { t } = useUi();
   const { track, handle, stop, mediaState, inlineVisible } = usePlayer();
   const pathname = usePathname();
+
   const [playing, setPlaying] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const [slot, setSlot] = useState<Slot>("bottom");
+  const [isHovered, setIsHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+
+  // Popout PiP window caption & transcript state
+  const [showPopoutCaption, setShowPopoutCaption] = useState(true);
+  const [showPopoutTranscript, setShowPopoutTranscript] = useState(false);
+
+  // MiniPlayer caption & transcript toggles
+  const [showCaptionBubble, setShowCaptionBubble] = useState(false);
+  const [showTranscriptDrawer, setShowTranscriptDrawer] = useState(false);
+  const [currentCaption, setCurrentCaption] = useState<CaptionSegment | null>(null);
+  const [transcriptList, setTranscriptList] = useState<CaptionSegment[]>([]);
+
+  // iPhone / Mobile Bottom Sheet state
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [favorited, setFavorited] = useState(false);
+
+  useEffect(() => {
+    if (!track?.id) {
+      setFavorited(false);
+      return;
+    }
+    const updateFav = () => setFavorited(isEpisodeFavorited(track.id));
+    updateFav();
+    window.addEventListener("hoerbar:library-changed", updateFav);
+    return () => window.removeEventListener("hoerbar:library-changed", updateFav);
+  }, [track?.id]);
+
+  const toggleFav = useCallback(() => {
+    if (!track) return;
+    toggleFavoriteEpisode({
+      id: track.id,
+      title: track.title,
+      showTitle: track.showTitle,
+      feedUrl: null,
+      url: track.url ?? "",
+      artwork: track.artwork,
+      durationSec: track.durationSec ?? null,
+      publishedAt: track.publishedAt ?? null,
+      description: track.description ?? "",
+    });
+    setFavorited(isEpisodeFavorited(track.id));
+  }, [track]);
+
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fillRef = useRef<HTMLDivElement | null>(null);
   const timeRef = useRef<HTMLSpanElement | null>(null);
   const popFillRef = useRef<HTMLDivElement | null>(null);
   const popTimeRef = useRef<HTMLSpanElement | null>(null);
-  const popout = usePopout({ width: 400, height: 176 });
+
+  // Increased PiP window height for captions & transcripts
+  const popout = usePopout({ width: 440, height: 260 });
 
   useEffect(() => {
     try {
-      setCollapsed(window.localStorage.getItem(COLLAPSED_KEY) === "1");
-      const stored = window.localStorage.getItem(SLOT_KEY) as Slot | null;
-      if (stored && SLOTS.includes(stored)) setSlot(stored);
-    } catch {
-      // Storage can be unavailable; the defaults are fine.
-    }
+      const storedSlot = window.localStorage.getItem(SLOT_KEY) as Slot | null;
+      if (storedSlot && SLOTS.includes(storedSlot)) setSlot(storedSlot);
+      setPinned(window.localStorage.getItem(PINNED_KEY) === "1");
+    } catch {}
   }, []);
 
   const remember = useCallback((key: string, value: string) => {
     try {
       window.localStorage.setItem(key, value);
-    } catch {
-      // Not remembering a preference is not worth an error.
-    }
+    } catch {}
   }, []);
 
-  const toggleCollapsed = useCallback(() => {
-    setCollapsed((value) => {
-      const next = !value;
-      remember(COLLAPSED_KEY, next ? "1" : "0");
+  const togglePinned = useCallback(() => {
+    setPinned((prev) => {
+      const next = !prev;
+      remember(PINNED_KEY, next ? "1" : "0");
       return next;
     });
   }, [remember]);
@@ -105,8 +128,21 @@ export function MiniPlayer() {
     [remember],
   );
 
-  // One loop drives both copies of the progress bar. The refs for the pop-out
-  // are simply null while it is closed.
+  // Listen to live caption and transcript updates
+  useEffect(() => {
+    const unsubCap = liveCaptionService.onCaption((seg) => {
+      setCurrentCaption(seg);
+    });
+    const unsubTrans = liveCaptionService.onTranscript((items) => {
+      setTranscriptList(items);
+    });
+    return () => {
+      unsubCap();
+      unsubTrans();
+    };
+  }, []);
+
+  // One loop drives both copies of the progress bar
   useEffect(() => {
     let frame = 0;
     let last = false;
@@ -129,6 +165,21 @@ export function MiniPlayer() {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [handle]);
+
+  // Hover expansion handlers with smooth leave delay
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 400);
+  };
 
   if (!track) return null;
 
@@ -168,46 +219,103 @@ export function MiniPlayer() {
     </>
   );
 
-  // The floating window. Rendered into the pop-out document, so it keeps the
-  // page's styling but none of its layout.
+  // Floating PiP window with Picture-in-Picture Caption and Transcript option
   const popoutUi = popout.container
     ? createPortal(
-        <div className="flex h-full flex-col gap-3 p-3" style={{ fontFamily: "var(--font-body)" }}>
+        <div
+          className="flex h-full flex-col justify-between gap-2.5 p-3.5 bg-[var(--paper)] text-[var(--ink)] select-none overflow-hidden"
+          style={{ fontFamily: "var(--font-body)" }}
+        >
+          {/* Track Header */}
           <div className="flex items-center gap-3">
-            <Art src={track.artwork} alt="" size={48} seed={track.showTitle || track.title} />
+            <Art src={track.artwork} alt="" size={44} seed={track.showTitle || track.title} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[14px] font-semibold leading-tight">{track.title}</p>
-              <p className="truncate text-[12px] text-[var(--ink-faint)]">{track.showTitle}</p>
+              <p className="truncate text-[13.5px] font-semibold leading-tight">{track.title}</p>
+              <p className="truncate text-[11.5px] text-[var(--ink-faint)]">{track.showTitle}</p>
             </div>
+            <AudioVisualizer isPlaying={playing} barCount={6} />
           </div>
+
+          {/* Progress bar */}
           <div className="flex items-center gap-2">
-            <span ref={popTimeRef} className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--ink-faint)]">
+            <span ref={popTimeRef} className="shrink-0 font-mono text-[10.5px] tabular-nums text-[var(--ink-faint)]">
               0:00
             </span>
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--rule)]">
               <span ref={popFillRef} className="block h-full bg-[var(--accent-ring)]" style={{ width: 0 }} />
             </span>
           </div>
-          <div className="flex items-center justify-center gap-2">{transport}</div>
+
+          {/* Transport & Caption Controls */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">{transport}</div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowPopoutCaption((v) => !v)}
+                className={`btn px-2 py-1 text-[11px] ${
+                  showPopoutCaption
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 font-semibold"
+                    : "text-[var(--ink-faint)]"
+                }`}
+                title="Bật phụ đề trực tiếp trong cửa sổ nổi"
+              >
+                🎙️ {t("caption.toggle")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPopoutTranscript((v) => !v)}
+                className={`btn px-2 py-1 text-[11px] ${
+                  showPopoutTranscript
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)] font-semibold"
+                    : "text-[var(--ink-faint)]"
+                }`}
+                title="Bật transcript trong cửa sổ nổi"
+              >
+                📜 {t("caption.transcript")}
+              </button>
+            </div>
+          </div>
+
+          {/* Live Caption Display inside PiP Window */}
+          {showPopoutCaption && (
+            <div className="rounded-xl border border-[var(--rule)] bg-[var(--surface)]/80 p-2 text-[12px] leading-snug">
+              <p className="font-medium text-[var(--ink)] line-clamp-2">
+                {currentCaption?.text || "🎙️ Đang nghe podcast..."}
+              </p>
+              {currentCaption?.translation && (
+                <p className="mt-0.5 text-[11px] text-[var(--accent)] font-normal line-clamp-1">
+                  {currentCaption.translation}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Transcript snippet inside PiP Window */}
+          {showPopoutTranscript && (
+            <div className="max-h-24 overflow-y-auto space-y-1 rounded-lg border border-[var(--rule)] bg-[var(--surface)]/50 p-2 text-[11px]">
+              {transcriptList.slice(-4).map((s) => (
+                <div key={s.id} className="flex gap-1.5">
+                  <span className="font-mono text-[10px] text-[var(--ink-faint)] shrink-0">▶</span>
+                  <span className="text-[var(--ink)] line-clamp-1">{s.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>,
         popout.container,
       )
     : null;
 
-  // While the pop-out is open the page keeps only a way back, so there are not
-  // two live sets of controls a metre apart.
   if (popout.container) {
     return (
       <>
         {popoutUi}
-        <div
-          data-dock="popped"
-          className={`fixed right-3 z-50 sm:right-4 ${SLOT_CLASS[slot]}`}
-        >
+        <div data-dock="popped" className={`fixed right-3 z-50 sm:right-4 ${SLOT_CLASS[slot]}`}>
           <button
             type="button"
             onClick={popout.close}
-            className="card flex items-center gap-2 px-3 py-2 text-[12px] shadow-[var(--shadow-pop)]"
+            className="card flex items-center gap-2 px-3.5 py-2 text-[12px] shadow-[var(--shadow-pop)] font-medium"
           >
             <span aria-hidden className="text-[var(--accent)]">
               ▣
@@ -219,147 +327,369 @@ export function MiniPlayer() {
     );
   }
 
-  // The full player is on screen and does the same job better.
-  if (inlineVisible) return null;
-
-  if (collapsed) {
-    return (
-      <div data-dock="tucked" className={`fixed right-3 z-50 sm:right-4 ${SLOT_CLASS[slot]}`}>
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          className="card flex h-12 w-12 items-center justify-center rounded-full p-0 text-[15px] shadow-[var(--shadow-pop)]"
-          aria-label={t("player.expand")}
-          title={`${t("player.expand")} - ${track.title}`}
-        >
-          <span aria-hidden className="text-[var(--accent)]">
-            {playing ? "❚❚" : "▶"}
-          </span>
-        </button>
-      </div>
-    );
+  // Hide desktop dock if inline player is on screen, but keep iPhone bottom bar accessible
+  if (inlineVisible && !mobileDrawerOpen) {
+    return null;
   }
 
+  const isExpandedDesktop = isHovered || pinned || showCaptionBubble || showTranscriptDrawer;
+
   return (
-    // The wrapper spans the width but ignores pointer events, so the card can
-    // sit at the right on a wide screen and still stretch to the full width of
-    // a phone, where a 420px card would not fit anyway.
-    <div
-      data-dock="open"
-      className={`pointer-events-none fixed inset-x-0 z-50 flex justify-end px-3 sm:px-4 ${SLOT_CLASS[slot]}`}
-    >
-      <div className="group card pointer-events-auto relative flex w-full max-w-[420px] items-center gap-2.5 p-2 shadow-[var(--shadow-pop)] sm:gap-3">
-        {/*
-          Moving the dock is a pointer affordance, so it is hidden from touch
-          entirely: (hover: hover) keeps it off phones, where there is no hover
-          state to reveal it and the buttons would just be permanent clutter.
-        */}
-        <div className="pointer-events-none absolute -left-1 top-1/2 hidden -translate-x-full -translate-y-1/2 flex-col gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(hover:hover)]:sm:flex">
-          <button
-            type="button"
-            onClick={() => move(1)}
-            disabled={atTop}
-            className="card h-7 w-7 rounded-full p-0 text-[11px] disabled:opacity-30"
-            aria-label={t("player.moveUp")}
-            title={t("player.moveUp")}
-          >
-            <span aria-hidden>▲</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => move(-1)}
-            disabled={atBottom}
-            className="card h-7 w-7 rounded-full p-0 text-[11px] disabled:opacity-30"
-            aria-label={t("player.moveDown")}
-            title={t("player.moveDown")}
-          >
-            <span aria-hidden>▼</span>
-          </button>
-        </div>
-
-        {/* Space reserved for the docked video layer, which is fixed-positioned. */}
-        {hasVideoLayer ? <span className="h-[52px] w-[92px] shrink-0" aria-hidden /> : null}
-
-        {!hasVideoLayer ? (
-          <Art src={track.artwork} alt="" size={40} seed={track.showTitle || track.title} />
-        ) : null}
-
-        <button
-          type="button"
-          onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
-          className="btn btn-primary h-10 w-10 shrink-0 rounded-full p-0 text-[13px]"
-          aria-label={playing ? t("common.pause") : t("common.play")}
+    <>
+      {/* ========================================================================= */}
+      {/* 1. DESKTOP DOCK (Hover to Expand / Compact Pill Mode)                     */}
+      {/* ========================================================================= */}
+      <div
+        data-dock="desktop"
+        className={`pointer-events-none fixed inset-x-0 z-50 hidden sm:flex justify-end px-4 ${SLOT_CLASS[slot]}`}
+      >
+        <div
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className="pointer-events-auto flex flex-col items-end transition-all duration-300 ease-out"
         >
-          {playing ? "❚❚" : "▶"}
-        </button>
+          {/* Floating Caption Bubble above MiniPlayer if toggled */}
+          {showCaptionBubble && (
+            <div className="mb-2 w-[420px] rounded-2xl border border-white/20 bg-black/90 p-3 text-white shadow-2xl backdrop-blur-xl">
+              <div className="flex items-center justify-between pb-1.5 border-b border-white/10 text-[11px] text-zinc-400">
+                <span className="font-semibold text-emerald-400">🎙️ {t("caption.toggle")}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowCaptionBubble(false)}
+                  className="text-zinc-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="mt-1.5 text-[13.5px] font-medium leading-relaxed text-zinc-100">
+                {currentCaption?.text || t("caption.waiting")}
+              </p>
+              {currentCaption?.translation && (
+                <p className="mt-1 text-[12px] text-amber-300/90">{currentCaption.translation}</p>
+              )}
+            </div>
+          )}
 
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium leading-tight">{track.title}</p>
-          <p className="truncate text-[11.5px] text-[var(--ink-faint)]">
-            {mediaState.loading ? t("player.buffering") : track.showTitle}
-          </p>
-          <div className="mt-1.5 flex items-center gap-2">
-            <span
-              ref={timeRef}
-              className="shrink-0 font-mono text-[10px] tabular-nums text-[var(--ink-faint)]"
+          {/* Floating Transcript Drawer above MiniPlayer if toggled */}
+          {showTranscriptDrawer && (
+            <div className="mb-2 max-h-56 w-[420px] overflow-y-auto rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)] p-3 shadow-2xl backdrop-blur-xl space-y-2 text-[12px]">
+              <div className="flex items-center justify-between pb-1 border-b border-[var(--rule)] font-semibold text-[var(--ink)]">
+                <span>📜 {t("caption.transcript")}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowTranscriptDrawer(false)}
+                  className="text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                >
+                  ✕
+                </button>
+              </div>
+              {transcriptList.slice(-6).map((s) => (
+                <div
+                  key={s.id}
+                  onClick={() => handle.seekTo(s.start, true)}
+                  className="cursor-pointer rounded p-1.5 hover:bg-[var(--surface)] transition"
+                >
+                  <span className="font-mono text-[10px] text-[var(--accent)] mr-1.5 font-bold">
+                    ▶ {formatTime(s.start)}
+                  </span>
+                  <span className="text-[var(--ink)] font-medium">{s.text}</span>
+                  {s.translation && <p className="text-[11px] text-[var(--ink-faint)] mt-0.5">{s.translation}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* COLLAPSED PILL STATE */}
+          {!isExpandedDesktop ? (
+            <div
+              className="group flex items-center gap-2.5 rounded-full border border-white/20 bg-black/85 dark:bg-black/90 px-3.5 py-1.5 text-white shadow-2xl backdrop-blur-2xl transition-all duration-300 hover:scale-[1.03] cursor-pointer"
+              title="Rê chuột để mở rộng trình phát"
             >
-              0:00
-            </span>
-            <span className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--rule)]">
-              <span ref={fillRef} className="block h-full bg-[var(--accent-ring)]" style={{ width: 0 }} />
-            </span>
-            <AudioVisualizer isPlaying={playing} barCount={6} />
-          </div>
-        </div>
+              <Art src={track.artwork} alt="" size={30} seed={track.showTitle || track.title} />
+              <div className="max-w-[160px] truncate text-[12px] font-medium leading-tight">
+                {track.title}
+              </div>
+              <AudioVisualizer isPlaying={playing} barCount={5} />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handle.isPlaying() ? handle.pause() : handle.play();
+                }}
+                className="btn btn-primary h-7 w-7 rounded-full p-0 text-[11px] shrink-0"
+                aria-label={playing ? t("common.pause") : t("common.play")}
+              >
+                {playing ? "❚❚" : "▶"}
+              </button>
+            </div>
+          ) : (
+            /* FULL EXPANDED CARD STATE */
+            <div className="group card relative flex w-full max-w-[420px] flex-col gap-2 p-3 shadow-[var(--shadow-pop)] border border-[var(--rule)]">
+              {/* Height adjustment controls */}
+              <div className="pointer-events-none absolute -left-1 top-1/2 hidden -translate-x-full -translate-y-1/2 flex-col gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 sm:flex">
+                <button
+                  type="button"
+                  onClick={() => move(1)}
+                  disabled={atTop}
+                  className="card h-7 w-7 rounded-full p-0 text-[11px] disabled:opacity-30"
+                  aria-label={t("player.moveUp")}
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => move(-1)}
+                  disabled={atBottom}
+                  className="card h-7 w-7 rounded-full p-0 text-[11px] disabled:opacity-30"
+                  aria-label={t("player.moveDown")}
+                >
+                  ▼
+                </button>
+              </div>
 
-        {/* Chromium only, and pointless on a phone where there is no desktop to
-            float over, so it appears only where it can actually work. */}
-        {popout.supported ? (
-          <button
-            type="button"
-            onClick={() => void popout.open()}
-            className="icon-btn hidden shrink-0 text-[13px] sm:inline-flex"
-            aria-label={t("player.popout")}
-            title={t("player.popout")}
-          >
-            <span aria-hidden>▣</span>
-          </button>
-        ) : null}
+              {/* Top Row: Artwork, Info, Close/Pin */}
+              <div className="flex items-center gap-3">
+                {hasVideoLayer ? <span className="h-[48px] w-[80px] shrink-0" aria-hidden /> : null}
+                {!hasVideoLayer && (
+                  <Art src={track.artwork} alt="" size={44} seed={track.showTitle || track.title} />
+                )}
 
-        {/* On the listening page the full player is a scroll away rather than a
-            navigation, so this link would only reload the page you are on. */}
-        {!onListen ? (
-          <Link
-            href="/"
-            className="icon-btn shrink-0 text-[14px]"
-            aria-label={t("player.miniOpen")}
-            title={t("player.miniOpen")}
-          >
-            <span aria-hidden>&#8963;</span>
-          </Link>
-        ) : null}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13.5px] font-medium leading-tight">{track.title}</p>
+                  <p className="truncate text-[11.5px] text-[var(--ink-faint)]">
+                    {mediaState.loading ? t("player.buffering") : track.showTitle}
+                  </p>
+                </div>
 
-        <div className="flex shrink-0 flex-col">
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            className="icon-btn h-7 w-7 text-[14px]"
-            aria-label={t("player.collapse")}
-            title={t("player.collapse")}
-          >
-            <span aria-hidden>&rsaquo;</span>
-          </button>
-          <button
-            type="button"
-            onClick={stop}
-            className="icon-btn h-7 w-7 text-[15px]"
-            aria-label={t("player.miniClose")}
-            title={t("player.miniClose")}
-          >
-            &times;
-          </button>
+                <div className="flex items-center gap-1">
+                  {/* Favorite heart button */}
+                  <button
+                    type="button"
+                    onClick={toggleFav}
+                    className={`icon-btn h-7 w-7 text-[13px] transition ${
+                      favorited ? "text-rose-500 scale-105" : "text-[var(--ink-faint)] hover:text-rose-500"
+                    }`}
+                    aria-label={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+                    title={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+                  >
+                    {favorited ? "❤️" : "🤍"}
+                  </button>
+
+                  {/* Pin expanded button */}
+                  <button
+                    type="button"
+                    onClick={togglePinned}
+                    className={`icon-btn h-7 w-7 text-[12px] ${pinned ? "text-[var(--accent)] font-bold" : "text-[var(--ink-faint)]"}`}
+                    title={pinned ? "Bỏ ghim (tự thu gọn)" : "Ghim mở rộng"}
+                  >
+                    📌
+                  </button>
+
+                  {/* Popout PiP button */}
+                  {popout.supported && (
+                    <button
+                      type="button"
+                      onClick={() => void popout.open()}
+                      className="icon-btn h-7 w-7 text-[12px]"
+                      title={t("player.popout")}
+                    >
+                      ▣
+                    </button>
+                  )}
+
+                  {/* Close button */}
+                  <button
+                    type="button"
+                    onClick={stop}
+                    className="icon-btn h-7 w-7 text-[15px]"
+                    aria-label={t("player.miniClose")}
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrubber and Time */}
+              <div className="flex items-center gap-2">
+                <span ref={timeRef} className="shrink-0 font-mono text-[10px] tabular-nums text-[var(--ink-faint)]">
+                  0:00
+                </span>
+                <span className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--rule)]">
+                  <span ref={fillRef} className="block h-full bg-[var(--accent-ring)]" style={{ width: 0 }} />
+                </span>
+                <AudioVisualizer isPlaying={playing} barCount={6} />
+              </div>
+
+              {/* Bottom Action Row: Transport & Quick Caption/Transcript */}
+              <div className="flex items-center justify-between pt-1 border-t border-[var(--rule)]">
+                <div className="flex items-center gap-2">{transport}</div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowCaptionBubble((v) => !v)}
+                    className={`btn px-2 py-0.5 text-[11px] ${
+                      showCaptionBubble
+                        ? "border-emerald-500 text-emerald-600 font-semibold"
+                        : "text-[var(--ink-soft)]"
+                    }`}
+                    title="Bật phụ đề nhanh"
+                  >
+                    🎙️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTranscriptDrawer((v) => !v)}
+                    className={`btn px-2 py-0.5 text-[11px] ${
+                      showTranscriptDrawer
+                        ? "border-[var(--accent)] text-[var(--accent)] font-semibold"
+                        : "text-[var(--ink-soft)]"
+                    }`}
+                    title="Bật transcript nhanh"
+                  >
+                    📜
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
+
+      {/* ========================================================================= */}
+      {/* 2. MOBILE IPHONE DOCK (Dedicated Native iOS Style with Safe-Area Insets)   */}
+      {/* ========================================================================= */}
+      <div
+        data-dock="mobile-iphone"
+        className="fixed bottom-0 inset-x-0 z-50 sm:hidden bg-black/90 dark:bg-black/95 text-white backdrop-blur-2xl border-t border-white/15 pb-[calc(0.5rem+env(safe-area-inset-bottom,14px))] pt-2.5 px-3.5 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]"
+      >
+        <div className="flex items-center justify-between gap-3">
+          {/* Tapping track info opens the slide-up drawer */}
+          <div
+            onClick={() => setMobileDrawerOpen(true)}
+            className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+          >
+            <Art src={track.artwork} alt="" size={42} seed={track.showTitle || track.title} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13.5px] font-semibold leading-tight text-zinc-50">
+                {track.title}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className="truncate text-[11.5px] text-zinc-400">{track.showTitle}</p>
+                <AudioVisualizer isPlaying={playing} barCount={4} />
+              </div>
+            </div>
+          </div>
+
+          {/* Large touch targets for iPhone */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
+              className="btn h-10 w-10 rounded-full p-0 text-[12px] text-zinc-300 hover:text-white"
+              aria-label="-10s"
+            >
+              -10
+            </button>
+            <button
+              type="button"
+              onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
+              className="btn btn-primary h-11 w-11 rounded-full p-0 text-[15px] shadow-md"
+              aria-label={playing ? t("common.pause") : t("common.play")}
+            >
+              {playing ? "❚❚" : "▶"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileDrawerOpen((v) => !v)}
+              className="btn h-10 w-10 rounded-full p-0 text-[14px] text-zinc-300 hover:text-white"
+              title="Phụ đề & Transcript"
+            >
+              📜
+            </button>
+            <button
+              type="button"
+              onClick={toggleFav}
+              className={`btn h-10 w-10 rounded-full p-0 text-[15px] transition ${
+                favorited ? "text-rose-400 scale-105" : "text-zinc-400 hover:text-rose-400"
+              }`}
+              aria-label={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+              title={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+            >
+              {favorited ? "❤️" : "🤍"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. MOBILE IPHONE BOTTOM SHEET (Slide-up Drawer for Caption & Transcript)   */}
+      {/* ========================================================================= */}
+      {mobileDrawerOpen && (
+        <div className="fixed inset-0 z-[60] sm:hidden flex flex-col justify-end bg-black/60 backdrop-blur-xs">
+          {/* Backdrop click closes */}
+          <div className="flex-1" onClick={() => setMobileDrawerOpen(false)} />
+
+          {/* Slide-up Card */}
+          <div className="w-full max-h-[75vh] overflow-y-auto rounded-t-3xl bg-[var(--paper-raised)] p-4 shadow-2xl border-t border-[var(--rule)] pb-[calc(1.5rem+env(safe-area-inset-bottom,20px))]">
+            {/* Grab handle indicator */}
+            <div className="w-12 h-1.5 rounded-full bg-[var(--rule)] mx-auto mb-3" />
+
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--rule)]">
+              <div>
+                <h4 className="text-[14.5px] font-semibold text-[var(--ink)]">{track.title}</h4>
+                <p className="text-[12px] text-[var(--ink-faint)]">{track.showTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileDrawerOpen(false)}
+                className="icon-btn text-[18px]"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Current Live Caption */}
+            <div className="my-3 rounded-2xl bg-black/85 p-3.5 text-white shadow-md">
+              <span className="text-[10.5px] font-semibold text-emerald-400 uppercase tracking-wider">
+                🎙️ {t("caption.toggle")}
+              </span>
+              <p className="mt-1 text-[15px] font-medium leading-relaxed text-zinc-100">
+                {currentCaption?.text || t("caption.waiting")}
+              </p>
+              {currentCaption?.translation && (
+                <p className="mt-1 text-[13px] text-amber-300">{currentCaption.translation}</p>
+              )}
+            </div>
+
+            {/* Running Transcript list */}
+            <div className="mt-2 space-y-2">
+              <h5 className="text-[12.5px] font-semibold text-[var(--ink)]">
+                📜 {t("caption.transcript")} ({transcriptList.length})
+              </h5>
+              <div className="max-h-48 overflow-y-auto space-y-2 rounded-xl border border-[var(--rule)] p-2">
+                {transcriptList.map((s) => (
+                  <div
+                    key={s.id}
+                    onClick={() => {
+                      handle.seekTo(s.start, true);
+                      setMobileDrawerOpen(false);
+                    }}
+                    className="p-2 rounded-lg hover:bg-[var(--surface)] text-[12.5px] cursor-pointer"
+                  >
+                    <span className="font-mono text-[11px] font-semibold text-[var(--accent)] mr-2">
+                      ▶ {formatTime(s.start)}
+                    </span>
+                    <span className="font-medium text-[var(--ink)]">{s.text}</span>
+                    {s.translation && (
+                      <p className="text-[11.5px] text-[var(--ink-faint)] mt-0.5">{s.translation}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

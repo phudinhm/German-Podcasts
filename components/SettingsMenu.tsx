@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { UI_LANGS, useUi } from "@/lib/i18n";
 import { useTheme, type Theme } from "@/lib/theme";
+import { useZoom } from "@/lib/zoom";
 
 const THEME_GLYPH: Record<"light" | "dark", string> = { light: "☀", dark: "☾" };
 
@@ -25,6 +26,7 @@ const THEME_OPTIONS: Array<{ value: Theme; key: "theme.system" | "theme.light" |
 export function SettingsMenu() {
   const { t, lang, setLang } = useUi();
   const { theme, resolved, setTheme } = useTheme();
+  const { zoom, zoomIn, zoomOut, resetZoom } = useZoom();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -111,6 +113,43 @@ export function SettingsMenu() {
               {item.label}
             </button>
           ))}
+
+          <p className="mt-1 border-t border-[var(--rule)] px-2 pb-1 pt-2 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">
+            {t("theme.zoom")}
+          </p>
+          <div className="flex items-center justify-between px-2 py-1">
+            <div className="flex items-center rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-0.5 text-[12px]">
+              <button
+                type="button"
+                onClick={zoomOut}
+                className="rounded px-2 py-0.5 font-bold hover:bg-[var(--paper-raised)] text-[var(--ink-soft)] active:scale-95"
+                title={t("theme.zoomOut")}
+              >
+                -
+              </button>
+              <span className="px-2 font-mono text-[11px] font-semibold text-[var(--ink)]">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={zoomIn}
+                className="rounded px-2 py-0.5 font-bold hover:bg-[var(--paper-raised)] text-[var(--ink-soft)] active:scale-95"
+                title={t("theme.zoomIn")}
+              >
+                +
+              </button>
+            </div>
+            {zoom !== 1.0 ? (
+              <button
+                type="button"
+                onClick={resetZoom}
+                className="text-[11px] font-medium text-[var(--accent)] hover:underline"
+              >
+                {t("theme.zoomReset")}
+              </button>
+            ) : null}
+          </div>
+
           {/* Only on a phone, where the header has no room for it. */}
           <div className="mt-1 border-t border-[var(--rule)] pt-1 sm:hidden">
             <Link

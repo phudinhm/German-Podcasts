@@ -479,3 +479,30 @@ h3 {
   -webkit-backdrop-filter: blur(16px);
 }
 
+/* iPhone & iOS Safari touch and safe-area optimization */
+@supports (-webkit-touch-callout: none) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-overflow-scrolling: touch;
+  }
+  button, a {
+    touch-action: manipulation;
+  }
+  @media (max-width: 640px) {
+    input, select, textarea {
+      font-size: 16px !important; /* Prevents unwanted iOS auto-zoom on input focus */
+    }
+  }
+}
+
+/* Dynamic Island capsule animation */
+@keyframes capsulePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+.capsule-active {
+  animation: capsulePulse 3s ease-in-out infinite;
+}
+
+

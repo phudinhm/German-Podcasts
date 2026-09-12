@@ -17,6 +17,8 @@ interface LiveTranscriptPanelProps {
   onClose: () => void;
   settings: CaptionSettingsState;
   onUpdateSettings: (settings: CaptionSettingsState) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -32,6 +34,8 @@ export function LiveTranscriptPanel({
   onClose,
   settings,
   onUpdateSettings,
+  isCollapsed = false,
+  onToggleCollapse,
 }: LiveTranscriptPanelProps) {
   const { t, lang } = useUi();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
@@ -44,6 +48,15 @@ export function LiveTranscriptPanel({
   const [grammarNotes, setGrammarNotes] = useState<Record<string, string>>({});
   const [loadingGrammarId, setLoadingGrammarId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const readAloud = (text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "de-DE";
+    utterance.rate = 0.92;
+    window.speechSynthesis.speak(utterance);
+  };
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const activeItemRef = useRef<HTMLDivElement | null>(null);
@@ -196,10 +209,45 @@ export function LiveTranscriptPanel({
       )
     : segments;
 
+  if (isCollapsed) {
+    const activeSeg = segments.find((s) => s.id === activeSegmentId) ?? segments[segments.length - 1];
+    return (
+      <div className="rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)]/90 px-3.5 py-2 shadow-xl backdrop-blur-xl flex items-center gap-3 transition-all duration-300">
+        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent)] shrink-0">
+          <span>📜</span>
+          <span>{formatTime(currentTime)}</span>
+        </span>
+        <p className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--ink)]">
+          {activeSeg?.text || t("caption.waiting")}
+        </p>
+        <div className="flex items-center gap-1 shrink-0">
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="btn px-2 py-0.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--surface)]"
+              title={t("caption.expand")}
+            >
+              ⤢ {t("caption.expand")}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="icon-btn text-[14px]"
+            aria-label={t("common.close")}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <section className="card mt-4 flex flex-col overflow-hidden border border-[var(--rule)] bg-[var(--paper-raised)] shadow-lg transition-all duration-200">
+    <section className="card mt-4 flex flex-col overflow-hidden border border-[var(--rule)]/80 bg-[var(--paper-raised)]/95 shadow-2xl backdrop-blur-xl transition-all duration-200">
       {/* Top Header & Toolbar */}
-      <div className="border-b border-[var(--rule)] p-3.5 bg-[var(--surface)]/50">
+      <div className="border-b border-[var(--rule)] p-3.5 bg-[var(--surface)]/60 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="text-[18px]">📜</span>
@@ -211,12 +259,23 @@ export function LiveTranscriptPanel({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <CaptionSettings
               settings={settings}
               onChange={onUpdateSettings}
               compact
             />
+            {onToggleCollapse && (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="icon-btn text-[14px]"
+                title={t("caption.collapse")}
+                aria-label={t("caption.collapse")}
+              >
+                —
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -330,15 +389,32 @@ export function LiveTranscriptPanel({
                 }`}
               >
                 <div className="flex items-start gap-2.5">
-                  {/* Timestamp button (click to seek) */}
-                  <button
-                    type="button"
-                    onClick={() => onSeek(seg.start)}
-                    className="shrink-0 font-mono text-[11px] font-semibold text-[var(--ink-faint)] group-hover:text-[var(--accent)] rounded bg-[var(--surface)] px-1.5 py-0.5 transition"
-                    title={`Seek to ${formatTime(seg.start)}`}
-                  >
-                    ▶ {formatTime(seg.start)}
-                  </button>
+                  {/* Timestamp button (click to seek & replay from exact first word) */}
+                  <div className="shrink-0 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // 0.25s pre-roll buffer so the very first word or consonant is never cut off
+                        const target = Math.max(0, seg.start - 0.25);
+                        onSeek(target);
+                      }}
+                      className="font-mono text-[11px] font-semibold text-[var(--ink-faint)] group-hover:text-[var(--accent)] rounded bg-[var(--surface)] px-1.5 py-0.5 transition active:scale-95 flex items-center gap-1"
+                      title={`${t("caption.replaySegment")} (${formatTime(seg.start)})`}
+                    >
+                      <span className="text-[9px]">▶</span>
+                      <span>{formatTime(seg.start)}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => readAloud(seg.text)}
+                      className="text-[12px] opacity-40 hover:opacity-100 hover:text-[var(--accent)] transition px-0.5 py-0.5 rounded"
+                      title={t("caption.readAloud")}
+                      aria-label={t("caption.readAloud")}
+                    >
+                      🔊
+                    </button>
+                  </div>
 
                   {/* German text & Vietnamese translation */}
                   <div className="flex-1 min-w-0">

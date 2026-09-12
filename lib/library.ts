@@ -12,6 +12,8 @@
 
 const SHOWS_KEY = "hoerbar.library.shows.v1";
 const RECENTS_KEY = "hoerbar.library.recents.v1";
+const RECENT_SOURCES_KEY = "hoerbar.library.recent_sources.v1";
+const FAVORITES_KEY = "hoerbar.library.favorites.v1";
 
 /** Kept small deliberately: this is what travels to Drive and back. */
 export interface SavedShow {
@@ -22,6 +24,17 @@ export interface SavedShow {
   origin: string;
   pageUrl?: string;
   savedAt: string;
+}
+
+export interface RecentSource {
+  feedUrl: string;
+  title: string;
+  publisher: string;
+  artwork: string | null;
+  origin?: string;
+  pageUrl?: string;
+  lastPlayedAt: string;
+  lastEpisodeTitle?: string;
 }
 
 export interface RecentEpisode {
@@ -42,14 +55,31 @@ export interface RecentEpisode {
   playedAt: string;
 }
 
+export interface FavoriteEpisode {
+  id: string;
+  title: string;
+  showTitle: string;
+  feedUrl: string | null;
+  url: string;
+  artwork: string | null;
+  durationSec: number | null;
+  publishedAt: string | null;
+  description: string;
+  favoritedAt: string;
+}
+
 export interface Library {
   shows: SavedShow[];
   recents: RecentEpisode[];
+  favorites?: FavoriteEpisode[];
+  recentSources?: RecentSource[];
   /** Last write, used to decide which side of a sync is newer. */
   updatedAt: string;
 }
 
 export const MAX_RECENTS = 60;
+export const MAX_RECENT_SOURCES = 30;
+export const MAX_FAVORITES = 100;
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -75,6 +105,8 @@ export function loadLibrary(): Library {
   return {
     shows: read<SavedShow[]>(SHOWS_KEY, []),
     recents: read<RecentEpisode[]>(RECENTS_KEY, []),
+    favorites: read<FavoriteEpisode[]>(FAVORITES_KEY, []),
+    recentSources: read<RecentSource[]>(RECENT_SOURCES_KEY, []),
     updatedAt: read<string>("hoerbar.library.updatedAt", ""),
   };
 }
@@ -82,6 +114,8 @@ export function loadLibrary(): Library {
 export function saveLibrary(library: Library): void {
   write(SHOWS_KEY, library.shows);
   write(RECENTS_KEY, library.recents);
+  if (library.favorites) write(FAVORITES_KEY, library.favorites);
+  if (library.recentSources) write(RECENT_SOURCES_KEY, library.recentSources);
   write("hoerbar.library.updatedAt", library.updatedAt || new Date().toISOString());
 }
 
@@ -170,6 +204,91 @@ export function clearRecents(): void {
   touch();
 }
 
+// ---------------------------------------------------------------------------
+// Recent Sources (Podcasts heard)
+// ---------------------------------------------------------------------------
+
+export function listRecentSources(): RecentSource[] {
+  const stored = read<RecentSource[]>(RECENT_SOURCES_KEY, []);
+  const sourceMap = new Map<string, RecentSource>();
+  for (const s of stored) {
+    if (s.feedUrl) sourceMap.set(s.feedUrl, s);
+  }
+  // Cross-reference with recents to capture any source played previously
+  const recents = listRecents();
+  for (const ep of recents) {
+    if (ep.feedUrl && !sourceMap.has(ep.feedUrl)) {
+      sourceMap.set(ep.feedUrl, {
+        feedUrl: ep.feedUrl,
+        title: ep.showTitle || "Podcast",
+        publisher: "",
+        artwork: ep.artwork,
+        lastPlayedAt: ep.playedAt,
+        lastEpisodeTitle: ep.title,
+      });
+    }
+  }
+  return Array.from(sourceMap.values())
+    .sort((a, b) => b.lastPlayedAt.localeCompare(a.lastPlayedAt))
+    .slice(0, MAX_RECENT_SOURCES);
+}
+
+export function noteSourcePlayed(entry: Omit<RecentSource, "lastPlayedAt">): void {
+  if (!entry.feedUrl) return;
+  const sources = read<RecentSource[]>(RECENT_SOURCES_KEY, []);
+  const next: RecentSource = {
+    ...entry,
+    lastPlayedAt: new Date().toISOString(),
+  };
+  const filtered = sources.filter((s) => s.feedUrl !== entry.feedUrl);
+  write(RECENT_SOURCES_KEY, [next, ...filtered].slice(0, MAX_RECENT_SOURCES));
+  touch();
+}
+
+export function forgetRecentSource(feedUrl: string): void {
+  const sources = read<RecentSource[]>(RECENT_SOURCES_KEY, []);
+  write(RECENT_SOURCES_KEY, sources.filter((s) => s.feedUrl !== feedUrl));
+  touch();
+}
+
+export function clearRecentSources(): void {
+  write(RECENT_SOURCES_KEY, []);
+  touch();
+}
+
+// ---------------------------------------------------------------------------
+// Favorite Episodes (❤️)
+// ---------------------------------------------------------------------------
+
+export function listFavoriteEpisodes(): FavoriteEpisode[] {
+  return read<FavoriteEpisode[]>(FAVORITES_KEY, []).sort((a, b) => b.favoritedAt.localeCompare(a.favoritedAt));
+}
+
+export function isEpisodeFavorited(id: string): boolean {
+  return read<FavoriteEpisode[]>(FAVORITES_KEY, []).some((item) => item.id === id);
+}
+
+export function toggleFavoriteEpisode(entry: Omit<FavoriteEpisode, "favoritedAt">): boolean {
+  const favorites = read<FavoriteEpisode[]>(FAVORITES_KEY, []);
+  const existing = favorites.findIndex((item) => item.id === entry.id);
+  if (existing >= 0) {
+    favorites.splice(existing, 1);
+    write(FAVORITES_KEY, favorites);
+    touch();
+    return false;
+  }
+  favorites.unshift({ ...entry, favoritedAt: new Date().toISOString() });
+  write(FAVORITES_KEY, favorites.slice(0, MAX_FAVORITES));
+  touch();
+  return true;
+}
+
+export function removeFavoriteEpisode(id: string): void {
+  const favorites = read<FavoriteEpisode[]>(FAVORITES_KEY, []);
+  write(FAVORITES_KEY, favorites.filter((item) => item.id !== id));
+  touch();
+}
+
 function touch(): void {
   if (typeof window === "undefined") return;
   try {
@@ -213,11 +332,29 @@ export function mergeLibraries(a: Library, b: Library): Library {
     });
   }
 
+  const favorites = new Map<string, FavoriteEpisode>();
+  for (const fav of [...(a.favorites ?? []), ...(b.favorites ?? [])]) {
+    const existing = favorites.get(fav.id);
+    if (!existing || fav.favoritedAt < existing.favoritedAt) favorites.set(fav.id, fav);
+  }
+
+  const recentSources = new Map<string, RecentSource>();
+  for (const s of [...(a.recentSources ?? []), ...(b.recentSources ?? [])]) {
+    const existing = recentSources.get(s.feedUrl);
+    if (!existing || s.lastPlayedAt > existing.lastPlayedAt) recentSources.set(s.feedUrl, s);
+  }
+
   return {
     shows: [...shows.values()].sort((x, y) => y.savedAt.localeCompare(x.savedAt)),
     recents: [...recents.values()]
       .sort((x, y) => y.playedAt.localeCompare(x.playedAt))
       .slice(0, MAX_RECENTS),
+    favorites: [...favorites.values()]
+      .sort((x, y) => y.favoritedAt.localeCompare(x.favoritedAt))
+      .slice(0, MAX_FAVORITES),
+    recentSources: [...recentSources.values()]
+      .sort((x, y) => y.lastPlayedAt.localeCompare(x.lastPlayedAt))
+      .slice(0, MAX_RECENT_SOURCES),
     updatedAt: a.updatedAt > b.updatedAt ? a.updatedAt : b.updatedAt,
   };
 }

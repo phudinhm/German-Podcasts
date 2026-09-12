@@ -9,6 +9,16 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="max-w-2xl">
+      <div className="mb-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--accent)] hover:underline transition"
+        >
+          <span>←</span>
+          <span>Back to Listen</span>
+        </Link>
+      </div>
+
       <h1 className="text-[27px] font-semibold">How it works</h1>
 
       <section className="mt-6 space-y-3 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">
@@ -60,11 +70,15 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <p className="mt-8">
-        <Link href="/" className="btn">
+      <div className="mt-8 flex items-center justify-between border-t border-[var(--rule)] pt-4">
+        <Link href="/" className="btn btn-primary">
           Start listening
         </Link>
-      </p>
+        <Link href="/" className="btn text-[12.5px] flex items-center gap-1.5">
+          <span aria-hidden>←</span>
+          <span>Back to Listen</span>
+        </Link>
+      </div>
     </div>
   );
 }

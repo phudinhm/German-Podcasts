@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUi } from "@/lib/i18n";
 import {
@@ -9,8 +10,13 @@ import {
   listRecents,
   listShows,
   toggleShow,
+  listRecentSources,
+  listFavoriteEpisodes,
+  toggleFavoriteEpisode,
   type RecentEpisode,
   type SavedShow,
+  type RecentSource,
+  type FavoriteEpisode,
 } from "@/lib/library";
 import { usePlayer } from "./player/PlayerProvider";
 import { LibraryPanel } from "./listen/LibraryPanel";
@@ -29,10 +35,14 @@ export function LibraryClient() {
   const player = usePlayer();
   const [shows, setShows] = useState<SavedShow[]>([]);
   const [recents, setRecents] = useState<RecentEpisode[]>([]);
+  const [recentSources, setRecentSources] = useState<RecentSource[]>([]);
+  const [favoriteEpisodes, setFavoriteEpisodes] = useState<FavoriteEpisode[]>([]);
 
   const refresh = useCallback(() => {
     setShows(listShows());
     setRecents(listRecents());
+    setRecentSources(listRecentSources());
+    setFavoriteEpisodes(listFavoriteEpisodes());
   }, []);
 
   useEffect(() => {
@@ -41,10 +51,24 @@ export function LibraryClient() {
     return () => window.removeEventListener("hoerbar:library-changed", refresh);
   }, [refresh]);
 
-  const empty = shows.length === 0 && recents.length === 0;
+  const empty =
+    shows.length === 0 &&
+    recents.length === 0 &&
+    recentSources.length === 0 &&
+    favoriteEpisodes.length === 0;
 
   return (
     <div>
+      <div className="mb-3">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--accent)] hover:underline transition"
+        >
+          <span>←</span>
+          <span>{t("common.back")} ({t("nav.listen")})</span>
+        </Link>
+      </div>
+
       <header className="mb-5 max-w-2xl">
         <h1 className="text-[27px] font-semibold">{t("library.title")}</h1>
         <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">{t("library.lede")}</p>
@@ -62,9 +86,12 @@ export function LibraryClient() {
           <LibraryPanel
             shows={shows}
             recents={recents}
+            recentSources={recentSources}
+            favoriteEpisodes={favoriteEpisodes}
             /* Opening a show from here hands off to the listening page, which
                is where a feed is actually browsed. */
             onOpenShow={(show) => router.push(`/?feed=${encodeURIComponent(show.feedUrl)}`)}
+            onOpenRecentSource={(source) => router.push(`/?feed=${encodeURIComponent(source.feedUrl)}`)}
             onPlayRecent={(entry) => {
               player.play({
                 id: entry.id,
@@ -81,10 +108,14 @@ export function LibraryClient() {
             }}
             onForget={(id) => forgetRecent(id)}
             onUnfollow={(show) => toggleShow(show)}
+            onToggleFavoriteEpisode={(fav) => {
+              toggleFavoriteEpisode(fav);
+              refresh();
+            }}
           />
 
-          {recents.length > 0 ? (
-            <div className="mt-8 border-t border-[var(--rule)] pt-4">
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--rule)] pt-4">
+            {recents.length > 0 ? (
               <button
                 type="button"
                 className="btn text-[12.5px]"
@@ -94,8 +125,27 @@ export function LibraryClient() {
               >
                 {t("library.clear")}
               </button>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-2">
+              <Link
+                href="/"
+                className="btn text-[12.5px] flex items-center gap-1.5"
+              >
+                <span aria-hidden>←</span>
+                <span>{t("common.back")} ({t("nav.listen")})</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="btn text-[12.5px] flex items-center gap-1"
+              >
+                <span aria-hidden>↑</span>
+                <span>{t("common.scrollToTop")}</span>
+              </button>
             </div>
-          ) : null}
+          </div>
         </>
       )}
     </div>
