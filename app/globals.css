@@ -468,3 +468,14 @@ h3 {
     height: 40px;
   }
 }
+
+/* Live caption & Running Transcript enhancements */
+.caption-glow {
+  text-shadow: 0 0 14px rgba(224, 135, 15, 0.5);
+}
+
+.glass-panel {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+

@@ -26,6 +26,16 @@ import { Art } from "./listen/Art";
 import { LibraryPanel } from "./listen/LibraryPanel";
 import { EpisodeSort } from "./listen/EpisodeSort";
 import { sortEpisodes, type SortKey } from "@/lib/episodeSort";
+import { LiveCaptionOverlay } from "./caption/LiveCaptionOverlay";
+import { LiveTranscriptPanel } from "./caption/LiveTranscriptPanel";
+import {
+  CaptionSettings,
+  DEFAULT_CAPTION_SETTINGS,
+  loadCaptionSettings,
+  saveCaptionSettings,
+  type CaptionSettingsState,
+} from "./caption/CaptionSettings";
+import { liveCaptionService } from "@/lib/liveCaption";
 
 const RECENT_KEY = "hoerbar.discover.v2";
 const PAGE_SIZE = 40;
@@ -80,10 +90,77 @@ export function ListenClient() {
   const [saved, setSaved] = useState(false);
   const [expandedDescription, setExpandedDescription] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
+  const [showCaption, setShowCaption] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [captionSettings, setCaptionSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
+  const [currentTime, setCurrentTime] = useState(0);
 
   const playing = player.track;
   const playerRef = useRef<HTMLDivElement | null>(null);
   const openedFeedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setCaptionSettings(loadCaptionSettings());
+  }, []);
+
+  useEffect(() => {
+    liveCaptionService.setTimeProvider(() => player.handle.getTime());
+  }, [player.handle]);
+
+  useEffect(() => {
+    let frame = 0;
+    const tick = () => {
+      frame = requestAnimationFrame(tick);
+      if (player.handle.isPlaying()) {
+        setCurrentTime(player.handle.getTime());
+      }
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [player.handle]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === "c" || event.key === "C") {
+        setShowCaption((prev) => !prev);
+      }
+      if (event.key === "t" || event.key === "T") {
+        setShowTranscript((prev) => !prev);
+      }
+      if (event.key === "+" || event.key === "=") {
+        setCaptionSettings((prev) => {
+          const next = { ...prev, fontSize: Math.min(34, prev.fontSize + 2) };
+          saveCaptionSettings(next);
+          return next;
+        });
+      }
+      if (event.key === "-" || event.key === "_") {
+        setCaptionSettings((prev) => {
+          const next = { ...prev, fontSize: Math.max(13, prev.fontSize - 2) };
+          saveCaptionSettings(next);
+          return next;
+        });
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const toggleLiveCaption = useCallback(async (useTabAudio = false) => {
+    if (showCaption && !useTabAudio) {
+      setShowCaption(false);
+      liveCaptionService.stopCapture();
+    } else {
+      setShowCaption(true);
+      await liveCaptionService.startCapture({
+        useTabAudio,
+        streamTitle: playing?.title,
+      });
+    }
+  }, [showCaption, playing?.title]);
 
   const refreshLibrary = useCallback(() => {
     setShows(listShows());
@@ -436,11 +513,111 @@ export function ListenClient() {
             ) : null}
           </div>
 
+          {/* Smart Live Caption & Transcript toolbar */}
+          <div className="border-t border-[var(--rule)] bg-[var(--surface)]/40 px-4 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void toggleLiveCaption(false)}
+                  className={`btn text-[12px] font-medium flex items-center gap-1.5 transition ${
+                    showCaption
+                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold"
+                      : "text-[var(--ink-soft)]"
+                  }`}
+                  title={`${t("caption.toggle")} (Hotkey: C)`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${showCaption ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
+                  <span>🎙️ {t("caption.toggle")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void toggleLiveCaption(true)}
+                  className="btn text-[11.5px] text-[var(--ink-faint)] hover:text-[var(--ink)] flex items-center gap-1"
+                  title="Capture direct tab audio without microphone"
+                >
+                  <span>⚡ {t("caption.tabAudio")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowTranscript((v) => !v)}
+                  className={`btn text-[12px] font-medium flex items-center gap-1.5 transition ${
+                    showTranscript
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)] font-semibold"
+                      : "text-[var(--ink-soft)]"
+                  }`}
+                  title={`${t("caption.transcript")} (Hotkey: T)`}
+                >
+                  <span>📜 {t("caption.transcript")}</span>
+                </button>
+              </div>
+
+              {/* Quick Text Size Controls */}
+              <div className="flex items-center rounded-lg border border-[var(--rule)] bg-[var(--paper-raised)] p-0.5 text-[11.5px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaptionSettings((prev) => {
+                      const next = { ...prev, fontSize: Math.max(13, prev.fontSize - 2) };
+                      saveCaptionSettings(next);
+                      return next;
+                    });
+                  }}
+                  className="rounded px-2 py-0.5 font-bold hover:bg-[var(--surface)] text-[var(--ink-soft)]"
+                  title="Decrease caption text size (Hotkey: -)"
+                >
+                  A-
+                </button>
+                <span className="px-1 font-mono text-[10.5px] text-[var(--ink-faint)]">
+                  {captionSettings.fontSize}px
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaptionSettings((prev) => {
+                      const next = { ...prev, fontSize: Math.min(34, prev.fontSize + 2) };
+                      saveCaptionSettings(next);
+                      return next;
+                    });
+                  }}
+                  className="rounded px-2 py-0.5 font-bold hover:bg-[var(--surface)] text-[var(--ink-soft)]"
+                  title="Increase caption text size (Hotkey: +)"
+                >
+                  A+
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="border-t border-[var(--rule)] px-4 py-3">
             <StreamControls handle={player.handle} />
           </div>
         </section>
       ) : null}
+
+      {/* Floating / Docked Live Caption Overlay */}
+      {playing && showCaption && (
+        <LiveCaptionOverlay
+          isPlaying={player.handle.isPlaying()}
+          onOpenTranscript={() => setShowTranscript(true)}
+          onClose={() => setShowCaption(false)}
+          settings={captionSettings}
+          onUpdateSettings={setCaptionSettings}
+        />
+      )}
+
+      {/* Interactive Running Transcript Panel */}
+      {playing && showTranscript && (
+        <LiveTranscriptPanel
+          currentTime={currentTime}
+          onSeek={(seconds) => player.handle.seekTo(seconds, true)}
+          onClose={() => setShowTranscript(false)}
+          settings={captionSettings}
+          onUpdateSettings={setCaptionSettings}
+        />
+      )}
 
       {/* ---------------- results ---------------- */}
       {results && results.length > 0 && !feed ? (

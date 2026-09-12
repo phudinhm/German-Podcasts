@@ -8,6 +8,7 @@ import { useUi } from "@/lib/i18n";
 import { usePlayer } from "./PlayerProvider";
 import { usePopout } from "./usePopout";
 import { Art } from "../listen/Art";
+import { AudioVisualizer } from "../caption/AudioVisualizer";
 
 const COLLAPSED_KEY = "hoerbar.dock.collapsed.v1";
 const SLOT_KEY = "hoerbar.dock.slot.v1";
@@ -307,6 +308,7 @@ export function MiniPlayer() {
             <span className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--rule)]">
               <span ref={fillRef} className="block h-full bg-[var(--accent-ring)]" style={{ width: 0 }} />
             </span>
+            <AudioVisualizer isPlaying={playing} barCount={6} />
           </div>
         </div>
 
