@@ -2,13 +2,10 @@
 
 import { useUi } from "@/lib/i18n";
 
-export type CaptionViewMode = "floating" | "side" | "theater";
-
 export interface CaptionSettingsState {
   fontSize: number; // in pixels, e.g. 14, 16, 18, 22, 26, 32
   lineHeight: number; // e.g. 1.4, 1.7, 2.0
   showTranslation: boolean;
-  viewMode: CaptionViewMode;
   autoScroll: boolean;
 }
 
@@ -18,7 +15,6 @@ export const DEFAULT_CAPTION_SETTINGS: CaptionSettingsState = {
   fontSize: 18,
   lineHeight: 1.6,
   showTranslation: true,
-  viewMode: "floating",
   autoScroll: true,
 };
 
@@ -99,50 +95,10 @@ export function CaptionSettings({ settings, onChange, compact = false }: Caption
             ? "border-[var(--accent)] text-[var(--accent)] font-medium"
             : "text-[var(--ink-faint)]"
         }`}
-        title="Toggle German/Vietnamese translation"
+        title={t("caption.bilingual")}
       >
-        <span>🌐 {t("caption.bilingual")}</span>
+        <span>{t("caption.bilingual")}</span>
       </button>
-
-      {/* View mode toggle */}
-      <div className="flex items-center rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-0.5">
-        <button
-          type="button"
-          onClick={() => update({ viewMode: "floating" })}
-          className={`rounded px-2 py-0.5 text-[11px] transition ${
-            settings.viewMode === "floating"
-              ? "bg-[var(--paper-raised)] font-medium text-[var(--ink)] shadow-xs"
-              : "text-[var(--ink-faint)] hover:text-[var(--ink)]"
-          }`}
-          title={t("caption.viewFloating")}
-        >
-          {t("caption.viewFloating")}
-        </button>
-        <button
-          type="button"
-          onClick={() => update({ viewMode: "side" })}
-          className={`rounded px-2 py-0.5 text-[11px] transition ${
-            settings.viewMode === "side"
-              ? "bg-[var(--paper-raised)] font-medium text-[var(--ink)] shadow-xs"
-              : "text-[var(--ink-faint)] hover:text-[var(--ink)]"
-          }`}
-          title={t("caption.viewSide")}
-        >
-          {t("caption.viewSide")}
-        </button>
-        <button
-          type="button"
-          onClick={() => update({ viewMode: "theater" })}
-          className={`rounded px-2 py-0.5 text-[11px] transition ${
-            settings.viewMode === "theater"
-              ? "bg-[var(--paper-raised)] font-medium text-[var(--ink)] shadow-xs"
-              : "text-[var(--ink-faint)] hover:text-[var(--ink)]"
-          }`}
-          title={t("caption.viewTheater")}
-        >
-          {t("caption.viewTheater")}
-        </button>
-      </div>
     </div>
   );
 }

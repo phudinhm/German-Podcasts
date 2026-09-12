@@ -42,7 +42,7 @@ import {
   saveCaptionSettings,
   type CaptionSettingsState,
 } from "./caption/CaptionSettings";
-import { liveCaptionService } from "@/lib/liveCaption";
+import { liveCaptionService, checkCaptionSupport, type CaptureMode } from "@/lib/liveCaption";
 
 const RECENT_KEY = "hoerbar.discover.v2";
 const PAGE_SIZE = 40;
@@ -100,6 +100,13 @@ export function ListenClient() {
   const [expandedDescription, setExpandedDescription] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
   const [showCaption, setShowCaption] = useState(false);
+  const [captureMode, setCaptureMode] = useState<CaptureMode>(null);
+  // Checked once: whether tab-sharing exists at all on this browser. iOS has
+  // neither tab-sharing nor (until recently) speech recognition, so this is
+  // what lets the toolbar be honest about what it can offer before anyone taps
+  // anything, rather than discovering it only after a failed attempt.
+  const [captionSupport] = useState(() => checkCaptionSupport());
+  const [captionNotice, setCaptionNotice] = useState<"denied" | "need-mic-confirm" | "unsupported" | "stopped" | null>(null);
   const { showTranscript, setShowTranscript } = player;
   const [captionSettings, setCaptionSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
   const [currentTime, setCurrentTime] = useState(0);
@@ -138,13 +145,84 @@ export function ListenClient() {
     return () => cancelAnimationFrame(frame);
   }, [player.handle]);
 
+  // Tracks whichever source is actually feeding the recognizer, so the
+  // toolbar can always say "tab audio" or "microphone" rather than a label
+  // that was only ever true for one of the two paths.
+  useEffect(() => liveCaptionService.onModeChange(setCaptureMode), []);
+
+  // Notices the engine stopping ON ITS OWN: a permanently failed recognizer,
+  // or the person using Chrome's own "Stop sharing" bar instead of this app's
+  // button. Deliberately a separate signal from onModeChange above - that one
+  // also fires to null on a plain, requested stop, and a requested stop and
+  // an engine failure look identical from "mode went to null" alone. Without
+  // this, the toolbar kept glowing "active" and the overlay kept showing
+  // "Listening..." forever after the capture had actually already died - a
+  // session that looks alive but is not is worse than one that visibly ended.
+  useEffect(
+    () =>
+      liveCaptionService.onUnexpectedEnd(() => {
+        setShowCaption(false);
+        setCaptionNotice("stopped");
+      }),
+    [],
+  );
+
+  const stopLiveCaption = useCallback(() => {
+    liveCaptionService.stopCapture();
+    setShowCaption(false);
+    setCaptionNotice(null);
+  }, []);
+
+  /** The default action: share this tab's audio. Never touches the microphone. */
+  const startTabCaption = useCallback(async () => {
+    setCaptionNotice(null);
+    // iOS has no tab-sharing API at all - no picker would even open - so this
+    // is decided before touching the network or any permission prompt, from a
+    // capability check rather than from a failed attempt.
+    if (!captionSupport.tabAudio) {
+      setCaptionNotice(captionSupport.speechRecognition ? "need-mic-confirm" : "unsupported");
+      return;
+    }
+    const result = await liveCaptionService.startTabAudioCapture();
+    if (result.ok) {
+      setShowCaption(true);
+      return;
+    }
+    // The share picker was cancelled or refused. Offer the microphone as a
+    // separate, explicit next step rather than reaching for it automatically.
+    setCaptionNotice(captionSupport.speechRecognition ? "need-mic-confirm" : "unsupported");
+  }, [captionSupport]);
+
+  /** The explicit, clearly-labelled fallback. Only this ever asks for the mic. */
+  const startMicCaption = useCallback(() => {
+    const result = liveCaptionService.startMicCapture();
+    setCaptionNotice(null);
+    if (result.ok) setShowCaption(true);
+  }, []);
+
+  const toggleLiveCaption = useCallback(() => {
+    if (showCaption) stopLiveCaption();
+    else void startTabCaption();
+  }, [showCaption, stopLiveCaption, startTabCaption]);
+
+  // A live capture has no natural end: without this, switching episodes kept
+  // captioning whatever the microphone or shared tab happened to be playing
+  // and attributing it to the new episode's timeline, and leaving this page
+  // entirely left the stream running with no control anywhere to stop it.
+  useEffect(() => {
+    stopLiveCaption();
+    liveCaptionService.clearTranscript();
+  }, [playing?.id, stopLiveCaption]);
+
+  useEffect(() => () => liveCaptionService.stopCapture(), []);
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === "c" || event.key === "C") {
-        setShowCaption((prev) => !prev);
+        toggleLiveCaption();
       }
       if (event.key === "t" || event.key === "T") {
         setShowTranscript((prev) => !prev);
@@ -166,20 +244,13 @@ export function ListenClient() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const toggleLiveCaption = useCallback(async (useTabAudio = false) => {
-    if (showCaption && !useTabAudio) {
-      setShowCaption(false);
-      liveCaptionService.stopCapture();
-    } else {
-      setShowCaption(true);
-      await liveCaptionService.startCapture({
-        useTabAudio,
-        streamTitle: playing?.title,
-      });
-    }
-  }, [showCaption, playing?.title]);
+    // toggleLiveCaption closes over showCaption by value (not the setState
+    // updater form), so it must be a dependency here or this effect keeps
+    // calling the version of it captured on the very first render - which is
+    // exactly the bug this replaced: "C" used to flip a display flag directly
+    // without starting or stopping the capture engine, leaving a mic or tab
+    // stream running invisibly after the overlay was "closed" from the keyboard.
+  }, [toggleLiveCaption]);
 
   const refreshLibrary = useCallback(() => {
     setShows(listShows());
@@ -613,49 +684,44 @@ export function ListenClient() {
             ) : null}
           </div>
 
-          {/* Smart Live Caption & Transcript toolbar */}
-          <div className="border-t border-[var(--rule)] bg-[var(--surface)]/40 px-4 py-2.5">
+          {/* Live caption and transcript toolbar */}
+          <div className="border-t border-[var(--rule)] bg-[var(--surface)] px-4 py-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => void toggleLiveCaption(false)}
-                  className={`btn text-[12px] font-medium flex items-center gap-1.5 transition ${
-                    showCaption
-                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold"
-                      : "text-[var(--ink-soft)]"
-                  }`}
-                  title={`${t("caption.toggle")} (Hotkey: C)`}
+                  onClick={toggleLiveCaption}
+                  className="btn text-[12px]"
+                  data-active={showCaption}
+                  title={`${t("caption.toggle")} (C)`}
                 >
-                  <span className={`h-2 w-2 rounded-full ${showCaption ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
-                  <span>🎙️ {t("caption.toggle")}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => void toggleLiveCaption(true)}
-                  className="btn text-[11.5px] text-[var(--ink-faint)] hover:text-[var(--ink)] flex items-center gap-1"
-                  title="Capture direct tab audio without microphone"
-                >
-                  <span>⚡ {t("caption.tabAudio")}</span>
+                  <span
+                    aria-hidden
+                    className={`h-1.5 w-1.5 rounded-full ${showCaption ? "bg-[var(--accent)]" : "bg-[var(--ink-faint)]"}`}
+                  />
+                  {t("caption.toggle")}
+                  {/* Which source is actually live, once one is: never claim "no
+                      mic" for a session that is reading the microphone. */}
+                  {showCaption && captureMode ? (
+                    <span className="chip text-[10px]">
+                      {captureMode === "tab" ? t("caption.modeTab") : t("caption.modeMic")}
+                    </span>
+                  ) : null}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setShowTranscript((v) => !v)}
-                  className={`btn text-[12px] font-medium flex items-center gap-1.5 transition ${
-                    showTranscript
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)] font-semibold"
-                      : "text-[var(--ink-soft)]"
-                  }`}
-                  title={`${t("caption.transcript")} (Hotkey: T)`}
+                  className="btn text-[12px]"
+                  data-active={showTranscript}
+                  title={`${t("caption.transcript")} (T)`}
                 >
-                  <span>📜 {t("caption.transcript")}</span>
+                  {t("caption.transcript")}
                 </button>
               </div>
 
-              {/* Quick Text Size Controls */}
-              <div className="flex items-center rounded-lg border border-[var(--rule)] bg-[var(--paper-raised)] p-0.5 text-[11.5px]">
+              {/* Text size */}
+              <div className="flex items-center rounded-full border border-[var(--rule)] bg-[var(--paper-raised)] p-0.5 text-[11.5px]">
                 <button
                   type="button"
                   onClick={() => {
@@ -665,8 +731,9 @@ export function ListenClient() {
                       return next;
                     });
                   }}
-                  className="rounded px-2 py-0.5 font-bold hover:bg-[var(--surface)] text-[var(--ink-soft)]"
-                  title="Decrease caption text size (Hotkey: -)"
+                  className="rounded-full px-2 py-0.5 font-semibold text-[var(--ink-soft)] hover:bg-[var(--surface)]"
+                  title={`${t("caption.zoomOut")} (-)`}
+                  aria-label={t("caption.zoomOut")}
                 >
                   A-
                 </button>
@@ -682,13 +749,46 @@ export function ListenClient() {
                       return next;
                     });
                   }}
-                  className="rounded px-2 py-0.5 font-bold hover:bg-[var(--surface)] text-[var(--ink-soft)]"
-                  title="Increase caption text size (Hotkey: +)"
+                  className="rounded-full px-2 py-0.5 font-semibold text-[var(--ink-soft)] hover:bg-[var(--surface)]"
+                  title={`${t("caption.zoomIn")} (+)`}
+                  aria-label={t("caption.zoomIn")}
                 >
                   A+
                 </button>
               </div>
             </div>
+
+            {/* Either the default (no-mic) attempt didn't work and this is the
+                one place the microphone is ever offered - always a second,
+                explicit tap, never a silent fallback - or a session that was
+                running died on its own and this says so instead of the
+                overlay just vanishing with no explanation. */}
+            {captionNotice ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--rule)] bg-[var(--paper-raised)] px-3 py-2 text-[12px] text-[var(--ink-soft)]">
+                <span className="flex-1">
+                  {captionNotice === "denied"
+                    ? t("caption.tabDenied")
+                    : captionNotice === "unsupported"
+                      ? t("caption.notSupported")
+                      : captionNotice === "stopped"
+                        ? t("caption.stopped")
+                        : t("caption.micExplain")}
+                </span>
+                {captionNotice === "need-mic-confirm" ? (
+                  <button type="button" className="btn px-2.5 py-1 text-[11.5px]" onClick={startMicCaption}>
+                    {t("caption.useMic")}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="icon-btn text-[13px]"
+                  aria-label={t("common.close")}
+                  onClick={() => setCaptionNotice(null)}
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="border-t border-[var(--rule)] px-4 py-3">
@@ -697,18 +797,19 @@ export function ListenClient() {
         </section>
       ) : null}
 
-      {/* Floating / Docked Live Caption Overlay */}
+      {/* Live caption line, shown only once a source is actually feeding it */}
       {playing && showCaption && (
         <LiveCaptionOverlay
           isPlaying={player.handle.isPlaying()}
+          mode={captureMode}
           onOpenTranscript={() => setShowTranscript(true)}
-          onClose={() => setShowCaption(false)}
+          onClose={stopLiveCaption}
           settings={captionSettings}
           onUpdateSettings={setCaptionSettings}
         />
       )}
 
-      {/* Interactive Running Transcript Panel */}
+      {/* Running transcript built from whatever has been captioned so far */}
       {playing && showTranscript && (
         <LiveTranscriptPanel
           currentTime={currentTime}

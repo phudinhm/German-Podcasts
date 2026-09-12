@@ -2,26 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useUi } from "@/lib/i18n";
-import {
-  liveCaptionService,
-  type CaptionSegment,
-} from "@/lib/liveCaption";
+import { liveCaptionService, type CaptionSegment, type CaptureMode } from "@/lib/liveCaption";
 import { AudioVisualizer } from "./AudioVisualizer";
-import {
-  CaptionSettings,
-  type CaptionSettingsState,
-} from "./CaptionSettings";
+import { CaptionSettings, type CaptionSettingsState } from "./CaptionSettings";
 
 interface LiveCaptionOverlayProps {
   isPlaying: boolean;
+  /** Which source is actually live, so the badge never claims one it isn't. */
+  mode: CaptureMode;
   onOpenTranscript: () => void;
   onClose: () => void;
   settings: CaptionSettingsState;
   onUpdateSettings: (settings: CaptionSettingsState) => void;
 }
 
+/**
+ * The current caption line, sitting under the player.
+ *
+ * Styled with the app's own tokens rather than a fixed dark glass panel, so it
+ * looks like part of Hörbar in both themes instead of a different product
+ * pasted underneath the player card.
+ */
 export function LiveCaptionOverlay({
   isPlaying,
+  mode,
   onOpenTranscript,
   onClose,
   settings,
@@ -36,10 +40,7 @@ export function LiveCaptionOverlay({
 
   useEffect(() => {
     liveCaptionService.setTargetLang(lang === "vi" ? "vi" : "en");
-    const unsub = liveCaptionService.onCaption((segment) => {
-      setCurrentCaption(segment);
-    });
-    return unsub;
+    return liveCaptionService.onCaption(setCurrentCaption);
   }, [lang]);
 
   const lookupWord = async (rawWord: string) => {
@@ -65,137 +66,104 @@ export function LiveCaptionOverlay({
     }
   };
 
-  // Split German sentence into clickable words
-  const renderInteractiveWords = (sentence: string) => {
-    const tokens = sentence.split(/(\s+)/);
-    return tokens.map((token, i) => {
-      if (/^\s+$/.test(token)) {
-        return <span key={i}>{token}</span>;
-      }
+  const renderInteractiveWords = (sentence: string) =>
+    sentence.split(/(\s+)/).map((token, i) => {
+      if (/^\s+$/.test(token)) return <span key={i}>{token}</span>;
       return (
         <button
           key={i}
           type="button"
           onClick={() => void lookupWord(token)}
-          className="inline-block rounded-xs hover:bg-[var(--accent)] hover:text-white px-0.5 transition cursor-pointer"
-          title="Click to translate this German word"
+          className="rounded px-0.5 transition hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+          title={t("caption.explain")}
         >
           {token}
         </button>
       );
     });
-  };
 
   const displayText = currentCaption?.text || t("caption.waiting");
   const translationText = currentCaption?.translation;
 
   return (
-    <div
-      className={`relative z-40 my-3 w-full rounded-2xl border border-white/20 bg-black/80 p-4 text-white shadow-2xl backdrop-blur-xl transition-all duration-200 dark:border-white/10 dark:bg-black/90 ${
-        settings.viewMode === "theater" ? "fixed inset-x-4 bottom-24 max-w-4xl mx-auto" : ""
-      }`}
-    >
-      {/* Header bar */}
-      <div className="mb-2 flex items-center justify-between border-b border-white/10 pb-2 text-[11.5px] text-zinc-300">
-        <div className="flex items-center gap-2">
-          <span className="flex h-2 w-2 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span className="font-semibold uppercase tracking-wider text-emerald-400">
-            {t("caption.toggle")}
-          </span>
-          <span className="hidden sm:inline-block rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            {t("caption.noMic")}
-          </span>
-          {currentCaption?.isFinal && (
-            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-              ✨ {t("caption.aiPolish")}
-            </span>
-          )}
+    <div className="card mt-4 p-3.5">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--rule)] pb-2 text-[11.5px] text-[var(--ink-faint)]">
+        <div className="flex flex-wrap items-center gap-2">
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+          <span className="font-medium text-[var(--ink)]">{t("caption.toggle")}</span>
+          {/* The mode is whatever is actually true right now, never a fixed
+              claim: earlier this always said "no mic needed" even while the
+              microphone was the thing being listened to. */}
+          {mode ? (
+            <span className="chip text-[10px]">{mode === "tab" ? t("caption.modeTab") : t("caption.modeMic")}</span>
+          ) : null}
+          {currentCaption?.isFinal ? (
+            <span className="chip chip-level text-[10px]">{t("caption.aiPolish")}</span>
+          ) : null}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <AudioVisualizer isPlaying={isPlaying} />
-
           <button
             type="button"
             onClick={() => setShowSettings((v) => !v)}
-            className="rounded px-2 py-1 text-zinc-300 hover:bg-white/10 hover:text-white transition"
+            className="btn px-2 py-1 text-[11px]"
+            aria-expanded={showSettings}
             title={t("caption.textSize")}
           >
-            ⚙️ {settings.fontSize}px
+            {settings.fontSize}px
           </button>
-
-          <button
-            type="button"
-            onClick={onOpenTranscript}
-            className="rounded bg-white/15 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-white/25 transition flex items-center gap-1"
-            title={t("caption.transcript")}
-          >
-            <span>📜 {t("caption.transcript")}</span>
+          <button type="button" onClick={onOpenTranscript} className="btn px-2.5 py-1 text-[11px]">
+            {t("caption.transcript")}
           </button>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-zinc-400 hover:bg-white/10 hover:text-white transition"
-            aria-label={t("common.close")}
-          >
-            ✕
+          <button type="button" onClick={onClose} className="icon-btn text-[15px]" aria-label={t("common.close")}>
+            ×
           </button>
         </div>
       </div>
 
-      {/* Settings drawer if toggled */}
-      {showSettings && (
-        <div className="mb-3 rounded-xl bg-white/10 p-2.5 backdrop-blur-md">
+      {showSettings ? (
+        <div className="mb-3 rounded-lg bg-[var(--surface)] p-2">
           <CaptionSettings settings={settings} onChange={onUpdateSettings} compact />
         </div>
-      )}
+      ) : null}
 
-      {/* Live caption text body */}
-      <div className="min-h-[48px] transition-all">
+      <div className="min-h-[48px]">
         <p
-          className="font-medium leading-relaxed tracking-wide text-zinc-50 select-text"
-          style={{
-            fontSize: `${settings.fontSize}px`,
-            lineHeight: settings.lineHeight,
-          }}
+          className="font-medium leading-relaxed text-[var(--ink)]"
+          style={{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight }}
         >
           {renderInteractiveWords(displayText)}
         </p>
 
-        {settings.showTranslation && translationText && (
+        {settings.showTranslation && translationText ? (
           <p
-            className="mt-1.5 font-normal text-amber-200/90 transition-opacity select-text"
-            style={{
-              fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.78))}px`,
-            }}
+            className="mt-1.5 text-[var(--ink-soft)]"
+            style={{ fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.78))}px` }}
           >
             {translationText}
           </p>
-        )}
+        ) : null}
       </div>
 
-      {/* Selected word popup */}
-      {selectedWord && (
-        <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-[12px] text-white">
-          <span className="font-semibold text-amber-300">{selectedWord}:</span>
+      {selectedWord ? (
+        <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-[var(--accent-soft)] px-3 py-1.5 text-[12px] text-[var(--ink)]">
+          <span className="font-semibold text-[var(--accent)]">{selectedWord}:</span>
           {loadingWord ? (
-            <span className="text-zinc-300 animate-pulse">{t("caption.translating")}</span>
+            <span className="text-[var(--ink-faint)]">{t("caption.translating")}</span>
           ) : (
-            <span className="font-medium text-zinc-100">{wordMeaning || "N/A"}</span>
+            <span>{wordMeaning || "-"}</span>
           )}
           <button
             type="button"
             onClick={() => setSelectedWord(null)}
-            className="ml-auto text-zinc-400 hover:text-white"
+            className="icon-btn ml-auto h-6 w-6 text-[13px]"
+            aria-label={t("common.close")}
           >
-            ✕
+            ×
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

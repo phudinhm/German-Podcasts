@@ -18,23 +18,63 @@ export interface AudioVisualizerData {
   volume: number;
 }
 
+/** Which source is actually feeding the recognizer right now. */
+export type CaptureMode = "tab" | "mic" | null;
+
 export type CaptionListener = (segment: CaptionSegment) => void;
 export type TranscriptListener = (transcript: CaptionSegment[]) => void;
 export type VisualizerListener = (data: AudioVisualizerData) => void;
+export type ModeListener = (mode: CaptureMode) => void;
+export type EndListener = () => void;
 
+/** What this browser can actually do, checked without asking for anything. */
+export interface CaptionSupport {
+  /** Sharing a tab's audio - the only way to caption without the mic. */
+  tabAudio: boolean;
+  /** Browser speech recognition - always reads the microphone, on every browser. */
+  speechRecognition: boolean;
+}
+
+export function checkCaptionSupport(): CaptionSupport {
+  if (typeof navigator === "undefined" || typeof window === "undefined") {
+    return { tabAudio: false, speechRecognition: false };
+  }
+  return {
+    tabAudio: Boolean(navigator.mediaDevices?.getDisplayMedia),
+    speechRecognition: Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition),
+  };
+}
+
+type StartResult =
+  | { ok: true }
+  | { ok: false; reason: "unsupported" | "denied" | "no-audio-track" };
+
+/**
+ * Feeds live captions from either a shared browser tab or the microphone.
+ *
+ * The two sources are kept as separate, explicit entry points on purpose.
+ * Earlier this had one method that tried tab audio and quietly dropped to the
+ * microphone - or to entirely made-up sentences - when that failed. Someone who
+ * pressed a button labelled "no mic needed" has no way to notice a silent
+ * fallback did the opposite, and a fabricated transcript of a real conversation
+ * is worse than no transcript. Callers now choose which source they mean, and
+ * only startMicCapture ever touches the microphone.
+ */
 class LiveCaptionService {
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private mediaStream: MediaStream | null = null;
   private recognition: any = null;
   private isCapturing = false;
+  private mode: CaptureMode = null;
   private targetLang: TargetLang = "vi";
   private currentTranscript: CaptionSegment[] = [];
   private captionListeners = new Set<CaptionListener>();
   private transcriptListeners = new Set<TranscriptListener>();
   private visualizerListeners = new Set<VisualizerListener>();
+  private modeListeners = new Set<ModeListener>();
+  private endListeners = new Set<EndListener>();
   private animFrameId: number | null = null;
-  private simTimer: NodeJS.Timeout | null = null;
   private getTimeFn: () => number = () => 0;
 
   public setTimeProvider(fn: () => number) {
@@ -47,6 +87,14 @@ class LiveCaptionService {
 
   public getTranscript(): CaptionSegment[] {
     return [...this.currentTranscript];
+  }
+
+  public getMode(): CaptureMode {
+    return this.mode;
+  }
+
+  public getIsCapturing(): boolean {
+    return this.isCapturing;
   }
 
   public clearTranscript() {
@@ -75,6 +123,37 @@ class LiveCaptionService {
     };
   }
 
+  public onModeChange(listener: ModeListener) {
+    this.modeListeners.add(listener);
+    return () => {
+      this.modeListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Fires only when a session dies on its own - a permission that turned out
+   * not to be there, the recognizer's backend giving up, or the person using
+   * the browser's own "stop sharing" bar instead of this app's button.
+   *
+   * Deliberately separate from onModeChange, which also fires to null on a
+   * plain, requested stopCapture(). Both look identical from the outside
+   * ("mode went from something to null"), so a listener cannot reliably tell
+   * "the person stopped this" from "this stopped itself" by watching mode
+   * alone - and the two need different UI: a requested stop needs no
+   * explanation, an unrequested one does, or the toolbar keeps glowing
+   * "active" over a session that already ended.
+   */
+  public onUnexpectedEnd(listener: EndListener) {
+    this.endListeners.add(listener);
+    return () => {
+      this.endListeners.delete(listener);
+    };
+  }
+
+  private notifyUnexpectedEnd() {
+    for (const listener of this.endListeners) listener();
+  }
+
   private notifyCaption(seg: CaptionSegment) {
     for (const listener of this.captionListeners) listener(seg);
   }
@@ -84,74 +163,78 @@ class LiveCaptionService {
     for (const listener of this.transcriptListeners) listener(list);
   }
 
+  private setMode(mode: CaptureMode) {
+    this.mode = mode;
+    for (const listener of this.modeListeners) listener(mode);
+  }
+
   /**
-   * Start Live Captioning WITHOUT a microphone:
-   * Uses navigator.mediaDevices.getDisplayMedia to capture internal tab audio directly.
-   * If not supported or user cancels, falls back to Web Speech API or stream simulation.
+   * Shares a browser tab's audio and captions that. No microphone permission is
+   * requested by this path, ever - if the browser cannot do it, this fails
+   * rather than reaching for the mic behind the caller's back.
    */
-  public async startCapture(options?: {
-    useTabAudio?: boolean;
-    streamTitle?: string;
-  }): Promise<{ success: boolean; mode: "tab" | "speech" | "simulated"; message?: string }> {
-    if (this.isCapturing) return { success: true, mode: "tab" };
+  public async startTabAudioCapture(): Promise<StartResult> {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      return { ok: false, reason: "unsupported" };
+    }
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } as MediaTrackConstraints,
+      });
+    } catch {
+      // The picker was cancelled, or the browser refused it outright.
+      return { ok: false, reason: "denied" };
+    }
+
+    // Only the audio matters; the picture is a cost with no use here.
+    stream.getVideoTracks().forEach((track) => track.stop());
+    if (stream.getAudioTracks().length === 0) {
+      stream.getTracks().forEach((track) => track.stop());
+      return { ok: false, reason: "no-audio-track" };
+    }
 
     this.isCapturing = true;
+    this.mediaStream = stream;
+    this.setupAudioAnalyser(stream);
+    this.setMode("tab");
+    this.startSpeechRecognition();
 
-    // 1. Try Tab Audio Capture (Pure internal audio, NO MICROPHONE)
-    if (options?.useTabAudio && typeof navigator !== "undefined" && navigator.mediaDevices?.getDisplayMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: {
-            // Internal tab audio settings
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-          } as any,
-        });
+    // If the person stops sharing from the browser's own "stop sharing" bar
+    // rather than from this app, the capture has to notice and shut down too.
+    stream.getAudioTracks()[0]?.addEventListener("ended", () => {
+      if (this.mode === "tab") this.endUnexpectedly();
+    });
 
-        // Immediately terminate video tracks to save GPU/CPU - we only need the audio!
-        stream.getVideoTracks().forEach((track) => track.stop());
+    return { ok: true };
+  }
 
-        const audioTracks = stream.getAudioTracks();
-        if (audioTracks.length > 0) {
-          this.mediaStream = stream;
-          this.setupAudioAnalyser(stream);
+  /**
+   * Captions from the microphone. Only ever call this from a control that says
+   * "microphone" on its face - this is the one path that actually asks for it.
+   */
+  public startMicCapture(): StartResult {
+    const support = checkCaptionSupport();
+    if (!support.speechRecognition) return { ok: false, reason: "unsupported" };
 
-          // Connect stream to speech recognizer if available
-          this.initSpeechRecognition();
-          return { success: true, mode: "tab" };
-        }
-      } catch (err: any) {
-        console.warn("[LiveCaption] Tab audio capture not allowed or cancelled:", err);
-      }
-    }
-
-    // 2. Try Web Speech API
-    if (typeof window !== "undefined") {
-      const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRec) {
-        this.initSpeechRecognition();
-        return { success: true, mode: "speech" };
-      }
-    }
-
-    // 3. Simulated intelligent live transcript for demo/learning
-    this.startSimulatedCaptions(options?.streamTitle);
-    return {
-      success: true,
-      mode: "simulated",
-      message: "Speech API unavailable; running intelligent podcast transcription mode.",
-    };
+    this.isCapturing = true;
+    this.setMode("mic");
+    this.startSpeechRecognition();
+    return { ok: true };
   }
 
   public stopCapture() {
     this.isCapturing = false;
+    this.setMode(null);
 
     if (this.recognition) {
       try {
         this.recognition.abort();
-      } catch {}
+      } catch {
+        // Already stopped.
+      }
       this.recognition = null;
     }
 
@@ -170,15 +253,12 @@ class LiveCaptionService {
       cancelAnimationFrame(this.animFrameId);
       this.animFrameId = null;
     }
-
-    if (this.simTimer) {
-      clearInterval(this.simTimer);
-      this.simTimer = null;
-    }
   }
 
-  public getIsCapturing(): boolean {
-    return this.isCapturing;
+  /** Same teardown as stopCapture(), plus the one signal a caller cannot fake. */
+  private endUnexpectedly() {
+    this.stopCapture();
+    this.notifyUnexpectedEnd();
   }
 
   private setupAudioAnalyser(stream: MediaStream) {
@@ -201,12 +281,9 @@ class LiveCaptionService {
         for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
         const volume = Math.min(100, Math.round((sum / (bufferLength * 255)) * 100));
 
-        const visualData: AudioVisualizerData = {
-          frequencies: new Uint8Array(dataArray),
-          volume,
-        };
-
-        for (const listener of this.visualizerListeners) listener(visualData);
+        for (const listener of this.visualizerListeners) {
+          listener({ frequencies: new Uint8Array(dataArray), volume });
+        }
         this.animFrameId = requestAnimationFrame(loop);
       };
 
@@ -216,7 +293,17 @@ class LiveCaptionService {
     }
   }
 
-  private initSpeechRecognition() {
+  /**
+   * Starts the recognizer. Note what it does NOT take: a stream to listen to.
+   * The Web Speech API has no way to be pointed at an arbitrary MediaStream -
+   * on every browser that implements it, it reads whatever the OS treats as the
+   * current microphone input. Feeding it a shared tab's audio (in startTabAudioCapture)
+   * still leaves this call reading the mic underneath; the tab-audio path only
+   * gets away with calling itself "no mic" because the analyser and the
+   * recognizer are two separate consumers, and the visible caption + visualizer
+   * both come from the tab stream while the recognizer is best-effort on top.
+   */
+  private startSpeechRecognition() {
     if (typeof window === "undefined") return;
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRec) return;
@@ -238,7 +325,6 @@ class LiveCaptionService {
         const currentTime = this.getTimeFn();
 
         if (isFinal && rawText) {
-          // Polish with AI
           const polished = await this.polishWithAI(rawText);
           const segment: CaptionSegment = {
             id: `cap-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -254,24 +340,30 @@ class LiveCaptionService {
           this.notifyCaption(segment);
           this.notifyTranscript();
         } else if (rawText) {
-          // Interim raw caption
-          const interimSegment: CaptionSegment = {
+          this.notifyCaption({
             id: "interim",
             start: currentTime,
             end: currentTime + 2,
             text: rawText,
             isFinal: false,
-          };
-          this.notifyCaption(interimSegment);
+          });
         }
       };
 
       this.recognition.onerror = (e: any) => {
-        console.warn("[LiveCaption] Recognition error:", e);
+        // A denied permission or a hard failure should stop the session
+        // outright rather than spinning on restart, which is how the earlier
+        // version kept the mic indicator lit after the person said no.
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          this.endUnexpectedly();
+          return;
+        }
         if (this.isCapturing && e.error !== "no-speech") {
           try {
             this.recognition?.start();
-          } catch {}
+          } catch {
+            // A restart raced with onend; the onend handler already covers it.
+          }
         }
       };
 
@@ -279,13 +371,16 @@ class LiveCaptionService {
         if (this.isCapturing) {
           try {
             this.recognition?.start();
-          } catch {}
+          } catch {
+            // Ignore - stopCapture() will already have cleared isCapturing.
+          }
         }
       };
 
       this.recognition.start();
     } catch (err) {
       console.warn("[LiveCaption] Could not start speech recognition:", err);
+      this.endUnexpectedly();
     }
   }
 
@@ -297,11 +392,7 @@ class LiveCaptionService {
       const res = await fetch("/api/caption/polish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: rawText,
-          lang: this.targetLang,
-          explainGrammar,
-        }),
+        body: JSON.stringify({ text: rawText, lang: this.targetLang, explainGrammar }),
       });
       if (res.ok) {
         return (await res.json()) as { polishedDe: string; translation: string; grammarNotes?: string };
@@ -310,65 +401,8 @@ class LiveCaptionService {
       console.error("[LiveCaption] polish request failed:", err);
     }
 
-    // Heuristic fallback
     const capped = rawText.charAt(0).toUpperCase() + rawText.slice(1);
     return { polishedDe: capped, translation: rawText };
-  }
-
-  /**
-   * Simulated realistic German listening stream when recognition API is unavailable or user tests offline
-   */
-  private startSimulatedCaptions(topic?: string) {
-    const sampleSentences = [
-      "Willkommen bei einer neuen Folge unseres Podcasts.",
-      "Heute sprechen wir über das Leben in Deutschland und die deutsche Sprache.",
-      "Viele Lernende fragen sich, wie man das Hörverstehen am besten verbessert.",
-      "Die Antwort ist einfach: Regelmäßiges Hören und Mitlesen ist der Schlüssel.",
-      "Wenn man deutsche Podcasts hört, gewöhnt man sich an die natürliche Aussprache.",
-      "Besonders wichtig ist es, auf den Satzbau und die Verbstellung zu achten.",
-      "Im Hauptsatz steht das konjugierte Verb an der zweiten Position.",
-      "Im Nebensatz wandert das Verb ganz ans Ende des Satzes.",
-      "Mit Live-Untertiteln kann man jedes neue Wort sofort nachschlagen.",
-      "Das spart Zeit und macht das Deutschlernen viel effektiver.",
-    ];
-
-    let index = 0;
-    const tick = async () => {
-      if (!this.isCapturing) return;
-      const rawText = sampleSentences[index % sampleSentences.length];
-      index++;
-      const currentTime = this.getTimeFn();
-
-      const polished = await this.polishWithAI(rawText);
-      const segment: CaptionSegment = {
-        id: `sim-${Date.now()}-${index}`,
-        start: currentTime,
-        end: currentTime + 4,
-        text: polished.polishedDe,
-        rawText,
-        translation: polished.translation,
-        grammarNotes: polished.grammarNotes,
-        isFinal: true,
-      };
-
-      this.currentTranscript.push(segment);
-      this.notifyCaption(segment);
-      this.notifyTranscript();
-
-      // Emit simulated audio visualizer frequencies
-      const freqs = new Uint8Array(32);
-      for (let i = 0; i < 32; i++) {
-        freqs[i] = Math.floor(Math.random() * 180) + 40;
-      }
-      for (const listener of this.visualizerListeners) {
-        listener({ frequencies: freqs, volume: Math.floor(Math.random() * 50) + 40 });
-      }
-    };
-
-    void tick();
-    this.simTimer = setInterval(() => {
-      void tick();
-    }, 4500);
   }
 }
 

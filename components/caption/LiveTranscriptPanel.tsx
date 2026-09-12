@@ -212,11 +212,8 @@ export function LiveTranscriptPanel({
   if (isCollapsed) {
     const activeSeg = segments.find((s) => s.id === activeSegmentId) ?? segments[segments.length - 1];
     return (
-      <div className="rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)]/90 px-3.5 py-2 shadow-xl backdrop-blur-xl flex items-center gap-3 transition-all duration-300">
-        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent)] shrink-0">
-          <span>📜</span>
-          <span>{formatTime(currentTime)}</span>
-        </span>
+      <div className="card flex items-center gap-3 px-3.5 py-2">
+        <span className="shrink-0 text-[12px] font-semibold text-[var(--accent)]">{formatTime(currentTime)}</span>
         <p className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--ink)]">
           {activeSeg?.text || t("caption.waiting")}
         </p>
@@ -228,7 +225,7 @@ export function LiveTranscriptPanel({
               className="btn px-2 py-0.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--surface)]"
               title={t("caption.expand")}
             >
-              ⤢ {t("caption.expand")}
+              {t("caption.expand")}
             </button>
           )}
           <button
@@ -245,17 +242,15 @@ export function LiveTranscriptPanel({
   }
 
   return (
-    <section className="card mt-4 flex flex-col overflow-hidden border border-[var(--rule)]/80 bg-[var(--paper-raised)]/95 shadow-2xl backdrop-blur-xl transition-all duration-200">
-      {/* Top Header & Toolbar */}
-      <div className="border-b border-[var(--rule)] p-3.5 bg-[var(--surface)]/60 backdrop-blur-md">
+    <section className="card mt-4 flex flex-col overflow-hidden">
+      <div className="border-b border-[var(--rule)] bg-[var(--surface)] p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-[18px]">📜</span>
             <h3 className="text-[15px] font-semibold text-[var(--ink)]">
               {t("caption.transcript")}
             </h3>
             <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
-              {segments.length} {t("common.episodes") !== "episodes" ? "câu" : "lines"}
+              {segments.length} {t("caption.lines")}
             </span>
           </div>
 
@@ -303,7 +298,7 @@ export function LiveTranscriptPanel({
                 onClick={() => setSearchQuery("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ink-faint)] hover:text-[var(--ink)]"
               >
-                ✕
+                ×
               </button>
             )}
           </div>
@@ -315,7 +310,7 @@ export function LiveTranscriptPanel({
               className="btn px-2.5 py-1 text-[11.5px]"
               title={t("caption.copyAll")}
             >
-              {copied ? `✓ ${t("caption.copied")}` : `📋 ${t("caption.copyAll")}`}
+              {copied ? t("caption.copied") : t("caption.copyAll")}
             </button>
             <button
               type="button"
@@ -339,8 +334,8 @@ export function LiveTranscriptPanel({
 
       {/* Selected word definition card */}
       {selectedWord && (
-        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-[12.5px] text-amber-900 dark:text-amber-200 flex items-center gap-2">
-          <span className="font-bold">📖 {selectedWord}:</span>
+        <div className="flex items-center gap-2 border-b border-[var(--rule)] bg-[var(--accent-soft)] px-4 py-2 text-[12.5px] text-[var(--ink)]">
+          <span className="font-semibold text-[var(--accent)]">{selectedWord}:</span>
           {loadingWord ? (
             <span className="animate-pulse">{t("caption.translating")}</span>
           ) : (
@@ -349,9 +344,9 @@ export function LiveTranscriptPanel({
           <button
             type="button"
             onClick={() => setSelectedWord(null)}
-            className="ml-auto text-amber-700 dark:text-amber-300 hover:opacity-80"
+            className="icon-btn ml-auto h-6 w-6 text-[13px]"
           >
-            ✕
+            ×
           </button>
         </div>
       )}
@@ -365,10 +360,10 @@ export function LiveTranscriptPanel({
         {filteredSegments.length === 0 ? (
           <div className="py-12 text-center text-[13px] text-[var(--ink-faint)]">
             {searchQuery ? (
-              <p>Không tìm thấy câu nào phù hợp với từ khóa.</p>
+              <p>{t("caption.noMatch")}</p>
             ) : (
               <div className="space-y-2">
-                <p className="animate-pulse">🎙️ {t("caption.waiting")}</p>
+                <p>{t("caption.waiting")}</p>
                 <p className="text-[11.5px] max-w-sm mx-auto text-[var(--ink-faint)]">
                   {t("caption.chromeTip")}
                 </p>
@@ -412,7 +407,7 @@ export function LiveTranscriptPanel({
                       title={t("caption.readAloud")}
                       aria-label={t("caption.readAloud")}
                     >
-                      🔊
+                      &#9835;
                     </button>
                   </div>
 
@@ -455,7 +450,7 @@ export function LiveTranscriptPanel({
                     {/* AI Grammar explanation if loaded */}
                     {grammarNotes[seg.id] && (
                       <div className="mt-2 rounded-lg bg-[var(--accent-soft)] p-2 text-[12px] text-[var(--accent)] border border-[var(--accent)]/20">
-                        <span className="font-semibold">💡 {t("caption.explain")}:</span>{" "}
+                        <span className="font-semibold">{t("caption.explain")}:</span>{" "}
                         {grammarNotes[seg.id]}
                       </div>
                     )}
@@ -469,7 +464,7 @@ export function LiveTranscriptPanel({
                       className="rounded p-1 text-[11.5px] text-[var(--ink-faint)] hover:text-[var(--accent)]"
                       title={t("caption.explain")}
                     >
-                      {loadingGrammarId === seg.id ? "…" : "✨ AI"}
+                      {loadingGrammarId === seg.id ? "…" : "AI"}
                     </button>
                   </div>
                 </div>
@@ -485,9 +480,9 @@ export function LiveTranscriptPanel({
           <button
             type="button"
             onClick={resumeAutoScroll}
-            className="btn btn-primary py-1 px-3 text-[11.5px] shadow-sm animate-bounce"
+            className="btn btn-primary py-1 px-3 text-[11.5px]"
           >
-            ↓ {t("caption.jumpCurrent")}
+            {t("caption.jumpCurrent")}
           </button>
         </div>
       )}
