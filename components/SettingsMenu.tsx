@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { UI_LANGS, useUi } from "@/lib/i18n";
-import { useTheme, type Theme } from "@/lib/theme";
+import { useTheme, type AccentColor, type Theme } from "@/lib/theme";
 import { useZoom } from "@/lib/zoom";
 
 const THEME_GLYPH: Record<"light" | "dark", string> = { light: "☀", dark: "☾" };
@@ -12,6 +12,18 @@ const THEME_OPTIONS: Array<{ value: Theme; key: "theme.system" | "theme.light" |
   { value: "system", key: "theme.system", glyph: "◐" },
   { value: "light", key: "theme.light", glyph: "☀" },
   { value: "dark", key: "theme.dark", glyph: "☾" },
+];
+
+const ACCENT_OPTIONS: Array<{
+  value: AccentColor;
+  key: "theme.accentAmber" | "theme.accentBlue" | "theme.accentGreen" | "theme.accentPurple" | "theme.accentRose";
+  swatch: string;
+}> = [
+  { value: "amber", key: "theme.accentAmber", swatch: "#e0870f" },
+  { value: "blue", key: "theme.accentBlue", swatch: "#2f83b8" },
+  { value: "green", key: "theme.accentGreen", swatch: "#5f8f3e" },
+  { value: "purple", key: "theme.accentPurple", swatch: "#8659b3" },
+  { value: "rose", key: "theme.accentRose", swatch: "#c1466a" },
 ];
 
 /**
@@ -25,7 +37,7 @@ const THEME_OPTIONS: Array<{ value: Theme; key: "theme.system" | "theme.light" |
  */
 export function SettingsMenu() {
   const { t, lang, setLang } = useUi();
-  const { theme, resolved, setTheme } = useTheme();
+  const { theme, resolved, setTheme, accent, setAccent } = useTheme();
   const { zoom, zoomIn, zoomOut, resetZoom } = useZoom();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -89,6 +101,34 @@ export function SettingsMenu() {
               {t(option.key)}
             </button>
           ))}
+
+          <p className="mt-1 border-t border-[var(--rule)] px-2 pb-1 pt-2 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">
+            {t("theme.accent")}
+          </p>
+          <div className="flex items-center gap-1.5 px-2 py-1">
+            {ACCENT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={accent === option.value}
+                onClick={() => setAccent(option.value)}
+                title={t(option.key)}
+                aria-label={t(option.key)}
+                className={`grid h-6 w-6 place-items-center rounded-full border transition ${
+                  accent === option.value
+                    ? "border-[var(--ink)]"
+                    : "border-transparent hover:border-[var(--rule)]"
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className="h-4 w-4 rounded-full"
+                  style={{ background: option.swatch }}
+                />
+              </button>
+            ))}
+          </div>
 
           <p className="mt-1 border-t border-[var(--rule)] px-2 pb-1 pt-2 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">
             {t("common.uiLanguage")}

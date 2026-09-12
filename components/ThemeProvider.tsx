@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { THEME_KEY, THEMES, ThemeContext, type Theme } from "@/lib/theme";
+import {
+  ACCENT_COLORS,
+  ACCENT_KEY,
+  THEME_KEY,
+  THEMES,
+  ThemeContext,
+  type AccentColor,
+  type Theme,
+} from "@/lib/theme";
 
 function systemPrefersDark(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -18,6 +26,7 @@ function systemPrefersDark(): boolean {
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("system");
+  const [accent, setAccentState] = useState<AccentColor>("amber");
   const [systemDark, setSystemDark] = useState(false);
 
   useEffect(() => {
@@ -26,6 +35,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (stored && THEMES.includes(stored)) setThemeState(stored);
     } catch {
       // Storage can be unavailable. Following the system is a fine default.
+    }
+    try {
+      const storedAccent = window.localStorage.getItem(ACCENT_KEY) as AccentColor | null;
+      if (storedAccent && ACCENT_COLORS.includes(storedAccent)) setAccentState(storedAccent);
+    } catch {
+      // Same fallback as above: the default amber accent is a fine default.
     }
     setSystemDark(systemPrefersDark());
   }, []);
@@ -52,6 +67,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     else root.setAttribute("data-theme", next);
   }, []);
 
+  const setAccent = useCallback((next: AccentColor) => {
+    setAccentState(next);
+    try {
+      window.localStorage.setItem(ACCENT_KEY, next);
+    } catch {
+      // Not remembering the choice is not worth an error.
+    }
+    const root = document.documentElement;
+    if (next === "amber") root.removeAttribute("data-accent");
+    else root.setAttribute("data-accent", next);
+  }, []);
+
   const resolved = theme === "system" ? (systemDark ? "dark" : "light") : theme;
 
   // The browser paints its own chrome from this: the address bar on Android,
@@ -62,6 +89,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (meta) meta.setAttribute("content", resolved === "dark" ? "#0d0e11" : "#ffffff");
   }, [resolved]);
 
-  const value = useMemo(() => ({ theme, resolved, setTheme }), [theme, resolved, setTheme]);
+  const value = useMemo(
+    () => ({ theme, resolved, setTheme, accent, setAccent }),
+    [theme, resolved, setTheme, accent, setAccent],
+  );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
