@@ -49,9 +49,6 @@ export function MiniPlayer() {
   const [showPopoutCaption, setShowPopoutCaption] = useState(true);
   const [showPopoutTranscript, setShowPopoutTranscript] = useState(false);
 
-  // MiniPlayer caption & transcript toggles
-  const [showCaptionBubble, setShowCaptionBubble] = useState(false);
-  const [showTranscriptDrawer, setShowTranscriptDrawer] = useState(false);
   const [currentCaption, setCurrentCaption] = useState<CaptionSegment | null>(null);
   const [transcriptList, setTranscriptList] = useState<CaptionSegment[]>([]);
 
@@ -253,47 +250,41 @@ export function MiniPlayer() {
               <button
                 type="button"
                 onClick={() => setShowPopoutCaption((v) => !v)}
-                className={`btn px-2 py-1 text-[11px] ${
-                  showPopoutCaption
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 font-semibold"
-                    : "text-[var(--ink-faint)]"
-                }`}
-                title="Bật phụ đề trực tiếp trong cửa sổ nổi"
+                className="btn px-2 py-1 text-[11px]"
+                data-active={showPopoutCaption}
+                title={t("caption.toggle")}
               >
-                🎙️ {t("caption.toggle")}
+                {t("caption.toggle")}
               </button>
               <button
                 type="button"
                 onClick={() => setShowPopoutTranscript((v) => !v)}
-                className={`btn px-2 py-1 text-[11px] ${
-                  showPopoutTranscript
-                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)] font-semibold"
-                    : "text-[var(--ink-faint)]"
-                }`}
-                title="Bật transcript trong cửa sổ nổi"
+                className="btn px-2 py-1 text-[11px]"
+                data-active={showPopoutTranscript}
+                title={t("caption.transcript")}
               >
-                📜 {t("caption.transcript")}
+                {t("caption.transcript")}
               </button>
             </div>
           </div>
 
-          {/* Live Caption Display inside PiP Window */}
+          {/* The current caption line, if a session is capturing one */}
           {showPopoutCaption && (
-            <div className="rounded-xl border border-[var(--rule)] bg-[var(--surface)]/80 p-2 text-[12px] leading-snug">
-              <p className="font-medium text-[var(--ink)] line-clamp-2">
-                {currentCaption?.text || "🎙️ Đang nghe podcast..."}
+            <div className="rounded-xl border border-[var(--rule)] bg-[var(--surface)] p-2 text-[12px] leading-snug">
+              <p className="line-clamp-2 font-medium text-[var(--ink)]">
+                {currentCaption?.text || t("caption.waiting")}
               </p>
               {currentCaption?.translation && (
-                <p className="mt-0.5 text-[11px] text-[var(--accent)] font-normal line-clamp-1">
+                <p className="mt-0.5 line-clamp-1 text-[11px] font-normal text-[var(--accent)]">
                   {currentCaption.translation}
                 </p>
               )}
             </div>
           )}
 
-          {/* Transcript snippet inside PiP Window */}
+          {/* The last few lines of the running transcript */}
           {showPopoutTranscript && (
-            <div className="max-h-24 overflow-y-auto space-y-1 rounded-lg border border-[var(--rule)] bg-[var(--surface)]/50 p-2 text-[11px]">
+            <div className="max-h-24 space-y-1 overflow-y-auto rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-2 text-[11px]">
               {transcriptList.slice(-4).map((s) => (
                 <div key={s.id} className="flex gap-1.5">
                   <span className="font-mono text-[10px] text-[var(--ink-faint)] shrink-0">▶</span>
@@ -332,7 +323,7 @@ export function MiniPlayer() {
     return null;
   }
 
-  const isExpandedDesktop = isHovered || pinned || showCaptionBubble || showTranscriptDrawer;
+  const isExpandedDesktop = isHovered || pinned;
 
   return (
     <>
@@ -348,62 +339,11 @@ export function MiniPlayer() {
           onMouseLeave={handleMouseLeave}
           className="pointer-events-auto flex flex-col items-end transition-all duration-300 ease-out"
         >
-          {/* Floating Caption Bubble above MiniPlayer if toggled */}
-          {showCaptionBubble && (
-            <div className="mb-2 w-[420px] rounded-2xl border border-white/20 bg-black/90 p-3 text-white shadow-2xl backdrop-blur-xl">
-              <div className="flex items-center justify-between pb-1.5 border-b border-white/10 text-[11px] text-zinc-400">
-                <span className="font-semibold text-emerald-400">🎙️ {t("caption.toggle")}</span>
-                <button
-                  type="button"
-                  onClick={() => setShowCaptionBubble(false)}
-                  className="text-zinc-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-              <p className="mt-1.5 text-[13.5px] font-medium leading-relaxed text-zinc-100">
-                {currentCaption?.text || t("caption.waiting")}
-              </p>
-              {currentCaption?.translation && (
-                <p className="mt-1 text-[12px] text-amber-300/90">{currentCaption.translation}</p>
-              )}
-            </div>
-          )}
-
-          {/* Floating Transcript Drawer above MiniPlayer if toggled */}
-          {showTranscriptDrawer && (
-            <div className="mb-2 max-h-56 w-[420px] overflow-y-auto rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)] p-3 shadow-2xl backdrop-blur-xl space-y-2 text-[12px]">
-              <div className="flex items-center justify-between pb-1 border-b border-[var(--rule)] font-semibold text-[var(--ink)]">
-                <span>📜 {t("caption.transcript")}</span>
-                <button
-                  type="button"
-                  onClick={() => setShowTranscriptDrawer(false)}
-                  className="text-[var(--ink-faint)] hover:text-[var(--ink)]"
-                >
-                  ✕
-                </button>
-              </div>
-              {transcriptList.slice(-6).map((s) => (
-                <div
-                  key={s.id}
-                  onClick={() => handle.seekTo(s.start, true)}
-                  className="cursor-pointer rounded p-1.5 hover:bg-[var(--surface)] transition"
-                >
-                  <span className="font-mono text-[10px] text-[var(--accent)] mr-1.5 font-bold">
-                    ▶ {formatTime(s.start)}
-                  </span>
-                  <span className="text-[var(--ink)] font-medium">{s.text}</span>
-                  {s.translation && <p className="text-[11px] text-[var(--ink-faint)] mt-0.5">{s.translation}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* COLLAPSED PILL STATE */}
           {!isExpandedDesktop ? (
             <div
               className="group flex items-center gap-2.5 rounded-full border border-white/20 bg-black/85 dark:bg-black/90 px-3.5 py-1.5 text-white shadow-2xl backdrop-blur-2xl transition-all duration-300 hover:scale-[1.03] cursor-pointer"
-              title="Rê chuột để mở rộng trình phát"
+              title={t("player.hoverExpand")}
             >
               <Art src={track.artwork} alt="" size={30} seed={track.showTitle || track.title} />
               <div className="max-w-[160px] truncate text-[12px] font-medium leading-tight">
@@ -479,10 +419,12 @@ export function MiniPlayer() {
                   <button
                     type="button"
                     onClick={togglePinned}
-                    className={`icon-btn h-7 w-7 text-[12px] ${pinned ? "text-[var(--accent)] font-bold" : "text-[var(--ink-faint)]"}`}
-                    title={pinned ? "Bỏ ghim (tự thu gọn)" : "Ghim mở rộng"}
+                    className={`icon-btn h-7 w-7 text-[12px] ${pinned ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}
+                    aria-label={pinned ? t("player.unpinExpanded") : t("player.pinExpanded")}
+                    aria-pressed={pinned}
+                    title={pinned ? t("player.unpinExpanded") : t("player.pinExpanded")}
                   >
-                    📌
+                    &#128204;
                   </button>
 
                   {/* Popout PiP button */}
@@ -520,35 +462,12 @@ export function MiniPlayer() {
                 <AudioVisualizer isPlaying={playing} barCount={6} />
               </div>
 
-              {/* Bottom Action Row: Transport & Quick Caption/Transcript */}
-              <div className="flex items-center justify-between pt-1 border-t border-[var(--rule)]">
+              {/* Live captions and the running transcript are already reachable
+                  from the toolbar under the player and from the floating panel
+                  that follows you across pages - a third copy here duplicated
+                  both, in a third visual style. */}
+              <div className="flex items-center pt-1 border-t border-[var(--rule)]">
                 <div className="flex items-center gap-2">{transport}</div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowCaptionBubble((v) => !v)}
-                    className={`btn px-2 py-0.5 text-[11px] ${
-                      showCaptionBubble
-                        ? "border-emerald-500 text-emerald-600 font-semibold"
-                        : "text-[var(--ink-soft)]"
-                    }`}
-                    title="Bật phụ đề nhanh"
-                  >
-                    🎙️
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowTranscriptDrawer((v) => !v)}
-                    className={`btn px-2 py-0.5 text-[11px] ${
-                      showTranscriptDrawer
-                        ? "border-[var(--accent)] text-[var(--accent)] font-semibold"
-                        : "text-[var(--ink-soft)]"
-                    }`}
-                    title="Bật transcript nhanh"
-                  >
-                    📜
-                  </button>
-                </div>
               </div>
             </div>
           )}
@@ -601,10 +520,11 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={() => setMobileDrawerOpen((v) => !v)}
-              className="btn h-10 w-10 rounded-full p-0 text-[14px] text-zinc-300 hover:text-white"
-              title="Phụ đề & Transcript"
+              className="btn h-10 w-10 rounded-full p-0 text-[13px] text-zinc-300 hover:text-white"
+              aria-label={t("caption.openSheet")}
+              title={t("caption.openSheet")}
             >
-              📜
+              <span aria-hidden>&#8801;</span>
             </button>
             <button
               type="button"
@@ -643,28 +563,29 @@ export function MiniPlayer() {
                 type="button"
                 onClick={() => setMobileDrawerOpen(false)}
                 className="icon-btn text-[18px]"
+                aria-label={t("common.close")}
               >
-                ✕
+                ×
               </button>
             </div>
 
-            {/* Current Live Caption */}
-            <div className="my-3 rounded-2xl bg-black/85 p-3.5 text-white shadow-md">
-              <span className="text-[10.5px] font-semibold text-emerald-400 uppercase tracking-wider">
-                🎙️ {t("caption.toggle")}
+            {/* Current live caption */}
+            <div className="my-3 rounded-xl bg-[var(--surface)] p-3.5">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                {t("caption.toggle")}
               </span>
-              <p className="mt-1 text-[15px] font-medium leading-relaxed text-zinc-100">
+              <p className="mt-1 text-[15px] font-medium leading-relaxed text-[var(--ink)]">
                 {currentCaption?.text || t("caption.waiting")}
               </p>
               {currentCaption?.translation && (
-                <p className="mt-1 text-[13px] text-amber-300">{currentCaption.translation}</p>
+                <p className="mt-1 text-[13px] text-[var(--ink-soft)]">{currentCaption.translation}</p>
               )}
             </div>
 
-            {/* Running Transcript list */}
+            {/* Running transcript */}
             <div className="mt-2 space-y-2">
               <h5 className="text-[12.5px] font-semibold text-[var(--ink)]">
-                📜 {t("caption.transcript")} ({transcriptList.length})
+                {t("caption.transcript")} ({transcriptList.length})
               </h5>
               <div className="max-h-48 overflow-y-auto space-y-2 rounded-xl border border-[var(--rule)] p-2">
                 {transcriptList.map((s) => (
