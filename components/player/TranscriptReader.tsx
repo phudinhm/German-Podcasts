@@ -9,15 +9,15 @@ interface TranscriptReaderProps {
   currentTime: number;
   onSeek: (seconds: number) => void;
   showTranslation: boolean;
+  /** Which single translated language to show beneath the active line - the
+   * reader shows one language at a time (with a picker to switch), not
+   * every translation stacked together. */
+  translationLang: "de" | "en" | "vi";
   fontSize: number;
 }
 
-function translationFor(seg: CaptionSegment): string | null {
-  if (seg.translations) {
-    const parts = Object.values(seg.translations).filter(Boolean);
-    if (parts.length) return parts.join("  ·  ");
-  }
-  return seg.translation ?? null;
+function translationFor(seg: CaptionSegment, lang: "de" | "en" | "vi"): string | null {
+  return seg.translations?.[lang] ?? seg.translation ?? null;
 }
 
 /**
@@ -31,7 +31,13 @@ function translationFor(seg: CaptionSegment): string | null {
  * panel (this page's toolbar, the floating one); this screen is for reading
  * along with the episode, not for reference.
  */
-export function TranscriptReader({ currentTime, onSeek, showTranslation, fontSize }: TranscriptReaderProps) {
+export function TranscriptReader({
+  currentTime,
+  onSeek,
+  showTranslation,
+  translationLang,
+  fontSize,
+}: TranscriptReaderProps) {
   const { t } = useUi();
   const { track, onGenerateTranscript, generatingTranscript, generateTranscriptError } = usePlayer();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
@@ -94,7 +100,7 @@ export function TranscriptReader({ currentTime, onSeek, showTranslation, fontSiz
         >
           {segments.map((seg) => {
             const isActive = seg.id === activeSegmentId;
-            const translation = isActive && showTranslation ? translationFor(seg) : null;
+            const translation = isActive && showTranslation ? translationFor(seg, translationLang) : null;
             return (
               <span key={seg.id}>
                 <span

@@ -47,3 +47,23 @@ export function detectSpokenLang(feedLanguageTag: string | null | undefined, sam
 export function translationTargetsFor(source: SpokenLang): Array<"de" | "en" | "vi"> {
   return source === "de" ? ["en", "vi"] : ["de", "vi"];
 }
+
+/** Which of the two translated languages the reader wants shown, or "auto"
+ * to take whichever `translationTargetsFor` lists first for the episode. */
+export type TranslationLangPreference = "auto" | "de" | "en" | "vi";
+
+/**
+ * Turns a preference into one of the two languages actually available for
+ * this episode's source language - a preference left over from a previous
+ * episode (say "en", picked while listening to German) is not a valid
+ * target once the source itself is English, so it falls back to "auto"
+ * rather than showing nothing.
+ */
+export function resolveTranslationLang(
+  source: SpokenLang,
+  preferred: TranslationLangPreference,
+): "de" | "en" | "vi" {
+  const targets = translationTargetsFor(source);
+  if (preferred !== "auto" && (targets as string[]).includes(preferred)) return preferred;
+  return targets[0];
+}

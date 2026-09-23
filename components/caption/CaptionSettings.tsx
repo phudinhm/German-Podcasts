@@ -2,6 +2,12 @@
 
 import type { CSSProperties } from "react";
 import { useUi } from "@/lib/i18n";
+import {
+  resolveTranslationLang,
+  translationTargetsFor,
+  type SpokenLang,
+  type TranslationLangPreference,
+} from "@/lib/language";
 
 /**
  * A reading surface, independent of the site's own light/dark appearance.
@@ -77,6 +83,10 @@ export interface CaptionSettingsState {
   captionTheme: CaptionTheme;
   /** Fades the floating caption bar after a few quiet seconds. */
   autoHide: boolean;
+  /** Which of the episode's two translated languages to show when
+   * `showTranslation` is on. "auto" takes whichever `translationTargetsFor`
+   * lists first for the episode's own spoken language. */
+  translationLang: TranslationLangPreference;
 }
 
 const STORAGE_KEY = "hoerbar.caption.settings.v1";
@@ -88,6 +98,7 @@ export const DEFAULT_CAPTION_SETTINGS: CaptionSettingsState = {
   autoScroll: true,
   captionTheme: "modern",
   autoHide: true,
+  translationLang: "auto",
 };
 
 export function loadCaptionSettings(): CaptionSettingsState {
@@ -110,9 +121,19 @@ interface CaptionSettingsProps {
   settings: CaptionSettingsState;
   onChange: (updated: CaptionSettingsState) => void;
   compact?: boolean;
+  /** The episode's spoken language. Only when this is known can the two
+   * valid translation targets be worked out, so the language picker chips
+   * render only where a caller passes it (the full-screen reader, so far). */
+  sourceLang?: SpokenLang;
 }
 
-export function CaptionSettings({ settings, onChange, compact = false }: CaptionSettingsProps) {
+const LANG_LABEL: Record<"de" | "en" | "vi", "caption.langDe" | "caption.langEn" | "caption.langVi"> = {
+  de: "caption.langDe",
+  en: "caption.langEn",
+  vi: "caption.langVi",
+};
+
+export function CaptionSettings({ settings, onChange, compact = false, sourceLang }: CaptionSettingsProps) {
   const { t } = useUi();
 
   const update = (partial: Partial<CaptionSettingsState>) => {
@@ -171,6 +192,33 @@ export function CaptionSettings({ settings, onChange, compact = false }: Caption
       >
         <span>{t("caption.bilingual")}</span>
       </button>
+
+      {/* Which of the two translated languages to show alongside the
+          original - only meaningful once a source language narrows it to
+          exactly two candidates. */}
+      {sourceLang && settings.showTranslation ? (
+        <div className="flex items-center gap-1 rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-0.5">
+          {translationTargetsFor(sourceLang).map((lang) => {
+            const active = resolveTranslationLang(sourceLang, settings.translationLang) === lang;
+            return (
+              <button
+                key={lang}
+                type="button"
+                onClick={() => update({ translationLang: lang })}
+                aria-pressed={active}
+                title={t("caption.translateTo", { lang: t(LANG_LABEL[lang]) })}
+                className={`rounded px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wide transition ${
+                  active
+                    ? "bg-[var(--accent)] text-[var(--paper)]"
+                    : "text-[var(--ink-faint)] hover:bg-[var(--paper-raised)]"
+                }`}
+              >
+                {lang}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* Auto-hide toggle for the floating caption bar */}
       <button
