@@ -65,7 +65,7 @@ export function GlobalFloatingTranscript() {
   return (
     <aside
       aria-label="Floating Transcript"
-      className="fixed z-40 max-w-xl transition-all duration-300 pointer-events-auto sm:left-6 sm:w-[480px] max-sm:inset-x-3"
+      className="hidden sm:block fixed z-40 max-w-xl transition-all duration-300 pointer-events-auto sm:left-6 sm:w-[480px] max-sm:inset-x-3 drop-shadow-[0_12px_40px_rgba(0,0,0,0.15)]"
       style={{
         // Enough clearance for the mini player's tallest state (an open card,
         // not the tucked button) plus the safe area, so a phone where both
@@ -81,6 +81,7 @@ export function GlobalFloatingTranscript() {
         onUpdateSettings={handleUpdateSettings}
         isCollapsed={transcriptCollapsed}
         onToggleCollapse={() => setTranscriptCollapsed((v) => !v)}
+        isFloating={true}
       />
     </aside>
   );

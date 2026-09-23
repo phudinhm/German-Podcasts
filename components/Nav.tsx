@@ -55,7 +55,7 @@ export function Nav() {
         translation. Settings sits outside the scroller so it stays reachable
         whatever the labels do.
       */}
-      <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto text-[13.5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-1 sm:text-[14px]">
+      <nav className="hidden sm:flex min-w-0 items-center gap-0.5 overflow-x-auto text-[13.5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-1 sm:text-[14px]">
         {ITEMS.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
