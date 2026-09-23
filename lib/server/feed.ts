@@ -44,6 +44,10 @@ export interface FeedResult {
   link: string | null;
   format: "rss";
   episodes: FeedEpisode[];
+  /** The channel's declared <language> (e.g. "de-DE", "en-US"), for anything
+   * that needs to know what language the audio is actually in - such as which
+   * way round to auto-translate a published transcript. */
+  language: string | null;
 }
 
 /**
@@ -207,5 +211,6 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
     link: tag(header, "link"),
     format: "rss",
     episodes,
+    language: tag(header, "language") ?? tag(header, "itunes:language"),
   };
 }

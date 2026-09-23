@@ -5,9 +5,18 @@ import type { TargetLang } from "../types";
  * DeepL, then Google, then Anthropic. Every one of them is optional; when no
  * key is configured the caller falls back to the bundled lexicon and says so
  * in the response, rather than silently returning nothing.
+ *
+ * Every provider here was originally built assuming the source is always
+ * German, since that covered every caller: word lookups and live-caption
+ * polishing both work from German speech. The published-transcript feature
+ * added a source that can be English too (an English-language show
+ * translated into German and Vietnamese), so `Lang` widens the target set
+ * to include "de" and every provider now takes an explicit source - callers
+ * that only ever had German audio just don't pass one.
  */
+export type Lang = "de" | TargetLang;
 
-const DEEPL_TARGET: Record<TargetLang, string> = { en: "EN-GB", vi: "VI" };
+const DEEPL_LANG: Record<Lang, string> = { de: "DE", en: "EN-GB", vi: "VI" };
 
 export type TranslationSource = "deepl" | "google" | "anthropic" | "mymemory" | "none";
 
@@ -33,19 +42,24 @@ export function hasKeyedProvider(): boolean {
   );
 }
 
-export async function translate(text: string, lang: TargetLang): Promise<TranslationResult> {
+export async function translate(
+  text: string,
+  targetLang: Lang,
+  sourceLang: Lang = "de",
+): Promise<TranslationResult> {
   if (!text.trim()) return { text: null, source: "none" };
+  if (targetLang === sourceLang) return { text, source: "none" };
 
-  const deepl = await translateWithDeepL(text, lang);
+  const deepl = await translateWithDeepL(text, targetLang, sourceLang);
   if (deepl) return { text: deepl, source: "deepl" };
 
-  const google = await translateWithGoogle(text, lang);
+  const google = await translateWithGoogle(text, targetLang, sourceLang);
   if (google) return { text: google, source: "google" };
 
-  const anthropic = await translateWithAnthropic(text, lang);
+  const anthropic = await translateWithAnthropic(text, targetLang, sourceLang);
   if (anthropic) return { text: anthropic, source: "anthropic" };
 
-  const free = await translateWithMyMemory(text, lang);
+  const free = await translateWithMyMemory(text, targetLang, sourceLang);
   if (free) return { text: free, source: "mymemory" };
 
   return { text: null, source: "none" };
@@ -62,7 +76,7 @@ const MYMEMORY_LIMIT = 500;
  * this. But it means a fresh clone translates captions out of the box, which
  * is the difference between the feature existing and not.
  */
-async function translateWithMyMemory(text: string, lang: TargetLang): Promise<string | null> {
+async function translateWithMyMemory(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
   const trimmed = text.trim();
   if (!trimmed) return null;
 
@@ -86,7 +100,7 @@ async function translateWithMyMemory(text: string, lang: TargetLang): Promise<st
   const out: string[] = [];
   for (const part of parts) {
     try {
-      const params = new URLSearchParams({ q: part, langpair: `de|${lang}` });
+      const params = new URLSearchParams({ q: part, langpair: `${sourceLang}|${lang}` });
       const email = process.env.MYMEMORY_EMAIL;
       // Supplying a contact address raises the anonymous quota.
       if (email) params.set("de", email);
@@ -116,7 +130,7 @@ async function translateWithMyMemory(text: string, lang: TargetLang): Promise<st
   return out.join(" ") || null;
 }
 
-async function translateWithDeepL(text: string, lang: TargetLang): Promise<string | null> {
+async function translateWithDeepL(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
   const key = process.env.DEEPL_API_KEY;
   if (!key) return null;
   const host = process.env.DEEPL_API_HOST ?? "api-free.deepl.com";
@@ -129,8 +143,8 @@ async function translateWithDeepL(text: string, lang: TargetLang): Promise<strin
       },
       body: JSON.stringify({
         text: [text],
-        source_lang: "DE",
-        target_lang: DEEPL_TARGET[lang],
+        source_lang: DEEPL_LANG[sourceLang].replace("-GB", ""),
+        target_lang: DEEPL_LANG[lang],
       }),
     });
     if (!response.ok) {
@@ -145,14 +159,14 @@ async function translateWithDeepL(text: string, lang: TargetLang): Promise<strin
   }
 }
 
-async function translateWithGoogle(text: string, lang: TargetLang): Promise<string | null> {
+async function translateWithGoogle(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
   const key = process.env.GOOGLE_TRANSLATE_API_KEY;
   if (!key) return null;
   try {
     const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ q: text, source: "de", target: lang, format: "text" }),
+      body: JSON.stringify({ q: text, source: sourceLang, target: lang, format: "text" }),
     });
     if (!response.ok) {
       console.error("[translate] Google", response.status);
@@ -168,10 +182,11 @@ async function translateWithGoogle(text: string, lang: TargetLang): Promise<stri
   }
 }
 
-async function translateWithAnthropic(text: string, lang: TargetLang): Promise<string | null> {
-  const target = lang === "en" ? "English" : "Vietnamese";
+const LANG_NAME: Record<Lang, string> = { de: "German", en: "English", vi: "Vietnamese" };
+
+async function translateWithAnthropic(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
   const result = await askClaude({
-    system: `You are a translator. Translate the German input into natural ${target}. Reply with the translation only, no quotes and no commentary.`,
+    system: `You are a translator. Translate the ${LANG_NAME[sourceLang]} input into natural ${LANG_NAME[lang]}. Reply with the translation only, no quotes and no commentary.`,
     user: text,
     maxTokens: 400,
   });

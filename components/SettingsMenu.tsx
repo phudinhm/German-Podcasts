@@ -16,14 +16,25 @@ const THEME_OPTIONS: Array<{ value: Theme; key: "theme.system" | "theme.light" |
 
 const ACCENT_OPTIONS: Array<{
   value: AccentColor;
-  key: "theme.accentAmber" | "theme.accentBlue" | "theme.accentGreen" | "theme.accentPurple" | "theme.accentRose";
+  key:
+    | "theme.accentAmber"
+    | "theme.accentBlue"
+    | "theme.accentTeal"
+    | "theme.accentGreen"
+    | "theme.accentIndigo"
+    | "theme.accentPurple"
+    | "theme.accentRose"
+    | "theme.accentGold";
   swatch: string;
 }> = [
   { value: "amber", key: "theme.accentAmber", swatch: "#e0870f" },
   { value: "blue", key: "theme.accentBlue", swatch: "#2f83b8" },
+  { value: "teal", key: "theme.accentTeal", swatch: "#1f9188" },
   { value: "green", key: "theme.accentGreen", swatch: "#5f8f3e" },
+  { value: "indigo", key: "theme.accentIndigo", swatch: "#5c6bc4" },
   { value: "purple", key: "theme.accentPurple", swatch: "#8659b3" },
   { value: "rose", key: "theme.accentRose", swatch: "#c1466a" },
+  { value: "gold", key: "theme.accentGold", swatch: "#b6911f" },
 ];
 
 /**
@@ -105,7 +116,7 @@ export function SettingsMenu() {
           <p className="mt-1 border-t border-[var(--rule)] px-2 pb-1 pt-2 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">
             {t("theme.accent")}
           </p>
-          <div className="flex items-center gap-1.5 px-2 py-1">
+          <div className="flex flex-wrap items-center gap-1.5 px-2 py-1">
             {ACCENT_OPTIONS.map((option) => (
               <button
                 key={option.value}

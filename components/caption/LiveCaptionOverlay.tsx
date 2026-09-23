@@ -86,7 +86,7 @@ export function LiveCaptionOverlay({
   const translationText = currentCaption?.translation;
 
   return (
-    <div className="card mt-4 p-3.5" style={captionThemeStyle(settings.captionTheme)}>
+    <div className="card glass-panel mt-4 p-3.5" style={captionThemeStyle(settings.captionTheme)}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--rule)] pb-2 text-[11.5px] text-[var(--ink-faint)]">
         <div className="flex flex-wrap items-center gap-2">
           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />

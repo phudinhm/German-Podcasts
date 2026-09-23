@@ -20,6 +20,8 @@
     "lib/types.ts",
     "lib/server/feed.ts",
     "lib/server/transcript.ts",
+    "lib/server/transcribe.ts",
+    "lib/language.ts",
     "lib/media.ts",
     "lib/server/discover.ts",
     "lib/server/range.ts",
