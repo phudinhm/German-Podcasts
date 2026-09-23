@@ -43,19 +43,10 @@ import {
   type CaptionSettingsState,
 } from "./caption/CaptionSettings";
 import { liveCaptionService, checkCaptionSupport, type CaptureMode } from "@/lib/liveCaption";
-import { pickBestTranscript } from "@/lib/server/transcript";
-import { detectSpokenLang, translationTargetsFor } from "@/lib/language";
+import { detectSpokenLang } from "@/lib/language";
 
 const RECENT_KEY = "hoerbar.discover.v2";
 const PAGE_SIZE = 40;
-
-/** How many lines of a published transcript get auto-translated. A cap
- * rather than the whole thing: a long interview can run past a thousand
- * lines, and this bounds the request count that follows without hiding the
- * feature on the shows people actually listen to end to end. */
-const AUTO_TRANSLATE_MAX_LINES = 400;
-/** Lines per translation request - matches /api/translate's own batch cap. */
-const TRANSLATE_CHUNK_SIZE = 40;
 
 const ORIGIN_LABEL: Record<DiscoverResult["origin"], string> = {
   apple: "Apple Podcasts",
@@ -219,68 +210,12 @@ export function ListenClient() {
   // captioning whatever the microphone or shared tab happened to be playing
   // and attributing it to the new episode's timeline, and leaving this page
   // entirely left the stream running with no control anywhere to stop it.
+  // The transcript itself is cleared and reloaded by PlayerProvider, which
+  // owns `track` and is the shared ancestor of every surface that renders
+  // one - this page, the full-screen view, and the floating panel.
   useEffect(() => {
     stopLiveCaption();
-    liveCaptionService.clearTranscript();
   }, [playing?.id, stopLiveCaption]);
-
-  // Some feeds already ship a real transcript for the episode (the
-  // Podcasting 2.0 tag Apple Podcasts is one of the bigger publishers of) -
-  // when one exists there is nothing to capture live, so this loads it
-  // straight into the same panel instead. Runs after the clear above, and on
-  // every device: unlike live capture this never touches a microphone or a
-  // shared tab, so it works on mobile too.
-  useEffect(() => {
-    const best = playing?.transcripts?.length ? pickBestTranscript(playing.transcripts) : null;
-    if (!best) return;
-    let cancelled = false;
-    const sourceLang = playing?.sourceLang ?? "de";
-
-    async function run() {
-      const res = await fetch("/api/transcript", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // best is narrowed non-null by the guard above; TypeScript does not
-        // carry that narrowing into a nested function's closure.
-        body: JSON.stringify({ url: best!.url, type: best!.type }),
-      }).catch(() => null);
-      if (!res?.ok || cancelled) return;
-      const data = (await res.json()) as {
-        segments?: Array<{ id: string; start: number; end: number; text: string }>;
-      };
-      const segments = data.segments ?? [];
-      if (cancelled || segments.length === 0) return;
-      liveCaptionService.loadTranscript(segments.map((s) => ({ ...s, isFinal: true })));
-
-      // Auto-translate every line into whichever two languages the listener
-      // did not already get from the audio itself. Capped and chunked: a
-      // long episode can carry hundreds of lines, and this is one request
-      // per chunk per language rather than one per line.
-      const toTranslate = segments.slice(0, AUTO_TRANSLATE_MAX_LINES);
-      for (const targetLang of translationTargetsFor(sourceLang)) {
-        for (let i = 0; i < toTranslate.length; i += TRANSLATE_CHUNK_SIZE) {
-          if (cancelled) return;
-          const chunk = toTranslate.slice(i, i + TRANSLATE_CHUNK_SIZE);
-          const translateRes = await fetch("/api/translate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ texts: chunk.map((s) => s.text), lang: targetLang, sourceLang }),
-          }).catch(() => null);
-          if (!translateRes?.ok || cancelled) continue;
-          const translated = (await translateRes.json()) as { texts?: Array<string | null> };
-          const updates = chunk
-            .map((seg, idx) => ({ id: seg.id, text: translated.texts?.[idx] ?? "" }))
-            .filter((update) => update.text);
-          liveCaptionService.setSegmentTranslations(targetLang, updates);
-        }
-      }
-    }
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [playing?.id, playing?.sourceLang]);
 
   useEffect(() => () => liveCaptionService.stopCapture(), []);
 

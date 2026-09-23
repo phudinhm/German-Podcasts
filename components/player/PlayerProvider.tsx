@@ -13,6 +13,9 @@ import { useMediaElement, type MediaElementState } from "./useMediaElement";
 import { NOOP_PLAYER, type PlayerHandle } from "./types";
 import type { FeedTranscript } from "@/lib/server/feed";
 import type { SpokenLang } from "@/lib/language";
+import { pickBestTranscript } from "@/lib/server/transcript";
+import { liveCaptionService } from "@/lib/liveCaption";
+import { generateTranscript, loadPublishedTranscript, type GenerateTranscriptError } from "@/lib/transcriptPipeline";
 
 export interface Track {
   /** Stable id, used to tell "same episode" from "new episode". */
@@ -82,6 +85,14 @@ interface PlayerContextValue {
    * survives whatever route is underneath it. */
   fullscreenOpen: boolean;
   setFullscreenOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  /**
+   * Generates a transcript from the current episode's own audio, for one
+   * with no published transcript. Explicitly triggered - see
+   * lib/transcriptPipeline.ts for why this never runs on its own.
+   */
+  onGenerateTranscript: () => void;
+  generatingTranscript: boolean;
+  generateTranscriptError: GenerateTranscriptError | null;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -263,6 +274,54 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!track) setFullscreenOpen(false);
   }, [track]);
 
+  // Some feeds already ship a real transcript for the episode (the
+  // Podcasting 2.0 tag Apple Podcasts is one of the bigger publishers of) -
+  // when one exists there is nothing to capture live, so this loads it
+  // straight into the shared transcript instead. Lives here, not on any one
+  // page, because `track` does too, and every surface that shows a
+  // transcript (this page, the full-screen view, the floating panel) needs
+  // the same one loaded regardless of which of them happens to be mounted.
+  useEffect(() => {
+    liveCaptionService.clearTranscript();
+    const best = track?.transcripts?.length ? pickBestTranscript(track.transcripts) : null;
+    if (!best) return;
+    let cancelled = false;
+    void loadPublishedTranscript(best, track?.sourceLang ?? "de", () => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [track?.id, track?.sourceLang]);
+
+  // The explicit fallback for an episode whose feed has no transcript at
+  // all: generates one from the audio itself via a free speech-to-text
+  // provider, only when someone asks for it.
+  const [generatingTranscript, setGeneratingTranscript] = useState(false);
+  const [generateTranscriptError, setGenerateTranscriptError] = useState<GenerateTranscriptError | null>(null);
+  const generateCancelledRef = useRef(false);
+
+  const onGenerateTranscript = useCallback(() => {
+    if (!track?.url || generatingTranscript) return;
+    generateCancelledRef.current = false;
+    setGeneratingTranscript(true);
+    setGenerateTranscriptError(null);
+    void generateTranscript(track.url, track.sourceLang ?? "de", () => generateCancelledRef.current).then(
+      (result) => {
+        if (generateCancelledRef.current) return;
+        setGeneratingTranscript(false);
+        if (!result.ok) setGenerateTranscriptError(result.error);
+      },
+    );
+  }, [track?.url, track?.sourceLang, generatingTranscript]);
+
+  useEffect(() => {
+    generateCancelledRef.current = false;
+    setGeneratingTranscript(false);
+    setGenerateTranscriptError(null);
+    return () => {
+      generateCancelledRef.current = true;
+    };
+  }, [track?.id]);
+
   const value = useMemo<PlayerContextValue>(
     () => ({
       track,
@@ -283,6 +342,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setTranscriptCollapsed,
       fullscreenOpen,
       setFullscreenOpen,
+      onGenerateTranscript,
+      generatingTranscript,
+      generateTranscriptError,
     }),
     [
       track,
@@ -299,6 +361,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       showTranscript,
       transcriptCollapsed,
       fullscreenOpen,
+      onGenerateTranscript,
+      generatingTranscript,
+      generateTranscriptError,
     ],
   );
 

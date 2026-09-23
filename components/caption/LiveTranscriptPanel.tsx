@@ -6,6 +6,7 @@ import {
   liveCaptionService,
   type CaptionSegment,
 } from "@/lib/liveCaption";
+import { usePlayer } from "@/components/player/PlayerProvider";
 import {
   CaptionSettings,
   captionThemeStyle,
@@ -43,6 +44,7 @@ export function LiveTranscriptPanel({
   onToggleCollapse,
 }: LiveTranscriptPanelProps) {
   const { t, lang } = useUi();
+  const { track, onGenerateTranscript, generatingTranscript, generateTranscriptError } = usePlayer();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [autoScroll, setAutoScroll] = useState(settings.autoScroll);
@@ -408,12 +410,31 @@ export function LiveTranscriptPanel({
           <div className="py-12 text-center text-[13px] text-[var(--ink-faint)]">
             {searchQuery ? (
               <p>{t("caption.noMatch")}</p>
-            ) : (
+            ) : generatingTranscript ? (
               <div className="space-y-2">
-                <p>{t("caption.waiting")}</p>
+                <p className="font-medium text-[var(--ink)]">{t("caption.generating")}</p>
                 <p className="text-[11.5px] max-w-sm mx-auto text-[var(--ink-faint)]">
-                  {t("caption.chromeTip")}
+                  {t("caption.generatingHint")}
                 </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p>{t("caption.noTranscript")}</p>
+                {generateTranscriptError ? (
+                  <p className="text-[11.5px] max-w-sm mx-auto text-rose-500">
+                    {generateTranscriptError === "too-large"
+                      ? t("caption.generateTooLarge")
+                      : generateTranscriptError === "no-key"
+                        ? t("caption.generateNoProvider")
+                        : t("caption.generateFailed")}
+                  </p>
+                ) : null}
+                {track?.url ? (
+                  <button type="button" onClick={onGenerateTranscript} className="btn btn-primary px-3.5 py-1.5 text-[12.5px]">
+                    {t("caption.generateTranscript")}
+                  </button>
+                ) : null}
+                <p className="text-[11.5px] max-w-sm mx-auto text-[var(--ink-faint)]">{t("caption.chromeTip")}</p>
               </div>
             )}
           </div>
