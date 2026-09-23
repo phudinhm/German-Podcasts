@@ -13,6 +13,14 @@
  */
 const MAX_ITEMS = 300;
 
+/** A publisher-supplied transcript, from the Podcasting 2.0 namespace tag. */
+export interface FeedTranscript {
+  url: string;
+  /** MIME type as the feed declared it, e.g. "application/srt", "text/vtt", "application/json". */
+  type: string;
+  language?: string;
+}
+
 export interface FeedEpisode {
   guid: string;
   title: string;
@@ -25,6 +33,8 @@ export interface FeedEpisode {
   image: string | null;
   /** The episode's own page, for linking out. */
   pageUrl?: string;
+  /** Ready-made transcripts the publisher already shipped, if any. */
+  transcripts: FeedTranscript[];
 }
 
 export interface FeedResult {
@@ -95,6 +105,39 @@ function attr(block: string, name: string, attribute: string): string | null {
   return match ? decodeXmlText(match[1]) : null;
 }
 
+function attrFromTagText(tagText: string, attribute: string): string | null {
+  const match = tagText.match(new RegExp(`${attribute}\\s*=\\s*["']([^"']*)["']`, "i"));
+  return match ? decodeXmlText(match[1]) : null;
+}
+
+/**
+ * `<podcast:transcript>` (Podcasting 2.0 namespace) can appear more than once
+ * per item - one entry per format a publisher shipped - so this collects all
+ * of them rather than the single first match `attr()` returns.
+ */
+function extractTranscripts(item: string): FeedTranscript[] {
+  const tags = item.match(/<podcast:transcript\b[^>]*\/?>/gi) ?? [];
+  const transcripts: FeedTranscript[] = [];
+
+  for (const rawTag of tags) {
+    const url = attrFromTagText(rawTag, "url");
+    if (!url) continue;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") continue;
+      transcripts.push({
+        url: parsed.toString(),
+        type: attrFromTagText(rawTag, "type") ?? "text/plain",
+        language: attrFromTagText(rawTag, "language") ?? undefined,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return transcripts;
+}
+
 /** iTunes durations arrive as seconds, mm:ss or hh:mm:ss. */
 export function parseDuration(value: string | null): number | null {
   if (!value) return null;
@@ -153,6 +196,7 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
       durationSec: parseDuration(tag(item, "itunes:duration")),
       publishedAt: tag(item, "pubDate"),
       image: attr(item, "itunes:image", "href"),
+      transcripts: extractTranscripts(item),
     });
   }
 

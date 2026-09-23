@@ -102,6 +102,17 @@ class LiveCaptionService {
     this.notifyTranscript();
   }
 
+  /**
+   * Loads a transcript the publisher already shipped, so the panel has
+   * something to show without anyone capturing a single word live. Distinct
+   * from the live-capture path on purpose: this never touches `mode` or
+   * `isCapturing`, since nothing is actually being listened to right now.
+   */
+  public loadTranscript(segments: CaptionSegment[]) {
+    this.currentTranscript = segments;
+    this.notifyTranscript();
+  }
+
   public onCaption(listener: CaptionListener) {
     this.captionListeners.add(listener);
     return () => {

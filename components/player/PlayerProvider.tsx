@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useMediaElement, type MediaElementState } from "./useMediaElement";
 import { NOOP_PLAYER, type PlayerHandle } from "./types";
+import type { FeedTranscript } from "@/lib/server/feed";
 
 export interface Track {
   /** Stable id, used to tell "same episode" from "new episode". */
@@ -31,6 +32,8 @@ export interface Track {
    * used to drop you back at the beginning.
    */
   startAt?: number;
+  /** Transcripts the publisher already shipped for this episode, if any. */
+  transcripts?: FeedTranscript[];
 }
 
 interface PlayerContextValue {

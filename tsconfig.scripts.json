@@ -19,6 +19,7 @@
   "files": [
     "lib/types.ts",
     "lib/server/feed.ts",
+    "lib/server/transcript.ts",
     "lib/media.ts",
     "lib/server/discover.ts",
     "lib/server/range.ts",
