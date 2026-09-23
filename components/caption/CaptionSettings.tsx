@@ -220,6 +220,20 @@ export function CaptionSettings({ settings, onChange, compact = false, sourceLan
         </div>
       ) : null}
 
+      {/* Auto-scroll toggle - off lets someone read back through past lines
+          (or ahead) without the view snapping back to the current one on
+          every segment change. */}
+      <button
+        type="button"
+        onClick={() => update({ autoScroll: !settings.autoScroll })}
+        className={`btn px-2.5 py-1 text-[11.5px] ${
+          settings.autoScroll ? "border-[var(--accent)] text-[var(--accent)] font-medium" : "text-[var(--ink-faint)]"
+        }`}
+        title={t("caption.autoScroll")}
+      >
+        <span>{t("caption.autoScroll")}</span>
+      </button>
+
       {/* Auto-hide toggle for the floating caption bar */}
       <button
         type="button"

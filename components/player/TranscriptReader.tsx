@@ -13,6 +13,9 @@ interface TranscriptReaderProps {
    * reader shows one language at a time (with a picker to switch), not
    * every translation stacked together. */
   translationLang: "de" | "en" | "vi";
+  /** Off lets someone scroll back through earlier lines - or ahead - without
+   * the view snapping back to the current one on every segment change. */
+  autoScroll: boolean;
   fontSize: number;
 }
 
@@ -36,6 +39,7 @@ export function TranscriptReader({
   onSeek,
   showTranslation,
   translationLang,
+  autoScroll,
   fontSize,
 }: TranscriptReaderProps) {
   const { t } = useUi();
@@ -53,8 +57,9 @@ export function TranscriptReader({
   )?.id;
 
   useEffect(() => {
+    if (!autoScroll) return;
     activeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [activeSegmentId]);
+  }, [activeSegmentId, autoScroll]);
 
   if (segments.length === 0) {
     return (
