@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useUi } from "@/lib/i18n";
 import { usePlayer } from "./PlayerProvider";
 import { Transport } from "./Transport";
 import { Art } from "../listen/Art";
-import { LiveTranscriptPanel } from "../caption/LiveTranscriptPanel";
+import { TranscriptReader } from "./TranscriptReader";
 import {
+  CaptionSettings,
   DEFAULT_CAPTION_SETTINGS,
   loadCaptionSettings,
   saveCaptionSettings,
@@ -14,21 +15,42 @@ import {
 } from "../caption/CaptionSettings";
 
 /**
+ * Overrides the same custom properties the site's own theme sets, fixed to
+ * a dark palette regardless of which theme is active.
+ *
+ * Every "now playing" screen - Apple Podcasts, Apple Music, Spotify - reads
+ * dark text over artwork the same way whether the phone is in light or dark
+ * mode, because the artwork's own brightness varies too much for a
+ * theme-driven palette to stay legible on all of it. Everything under this
+ * still uses var(--ink) etc., so buttons, the transport and the transcript
+ * inherit it for free rather than needing their own dark variants.
+ */
+const NOW_PLAYING_VARS: CSSProperties = {
+  ["--paper" as string]: "#0b0c0e",
+  ["--paper-raised" as string]: "#1e2024",
+  ["--ink" as string]: "#f5f5f4",
+  ["--ink-soft" as string]: "#c7c7c5",
+  ["--ink-faint" as string]: "#9a9a97",
+  ["--rule" as string]: "#3a3c40",
+  ["--surface" as string]: "#25272b",
+  ["--accent" as string]: "#ffffff",
+  ["--accent-ring" as string]: "#ffffff",
+  ["--accent-soft" as string]: "#2c2e32",
+};
+
+/**
  * The "now playing" screen every music and podcast app has: everything else
- * steps aside, the artwork fills the background, and the transcript scrolls
- * alongside the transport. Mounted once at the root - like the mini player it
- * replaces - so it opens over whatever page is underneath and survives
- * navigation while it's up.
+ * steps aside, the artwork fills the background, and the transcript reads
+ * along beneath the transport. Mounted once at the root - like the mini
+ * player it replaces - so it opens over whatever page is underneath and
+ * survives navigation while it's up.
  */
 export function FullscreenPlayer() {
   const { track, handle, mediaState, retry, fullscreenOpen, setFullscreenOpen } = usePlayer();
   const { t } = useUi();
   const [currentTime, setCurrentTime] = useState(0);
   const [settings, setSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
-  // Collapsing the transcript here tucks it into the compact bar and keeps
-  // the rest of the now-playing screen up - closing this whole screen is a
-  // separate, explicit action (the chevron at the top, or Esc).
-  const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     setSettings(loadCaptionSettings());
@@ -68,18 +90,23 @@ export function FullscreenPlayer() {
   };
 
   return (
-    <div className="fixed inset-0 z-[80] overflow-y-auto bg-[var(--paper)]">
+    <div className="fixed inset-0 z-[80] overflow-hidden" style={NOW_PLAYING_VARS}>
+      {/* A solid base first: the artwork layer below is transparent whenever
+          there's no artwork URL (or it fails to load), and 60% black alone
+          isn't opaque enough to hide the page underneath - so this screen
+          must never depend on the artwork having loaded to read as solid. */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 bg-[var(--paper)]" />
       {/* The episode's own artwork, blurred hard and darkened, so the screen
           reads as "about this episode" without needing a second image asset. */}
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-0 bg-cover bg-center opacity-40 blur-3xl saturate-150"
+        className="pointer-events-none fixed inset-0 bg-cover bg-center opacity-90 blur-3xl saturate-150"
         style={track.artwork ? { backgroundImage: `url(${track.artwork})` } : undefined}
       />
-      <div aria-hidden className="pointer-events-none fixed inset-0 bg-[var(--paper)]/55" />
+      <div aria-hidden className="pointer-events-none fixed inset-0 bg-black/75" />
 
-      <div className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-4 pb-10 pt-4 sm:px-6">
-        <div className="flex items-center justify-between py-2">
+      <div className="relative mx-auto flex h-full w-full max-w-2xl flex-col px-4 pb-4 pt-3 sm:px-6">
+        <div className="flex shrink-0 items-center justify-between py-1">
           <button
             type="button"
             onClick={() => setFullscreenOpen(false)}
@@ -89,33 +116,44 @@ export function FullscreenPlayer() {
           >
             ⌄
           </button>
-          <p className="max-w-[70%] truncate text-[12px] font-medium uppercase tracking-wide text-[var(--ink-faint)]">
+          <p className="max-w-[55%] truncate text-[12px] font-medium uppercase tracking-wide text-[var(--ink-faint)]">
             {track.showTitle}
           </p>
-          <span className="w-[18px]" aria-hidden />
+          <button
+            type="button"
+            onClick={() => setShowSettings((v) => !v)}
+            className="icon-btn text-[13px] font-semibold"
+            aria-expanded={showSettings}
+            title={t("caption.textSize")}
+          >
+            Aa
+          </button>
         </div>
 
-        <div className="mt-4 flex flex-col items-center text-center">
-          <Art src={track.artwork} alt="" size={260} seed={track.showTitle || track.title} />
-          <h1 className="mt-5 line-clamp-2 text-[22px] font-semibold leading-snug text-[var(--ink)]">
+        {showSettings ? (
+          <div className="mt-2 shrink-0 rounded-xl bg-[var(--surface)] p-2">
+            <CaptionSettings settings={settings} onChange={handleUpdateSettings} compact />
+          </div>
+        ) : null}
+
+        <div className="mt-3 flex shrink-0 flex-col items-center text-center">
+          <Art src={track.artwork} alt="" size={148} seed={track.showTitle || track.title} />
+          <h1 className="mt-4 line-clamp-2 text-[18px] font-semibold leading-snug text-[var(--ink)]">
             {track.title}
           </h1>
-          <p className="mt-1 text-[13px] text-[var(--ink-soft)]">{track.showTitle}</p>
+          <p className="mt-1 text-[12.5px] text-[var(--ink-soft)]">{track.showTitle}</p>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-4 shrink-0">
           <Transport handle={handle} state={mediaState} onRetry={retry} />
         </div>
 
-        <div className="mt-2 flex-1">
-          <LiveTranscriptPanel
+        <div className="mt-2 min-h-0 flex-1">
+          <TranscriptReader
             currentTime={currentTime}
             onSeek={onSeekWithPlay}
-            onClose={() => setTranscriptCollapsed(true)}
-            settings={settings}
-            onUpdateSettings={handleUpdateSettings}
-            isCollapsed={transcriptCollapsed}
-            onToggleCollapse={() => setTranscriptCollapsed((v) => !v)}
+            showTranslation={settings.showTranslation}
+            fontSize={settings.fontSize + 2}
           />
         </div>
       </div>
