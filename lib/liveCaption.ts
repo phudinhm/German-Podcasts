@@ -8,7 +8,16 @@ export interface CaptionSegment {
   end: number;
   text: string;
   rawText?: string;
+  /** Single translation, filled in by the live-capture AI-polish pipeline. */
   translation?: string;
+  /**
+   * Every language a published transcript has been auto-translated into so
+   * far. Separate from `translation` above because a published transcript
+   * needs two target languages at once (English and Vietnamese for a German
+   * show, German and Vietnamese for an English one), where live capture only
+   * ever produces the one the listener has picked as their UI language.
+   */
+  translations?: Partial<Record<"de" | "en" | "vi", string>>;
   grammarNotes?: string;
   isFinal: boolean;
 }
@@ -99,6 +108,34 @@ class LiveCaptionService {
 
   public clearTranscript() {
     this.currentTranscript = [];
+    this.notifyTranscript();
+  }
+
+  /**
+   * Loads a transcript the publisher already shipped, so the panel has
+   * something to show without anyone capturing a single word live. Distinct
+   * from the live-capture path on purpose: this never touches `mode` or
+   * `isCapturing`, since nothing is actually being listened to right now.
+   */
+  public loadTranscript(segments: CaptionSegment[]) {
+    this.currentTranscript = segments;
+    this.notifyTranscript();
+  }
+
+  /**
+   * Fills in one language's worth of auto-translated lines as they come
+   * back, without disturbing anything already loaded - translation happens
+   * in chunks after the transcript itself is already on screen, and each
+   * chunk of each language arrives as its own call.
+   */
+  public setSegmentTranslations(lang: "de" | "en" | "vi", updates: Array<{ id: string; text: string }>) {
+    if (updates.length === 0) return;
+    const textById = new Map(updates.map((u) => [u.id, u.text]));
+    this.currentTranscript = this.currentTranscript.map((seg) => {
+      const text = textById.get(seg.id);
+      if (!text) return seg;
+      return { ...seg, translations: { ...seg.translations, [lang]: text } };
+    });
     this.notifyTranscript();
   }
 

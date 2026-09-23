@@ -43,6 +43,7 @@ import {
   type CaptionSettingsState,
 } from "./caption/CaptionSettings";
 import { liveCaptionService, checkCaptionSupport, type CaptureMode } from "@/lib/liveCaption";
+import { detectSpokenLang } from "@/lib/language";
 
 const RECENT_KEY = "hoerbar.discover.v2";
 const PAGE_SIZE = 40;
@@ -210,9 +211,11 @@ export function ListenClient() {
   // captioning whatever the microphone or shared tab happened to be playing
   // and attributing it to the new episode's timeline, and leaving this page
   // entirely left the stream running with no control anywhere to stop it.
+  // The transcript itself is cleared and reloaded by PlayerProvider, which
+  // owns `track` and is the shared ancestor of every surface that renders
+  // one - this page, the full-screen view, and the floating panel.
   useEffect(() => {
     stopLiveCaption();
-    liveCaptionService.clearTranscript();
   }, [playing?.id, stopLiveCaption]);
 
   useEffect(() => () => liveCaptionService.stopCapture(), []);
@@ -296,6 +299,17 @@ export function ListenClient() {
         body: JSON.stringify({ url: target.feedUrl }),
       });
       const data = (await response.json()) as FeedResult & { error?: string };
+      // A validation or upstream failure (bad URL, unreachable host, a
+      // blocked or dead feed) responds with just { error } - no title, no
+      // episodes. Rendering that as a FeedResult crashed the whole page on
+      // `feed.episodes.length`, so this is the one case that must not call
+      // setFeed at all. A feed that parsed fine but happens to have zero
+      // episodes still comes back 200 with a real (empty) episodes array,
+      // and that one still renders normally with its own message.
+      if (!response.ok || !Array.isArray(data.episodes)) {
+        setError(data.error ?? t("listen.feedFailed"));
+        return;
+      }
       setFeed(data);
       if (data.error) setError(data.error);
     } catch {
@@ -363,6 +377,8 @@ export function ListenClient() {
         durationSec: episode.durationSec,
         publishedAt: episode.publishedAt,
         startAt: from ?? resumeAt(id),
+        transcripts: episode.transcripts,
+        sourceLang: detectSpokenLang(feed?.language, `${episode.title} ${episode.description}`),
       };
       player.play(track);
       noteplayed({
@@ -647,6 +663,15 @@ export function ListenClient() {
                   onClick={() => setFreezePane((v) => !v)}
                 >
                   📌
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn text-[15px] text-[var(--ink-faint)]"
+                  aria-label={t("player.fullscreen")}
+                  title={t("player.fullscreen")}
+                  onClick={() => player.setFullscreenOpen(true)}
+                >
+                  ⛶
                 </button>
                 <button
                   type="button"

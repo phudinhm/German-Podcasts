@@ -6,11 +6,12 @@ const { parseMediaUrl } = await import("../.scripts-out/lib/media.js");
 
 /** A feed shaped like the ones actually in the wild: CDATA, namespaces, noise. */
 const FEED = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:podcast="https://podcastindex.org/namespace/1.0">
   <channel>
     <title><![CDATA[Wirtschaft &amp; Wandel]]></title>
     <link>https://example.de/podcast</link>
     <description>Ein Podcast über die deutsche Wirtschaft.</description>
+    <language>de-DE</language>
     <itunes:image href="https://cdn.example.de/cover.jpg"/>
     <item>
       <title>Folge 12: Zinsen und Mittelstand</title>
@@ -19,6 +20,9 @@ const FEED = `<?xml version="1.0" encoding="UTF-8"?>
       <itunes:duration>28:41</itunes:duration>
       <guid isPermaLink="false">ep-12</guid>
       <enclosure url="https://cdn.example.de/audio/ep12.mp3" length="27000000" type="audio/mpeg"/>
+      <podcast:transcript url="https://cdn.example.de/transcripts/ep12.srt" type="application/srt"/>
+      <podcast:transcript url="https://cdn.example.de/transcripts/ep12.json" type="application/json" language="de"/>
+      <podcast:transcript url="javascript:alert(1)" type="text/plain"/>
     </item>
     <item>
       <title>Folge 11</title>
@@ -44,6 +48,12 @@ test("parses a feed's channel metadata", () => {
   assert.equal(feed.title, "Wirtschaft & Wandel");
   assert.equal(feed.link, "https://example.de/podcast");
   assert.equal(feed.image, "https://cdn.example.de/cover.jpg");
+  assert.equal(feed.language, "de-DE");
+});
+
+test("a feed with no <language> tag reports null rather than guessing", () => {
+  const xml = "<rss><channel><title>Show</title></channel></rss>";
+  assert.equal(parseFeed(xml, "x").language, null);
 });
 
 test("keeps only items with a playable enclosure", () => {
@@ -74,6 +84,25 @@ test("carries the enclosure type through so video streams render as video", () =
   const video = parseFeed(FEED, "fallback").episodes.find((e) => e.title === "Video-Folge");
   assert.ok(video);
   assert.equal(video.type, "video/mp4");
+});
+
+test("collects every podcast:transcript tag on an item", () => {
+  const [first] = parseFeed(FEED, "fallback").episodes;
+  assert.equal(first.transcripts.length, 2);
+  assert.ok(first.transcripts.some((t) => t.type === "application/srt"));
+  const json = first.transcripts.find((t) => t.type === "application/json");
+  assert.equal(json.url, "https://cdn.example.de/transcripts/ep12.json");
+  assert.equal(json.language, "de");
+});
+
+test("drops a podcast:transcript with an unsafe scheme", () => {
+  const [first] = parseFeed(FEED, "fallback").episodes;
+  assert.ok(!first.transcripts.some((t) => t.url.startsWith("javascript:")));
+});
+
+test("episodes with no transcript tag get an empty list, not undefined", () => {
+  const noTranscript = parseFeed(FEED, "fallback").episodes.find((e) => e.title === "Folge 11");
+  assert.deepEqual(noTranscript.transcripts, []);
 });
 
 test("keeps extensionless tracking redirects, which most feeds use", () => {

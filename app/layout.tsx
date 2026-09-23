@@ -8,6 +8,7 @@ import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { PlayerProvider } from "@/components/player/PlayerProvider";
 import { MiniPlayer } from "@/components/player/MiniPlayer";
+import { FullscreenPlayer } from "@/components/player/FullscreenPlayer";
 import { GlobalFloatingTranscript } from "@/components/caption/GlobalFloatingTranscript";
 
 export const metadata: Metadata = {
@@ -78,6 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
           <MiniPlayer />
           <GlobalFloatingTranscript />
+          <FullscreenPlayer />
           </PlayerProvider>
         </UiLangProvider>
         </ThemeProvider>
