@@ -194,6 +194,7 @@ export function FullscreenPlayer() {
             onSeek={onSeekWithPlay}
             showTranslation={settings.showTranslation}
             translationLang={translationLang}
+            autoScroll={settings.autoScroll}
             fontSize={settings.fontSize + 2}
           />
         </div>
