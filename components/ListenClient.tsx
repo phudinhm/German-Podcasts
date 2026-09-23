@@ -44,9 +44,18 @@ import {
 } from "./caption/CaptionSettings";
 import { liveCaptionService, checkCaptionSupport, type CaptureMode } from "@/lib/liveCaption";
 import { pickBestTranscript } from "@/lib/server/transcript";
+import { detectSpokenLang, translationTargetsFor } from "@/lib/language";
 
 const RECENT_KEY = "hoerbar.discover.v2";
 const PAGE_SIZE = 40;
+
+/** How many lines of a published transcript get auto-translated. A cap
+ * rather than the whole thing: a long interview can run past a thousand
+ * lines, and this bounds the request count that follows without hiding the
+ * feature on the shows people actually listen to end to end. */
+const AUTO_TRANSLATE_MAX_LINES = 400;
+/** Lines per translation request - matches /api/translate's own batch cap. */
+const TRANSLATE_CHUNK_SIZE = 40;
 
 const ORIGIN_LABEL: Record<DiscoverResult["origin"], string> = {
   apple: "Apple Podcasts",
@@ -225,24 +234,53 @@ export function ListenClient() {
     const best = playing?.transcripts?.length ? pickBestTranscript(playing.transcripts) : null;
     if (!best) return;
     let cancelled = false;
-    fetch("/api/transcript", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: best.url, type: best.type }),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { segments?: Array<{ id: string; start: number; end: number; text: string }> } | null) => {
-        if (cancelled || !data?.segments?.length) return;
-        liveCaptionService.loadTranscript(data.segments.map((s) => ({ ...s, isFinal: true })));
-      })
-      .catch(() => {
-        // No published transcript loaded is not an error worth surfacing -
-        // live caption is still there as a fallback on desktop.
-      });
+    const sourceLang = playing?.sourceLang ?? "de";
+
+    async function run() {
+      const res = await fetch("/api/transcript", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // best is narrowed non-null by the guard above; TypeScript does not
+        // carry that narrowing into a nested function's closure.
+        body: JSON.stringify({ url: best!.url, type: best!.type }),
+      }).catch(() => null);
+      if (!res?.ok || cancelled) return;
+      const data = (await res.json()) as {
+        segments?: Array<{ id: string; start: number; end: number; text: string }>;
+      };
+      const segments = data.segments ?? [];
+      if (cancelled || segments.length === 0) return;
+      liveCaptionService.loadTranscript(segments.map((s) => ({ ...s, isFinal: true })));
+
+      // Auto-translate every line into whichever two languages the listener
+      // did not already get from the audio itself. Capped and chunked: a
+      // long episode can carry hundreds of lines, and this is one request
+      // per chunk per language rather than one per line.
+      const toTranslate = segments.slice(0, AUTO_TRANSLATE_MAX_LINES);
+      for (const targetLang of translationTargetsFor(sourceLang)) {
+        for (let i = 0; i < toTranslate.length; i += TRANSLATE_CHUNK_SIZE) {
+          if (cancelled) return;
+          const chunk = toTranslate.slice(i, i + TRANSLATE_CHUNK_SIZE);
+          const translateRes = await fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ texts: chunk.map((s) => s.text), lang: targetLang, sourceLang }),
+          }).catch(() => null);
+          if (!translateRes?.ok || cancelled) continue;
+          const translated = (await translateRes.json()) as { texts?: Array<string | null> };
+          const updates = chunk
+            .map((seg, idx) => ({ id: seg.id, text: translated.texts?.[idx] ?? "" }))
+            .filter((update) => update.text);
+          liveCaptionService.setSegmentTranslations(targetLang, updates);
+        }
+      }
+    }
+
+    void run();
     return () => {
       cancelled = true;
     };
-  }, [playing?.id]);
+  }, [playing?.id, playing?.sourceLang]);
 
   useEffect(() => () => liveCaptionService.stopCapture(), []);
 
@@ -325,6 +363,17 @@ export function ListenClient() {
         body: JSON.stringify({ url: target.feedUrl }),
       });
       const data = (await response.json()) as FeedResult & { error?: string };
+      // A validation or upstream failure (bad URL, unreachable host, a
+      // blocked or dead feed) responds with just { error } - no title, no
+      // episodes. Rendering that as a FeedResult crashed the whole page on
+      // `feed.episodes.length`, so this is the one case that must not call
+      // setFeed at all. A feed that parsed fine but happens to have zero
+      // episodes still comes back 200 with a real (empty) episodes array,
+      // and that one still renders normally with its own message.
+      if (!response.ok || !Array.isArray(data.episodes)) {
+        setError(data.error ?? t("listen.feedFailed"));
+        return;
+      }
       setFeed(data);
       if (data.error) setError(data.error);
     } catch {
@@ -393,6 +442,7 @@ export function ListenClient() {
         publishedAt: episode.publishedAt,
         startAt: from ?? resumeAt(id),
         transcripts: episode.transcripts,
+        sourceLang: detectSpokenLang(feed?.language, `${episode.title} ${episode.description}`),
       };
       player.play(track);
       noteplayed({
@@ -673,6 +723,15 @@ export function ListenClient() {
                   onClick={() => setFreezePane((v) => !v)}
                 >
                   📌
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn text-[15px] text-[var(--ink-faint)]"
+                  aria-label={t("player.fullscreen")}
+                  title={t("player.fullscreen")}
+                  onClick={() => player.setFullscreenOpen(true)}
+                >
+                  ⛶
                 </button>
                 <button
                   type="button"

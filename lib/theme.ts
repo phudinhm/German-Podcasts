@@ -22,9 +22,18 @@ export const THEME_KEY = "hoerbar.theme.v1";
  * and needs no attribute of its own, since the base stylesheet rules already
  * paint it with nothing set - the same reasoning "system" gets for Theme.
  */
-export type AccentColor = "amber" | "blue" | "green" | "purple" | "rose";
+export type AccentColor = "amber" | "blue" | "teal" | "green" | "indigo" | "purple" | "rose" | "gold";
 
-export const ACCENT_COLORS: AccentColor[] = ["amber", "blue", "green", "purple", "rose"];
+export const ACCENT_COLORS: AccentColor[] = [
+  "amber",
+  "blue",
+  "teal",
+  "green",
+  "indigo",
+  "purple",
+  "rose",
+  "gold",
+];
 
 export const ACCENT_KEY = "hoerbar.accent.v1";
 

@@ -12,6 +12,7 @@ import {
 import { useMediaElement, type MediaElementState } from "./useMediaElement";
 import { NOOP_PLAYER, type PlayerHandle } from "./types";
 import type { FeedTranscript } from "@/lib/server/feed";
+import type { SpokenLang } from "@/lib/language";
 
 export interface Track {
   /** Stable id, used to tell "same episode" from "new episode". */
@@ -34,6 +35,9 @@ export interface Track {
   startAt?: number;
   /** Transcripts the publisher already shipped for this episode, if any. */
   transcripts?: FeedTranscript[];
+  /** What language the episode is actually spoken in, for auto-translating
+   * a published transcript in the right direction. */
+  sourceLang?: SpokenLang;
 }
 
 interface PlayerContextValue {
@@ -72,6 +76,12 @@ interface PlayerContextValue {
   setShowTranscript: React.Dispatch<React.SetStateAction<boolean>>;
   transcriptCollapsed: boolean;
   setTranscriptCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+  /** The full-screen "now playing" view, the way a phone's own music app
+   * expands to cover everything while something plays. Lives here rather
+   * than on a page so it can be opened from the mini player too, and
+   * survives whatever route is underneath it. */
+  fullscreenOpen: boolean;
+  setFullscreenOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -244,6 +254,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [inlineVisible, setInlineVisible] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+
+  // Nothing is playing any more but the fullscreen view is still up over
+  // whatever comes next - closing it here matches every other player's
+  // now-playing screen, which dismisses itself once playback actually stops.
+  useEffect(() => {
+    if (!track) setFullscreenOpen(false);
+  }, [track]);
 
   const value = useMemo<PlayerContextValue>(
     () => ({
@@ -263,6 +281,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setShowTranscript,
       transcriptCollapsed,
       setTranscriptCollapsed,
+      fullscreenOpen,
+      setFullscreenOpen,
     }),
     [
       track,
@@ -278,6 +298,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       inlineVisible,
       showTranscript,
       transcriptCollapsed,
+      fullscreenOpen,
     ],
   );
 

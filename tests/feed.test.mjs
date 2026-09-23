@@ -11,6 +11,7 @@ const FEED = `<?xml version="1.0" encoding="UTF-8"?>
     <title><![CDATA[Wirtschaft &amp; Wandel]]></title>
     <link>https://example.de/podcast</link>
     <description>Ein Podcast über die deutsche Wirtschaft.</description>
+    <language>de-DE</language>
     <itunes:image href="https://cdn.example.de/cover.jpg"/>
     <item>
       <title>Folge 12: Zinsen und Mittelstand</title>
@@ -47,6 +48,12 @@ test("parses a feed's channel metadata", () => {
   assert.equal(feed.title, "Wirtschaft & Wandel");
   assert.equal(feed.link, "https://example.de/podcast");
   assert.equal(feed.image, "https://cdn.example.de/cover.jpg");
+  assert.equal(feed.language, "de-DE");
+});
+
+test("a feed with no <language> tag reports null rather than guessing", () => {
+  const xml = "<rss><channel><title>Show</title></channel></rss>";
+  assert.equal(parseFeed(xml, "x").language, null);
 });
 
 test("keeps only items with a playable enclosure", () => {

@@ -37,7 +37,7 @@ function formatTime(seconds: number): string {
 
 export function MiniPlayer() {
   const { t } = useUi();
-  const { track, handle, stop, mediaState, inlineVisible } = usePlayer();
+  const { track, handle, stop, mediaState, inlineVisible, setFullscreenOpen } = usePlayer();
   const pathname = usePathname();
 
   const [playing, setPlaying] = useState(false);
@@ -439,6 +439,17 @@ export function MiniPlayer() {
                     </button>
                   )}
 
+                  {/* Full-screen now-playing button */}
+                  <button
+                    type="button"
+                    onClick={() => setFullscreenOpen(true)}
+                    className="icon-btn h-7 w-7 text-[13px]"
+                    title={t("player.fullscreen")}
+                    aria-label={t("player.fullscreen")}
+                  >
+                    ⛶
+                  </button>
+
                   {/* Close button */}
                   <button
                     type="button"
@@ -555,18 +566,32 @@ export function MiniPlayer() {
             <div className="w-12 h-1.5 rounded-full bg-[var(--rule)] mx-auto mb-3" />
 
             <div className="flex items-center justify-between pb-2 border-b border-[var(--rule)]">
-              <div>
-                <h4 className="text-[14.5px] font-semibold text-[var(--ink)]">{track.title}</h4>
-                <p className="text-[12px] text-[var(--ink-faint)]">{track.showTitle}</p>
+              <div className="min-w-0">
+                <h4 className="truncate text-[14.5px] font-semibold text-[var(--ink)]">{track.title}</h4>
+                <p className="truncate text-[12px] text-[var(--ink-faint)]">{track.showTitle}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setMobileDrawerOpen(false)}
-                className="icon-btn text-[18px]"
-                aria-label={t("common.close")}
-              >
-                ×
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileDrawerOpen(false);
+                    setFullscreenOpen(true);
+                  }}
+                  className="icon-btn text-[15px]"
+                  title={t("player.fullscreen")}
+                  aria-label={t("player.fullscreen")}
+                >
+                  ⛶
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileDrawerOpen(false)}
+                  className="icon-btn text-[18px]"
+                  aria-label={t("common.close")}
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
             {/* Running transcript. Live caption itself is desktop-only - it

@@ -250,7 +250,7 @@ export function LiveTranscriptPanel({
     const activeSeg = segments.find((s) => s.id === activeSegmentId) ?? segments[segments.length - 1];
     return (
       <div
-        className={`card flex items-center gap-3 px-3.5 py-2 transition-opacity duration-500 ${
+        className={`card glass-panel flex items-center gap-3 px-3.5 py-2 shadow-lg transition-opacity duration-500 ${
           dimmed ? "opacity-35 hover:opacity-100" : "opacity-100"
         }`}
         style={captionThemeStyle(settings.captionTheme)}
@@ -286,7 +286,10 @@ export function LiveTranscriptPanel({
   }
 
   return (
-    <section className="card mt-4 flex flex-col overflow-hidden" style={captionThemeStyle(settings.captionTheme)}>
+    <section
+      className="card glass-panel mt-4 flex flex-col overflow-hidden"
+      style={captionThemeStyle(settings.captionTheme)}
+    >
       <div className="border-b border-[var(--rule)] bg-[var(--surface)] p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -480,7 +483,22 @@ export function LiveTranscriptPanel({
                       })}
                     </p>
 
-                    {settings.showTranslation && seg.translation && (
+                    {settings.showTranslation && seg.translations ? (
+                      <div className="mt-1 space-y-0.5">
+                        {Object.entries(seg.translations).map(([lang, text]) => (
+                          <p
+                            key={lang}
+                            className="text-[var(--ink-soft)] select-text"
+                            style={{ fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.8))}px` }}
+                          >
+                            <span className="mr-1.5 font-mono text-[10px] uppercase text-[var(--ink-faint)]">
+                              {lang}
+                            </span>
+                            {text}
+                          </p>
+                        ))}
+                      </div>
+                    ) : settings.showTranslation && seg.translation ? (
                       <p
                         className="mt-1 text-[var(--ink-soft)] select-text"
                         style={{
@@ -489,7 +507,7 @@ export function LiveTranscriptPanel({
                       >
                         {seg.translation}
                       </p>
-                    )}
+                    ) : null}
 
                     {/* AI Grammar explanation if loaded */}
                     {grammarNotes[seg.id] && (

@@ -201,6 +201,75 @@
   --row-active: #2c1219;
 }
 
+:root[data-accent="teal"] {
+  --accent: #146b64;
+  --accent-soft: #e3f3f1;
+  --accent-ring: #1f9188;
+  --row-active: #e3f3f1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="teal"]:not([data-theme="light"]) {
+    --accent: #5cd0c4;
+    --accent-soft: #123330;
+    --accent-ring: #1f9188;
+    --row-active: #0d2624;
+  }
+}
+
+:root[data-theme="dark"][data-accent="teal"] {
+  --accent: #5cd0c4;
+  --accent-soft: #123330;
+  --accent-ring: #1f9188;
+  --row-active: #0d2624;
+}
+
+:root[data-accent="indigo"] {
+  --accent: #4453a6;
+  --accent-soft: #ecedf9;
+  --accent-ring: #5c6bc4;
+  --row-active: #ecedf9;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="indigo"]:not([data-theme="light"]) {
+    --accent: #a3aef0;
+    --accent-soft: #232a4a;
+    --accent-ring: #5c6bc4;
+    --row-active: #1b2039;
+  }
+}
+
+:root[data-theme="dark"][data-accent="indigo"] {
+  --accent: #a3aef0;
+  --accent-soft: #232a4a;
+  --accent-ring: #5c6bc4;
+  --row-active: #1b2039;
+}
+
+:root[data-accent="gold"] {
+  --accent: #8a6d1a;
+  --accent-soft: #f7f0dc;
+  --accent-ring: #b6911f;
+  --row-active: #f7f0dc;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="gold"]:not([data-theme="light"]) {
+    --accent: #e0c065;
+    --accent-soft: #362c11;
+    --accent-ring: #b6911f;
+    --row-active: #2a2109;
+  }
+}
+
+:root[data-theme="dark"][data-accent="gold"] {
+  --accent: #e0c065;
+  --accent-soft: #362c11;
+  --accent-ring: #b6911f;
+  --row-active: #2a2109;
+}
+
 html {
   scroll-behavior: smooth;
   /* iOS otherwise inflates text on rotation, which breaks the scale below. */
@@ -253,6 +322,24 @@ h3 {
   [role="menu"].card,
   [role="listbox"].card {
     box-shadow: var(--shadow-pop);
+  }
+
+  /*
+   * A frosted, translucent surface for panels that float over other content -
+   * the live caption bar and the transcript. Built from the same tokens as
+   * .card rather than a fixed dark glass, so it still follows the current
+   * theme, accent, and caption reading surface instead of pasting one fixed
+   * look over all four. Declared after .card in this layer so it wins on the
+   * elements that carry both classes.
+   */
+  .glass-panel {
+    background: color-mix(in oklab, var(--paper-raised) 68%, transparent);
+    /* The build's CSS minifier drops the unprefixed property outright when
+       both are written by hand here, leaving Chrome and Firefox with no
+       blur at all - so this is left to the minifier's own autoprefixer to
+       add -webkit-backdrop-filter, rather than writing it ourselves. */
+    backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid color-mix(in oklab, var(--rule) 55%, transparent);
   }
 
   /* A flat, borderless surface, the way modern video interfaces group content. */
@@ -570,16 +657,6 @@ h3 {
     width: 40px;
     height: 40px;
   }
-}
-
-/* Live caption & Running Transcript enhancements */
-.caption-glow {
-  text-shadow: 0 0 14px rgba(224, 135, 15, 0.5);
-}
-
-.glass-panel {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 /* iPhone & iOS Safari touch and safe-area optimization */
