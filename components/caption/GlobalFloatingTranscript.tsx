@@ -45,10 +45,8 @@ export function GlobalFloatingTranscript() {
 
   if (!track || !showTranscript) return null;
 
-  // On homepage when the inline card's transcript is already visible and not collapsed,
-  // we don't duplicate it. But when scrolled down or on other pages, show it floating!
-  const isHomepage = pathname === "/";
-  const shouldFloat = !isHomepage || !inlineVisible || transcriptCollapsed;
+  // Always render floating transcript on all pages since we removed the inline one
+  const shouldFloat = true;
 
   const onSeekWithPlay = (seconds: number) => {
     handle.seekTo(seconds, true);
@@ -56,11 +54,6 @@ export function GlobalFloatingTranscript() {
       handle.play();
     }
   };
-
-  if (!shouldFloat && isHomepage) {
-    // Rendered inline on ListenClient if preferred, or handled globally
-    return null;
-  }
 
   return (
     <aside

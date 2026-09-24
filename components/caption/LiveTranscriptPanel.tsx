@@ -62,6 +62,7 @@ export function LiveTranscriptPanel({
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [wordMeaning, setWordMeaning] = useState<string | null>(null);
   const [loadingWord, setLoadingWord] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [grammarNotes, setGrammarNotes] = useState<Record<string, string>>({});
   const [loadingGrammarId, setLoadingGrammarId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -317,14 +318,15 @@ export function LiveTranscriptPanel({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <CaptionSettings
-              settings={settings}
-              onChange={onUpdateSettings}
-              compact
-              sourceLang={track?.sourceLang}
-              syncOffsetSec={transcriptOffsetSec}
-              onSyncOffsetChange={setTranscriptOffsetSec}
-            />
+            <button
+              type="button"
+              onClick={() => setShowSettings((v) => !v)}
+              className={`icon-btn text-[14px] ${showSettings ? "text-[var(--accent)]" : ""}`}
+              title={t("common.settings")}
+              aria-label={t("common.settings")}
+            >
+              ⚙
+            </button>
             {onToggleCollapse && (
               <button
                 type="button"
@@ -346,6 +348,19 @@ export function LiveTranscriptPanel({
             </button>
           </div>
         </div>
+
+        {showSettings && (
+          <div className="mt-3 rounded-lg bg-[var(--paper)] p-3 border border-[var(--rule)]">
+            <CaptionSettings
+              settings={settings}
+              onChange={onUpdateSettings}
+              compact
+              sourceLang={track?.sourceLang}
+              syncOffsetSec={transcriptOffsetSec}
+              onSyncOffsetChange={setTranscriptOffsetSec}
+            />
+          </div>
+        )}
 
         {/* Secondary Toolbar: Search, Copy, Export */}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[12px]">

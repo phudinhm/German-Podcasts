@@ -888,26 +888,17 @@ export function ListenClient() {
       ) : null}
 
       {/* Live caption line, shown only once a source is actually feeding it */}
-      {playing && showCaption && (
-        <LiveCaptionOverlay
-          isPlaying={player.handle.isPlaying()}
-          mode={captureMode}
-          onOpenTranscript={() => setShowTranscript(true)}
-          onClose={stopLiveCaption}
-          settings={captionSettings}
-          onUpdateSettings={setCaptionSettings}
-        />
-      )}
-
-      {/* Running transcript built from whatever has been captioned so far */}
-      {playing && showTranscript && (
-        <LiveTranscriptPanel
-          currentTime={currentTime}
-          onSeek={(seconds) => player.handle.seekTo(seconds, true)}
-          onClose={() => setShowTranscript(false)}
-          settings={captionSettings}
-          onUpdateSettings={setCaptionSettings}
-        />
+      {playing && showCaption && !showTranscript && (
+        <div className="fixed bottom-[var(--player-h)] left-0 right-0 z-40 mx-auto w-full max-w-2xl px-2 pb-2">
+          <LiveCaptionOverlay
+            isPlaying={player.handle.isPlaying()}
+            mode={captureMode}
+            onOpenTranscript={() => setShowTranscript(true)}
+            onClose={stopLiveCaption}
+            settings={captionSettings}
+            onUpdateSettings={setCaptionSettings}
+          />
+        </div>
       )}
 
       {/* ---------------- results ---------------- */}
