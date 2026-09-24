@@ -174,6 +174,7 @@ export async function generateTranscript(
     durationSec?: number | null;
     trackId?: string;
     pageUrl?: string;
+    immediatePreview?: boolean;
   },
   onReady?: () => void,
 ): Promise<{ ok: true } | { ok: false; error: GenerateTranscriptError }> {
@@ -185,33 +186,67 @@ export async function generateTranscript(
     }
   };
 
+  let totalSegments = 0;
+
   const applyClientFallback = () => {
+    if (isCancelled() || totalSegments > 0) return { ok: true as const };
     const rawText = [meta?.title, meta?.description?.replace(/<[^>]+>/g, " ")]
       .filter(Boolean)
       .join(". ")
       .replace(/\s+/g, " ")
       .trim();
-    const fallbackSentences = (rawText || "Herzlich willkommen zu dieser Podcast-Folge.")
+    const rawSentences = (rawText || "Herzlich willkommen zu dieser Podcast-Folge.")
       .split(/(?<=[.!?…])\s+/)
       .map((s) => s.trim())
       .filter((s) => s.length > 2)
-      .slice(0, 40);
+      .slice(0, 65);
+
+    // Split any overly long sentence (>135 chars) into readable phrase segments
+    const fallbackSentences: string[] = [];
+    for (const s of rawSentences) {
+      if (s.length <= 135) {
+        fallbackSentences.push(s);
+      } else {
+        const parts = s
+          .split(/(?<=[,;–—:])\s+/)
+          .map((p) => p.trim())
+          .filter(Boolean);
+        fallbackSentences.push(...(parts.length > 1 ? parts : [s]));
+      }
+    }
+
     const totalDur = meta?.durationSec && meta.durationSec > 15 ? meta.durationSec : 120;
-    const step = Math.max(3, totalDur / Math.max(1, fallbackSentences.length));
-    const segs = fallbackSentences.map((text, idx) => ({
-      id: `fallback-${idx}`,
-      start: Math.round(idx * step * 10) / 10,
-      end: Math.round((idx + 1) * step * 10) / 10,
-      text,
-      isFinal: true,
-    }));
+    const totalChars = fallbackSentences.reduce((sum, s) => sum + s.length, 0) || 1;
+    let cursor = 0;
+    const segs = fallbackSentences.map((text, idx) => {
+      const dur = Math.max(2.5, (text.length / totalChars) * totalDur);
+      const start = Math.round(cursor * 10) / 10;
+      const end = Math.round(Math.min(totalDur, cursor + dur) * 10) / 10;
+      cursor = end;
+      return {
+        id: `fallback-${idx}`,
+        start,
+        end: Math.max(start + 2, end),
+        text,
+        isFinal: true,
+      };
+    });
     liveCaptionService.loadTranscript(segs);
     void autoTranslateSegments(segs, sourceLang, isCancelled);
     notifyReady();
     return { ok: true as const };
   };
 
-  let totalSegments = 0;
+  // If explicitly clicked ("⚡ Generate transcript with AI"), show preview immediately (<0.1s),
+  // otherwise guarantee transcript renders within 1.5s while Whisper streams in the background!
+  if (meta?.immediatePreview) {
+    applyClientFallback();
+  }
+  const fastTimer = setTimeout(() => {
+    if (totalSegments === 0 && !isCancelled()) {
+      applyClientFallback();
+    }
+  }, 1500);
 
   const res = await fetch("/api/transcribe", {
     method: "POST",
@@ -229,6 +264,7 @@ export async function generateTranscript(
   }).catch(() => null);
 
   if (!res || !res.ok || !res.body) {
+    clearTimeout(fastTimer);
     return applyClientFallback();
   }
 
@@ -237,6 +273,7 @@ export async function generateTranscript(
   let buffer = "";
 
   const pushRealSegments = (incoming: FetchedSegment[]) => {
+    clearTimeout(fastTimer);
     const mapped = incoming.map((s) => ({ ...s, isFinal: true }));
     if (totalSegments === 0) {
       liveCaptionService.loadTranscript(mapped);
@@ -248,14 +285,29 @@ export async function generateTranscript(
     void autoTranslateSegments(incoming, sourceLang, isCancelled);
   };
 
+  const readWithTimeout = async () => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        reader.read(),
+        new Promise<{ done: true; value: undefined }>((resolve) => {
+          timeoutId = setTimeout(() => resolve({ done: true, value: undefined }), 20_000);
+        }),
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  };
+
   try {
     while (true) {
       if (isCancelled()) {
+        clearTimeout(fastTimer);
         reader.cancel();
         return totalSegments > 0 ? { ok: true } : { ok: false, error: "transcription-failed" };
       }
-      const { done, value } = await reader.read();
-      if (done) break;
+      const { done, value } = await readWithTimeout();
+      if (done || !value) break;
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
@@ -293,9 +345,12 @@ export async function generateTranscript(
     }
   } catch {
     if (totalSegments > 0) {
+      clearTimeout(fastTimer);
       notifyReady();
       return { ok: true };
     }
+  } finally {
+    clearTimeout(fastTimer);
   }
 
   if (isCancelled()) return { ok: false, error: "transcription-failed" };

@@ -225,11 +225,20 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
       }
     }
 
+    const rawContentEncoded = tag(item, "content:encoded") ?? "";
+    const rawDescription = tag(item, "description") ?? tag(item, "itunes:summary") ?? "";
+    const bestRawText =
+      rawContentEncoded.length > rawDescription.length ? rawContentEncoded : rawDescription;
+    // Strip leading sponsor block (e.g. Slow German 'WERBUNG ... Und jetzt zur Folge:') so the transcript starts at the real episode content
+    const cleanedDescription = bestRawText
+      .replace(/^[\s\S]{0,1800}?(?:Und jetzt zur Folge\s*:|Now to the episode\s*:)\s*/i, "")
+      .slice(0, 16000);
+
     episodes.push({
       guid: itemGuid,
       pageUrl: itemPageUrl,
       title: tag(item, "title") ?? "Ohne Titel",
-      description: (tag(item, "description") ?? tag(item, "itunes:summary") ?? "").slice(0, 600),
+      description: cleanedDescription,
       url: safeUrl,
       type: attr(item, "enclosure", "type") ?? "audio/mpeg",
       durationSec: parseDuration(tag(item, "itunes:duration")),

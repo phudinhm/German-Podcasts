@@ -329,6 +329,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             trackId: track.id,
             pageUrl: track.pageUrl,
           },
+          () => {
+            if (!isCancelled()) {
+              setGeneratingTranscript(false);
+              setGenerateTranscriptError(null);
+            }
+          },
         );
         if (isCancelled()) return;
         setGeneratingTranscript(false);
@@ -348,7 +354,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [track?.id, track?.url]);
 
   // Explicit generate trigger: ALWAYS works at any playback speed (1.0x, 1.5x, 2.0x)
-  // and is NEVER blocked if an earlier background run is still in progress.
+  // and immediately populates the transcript UI while streaming Whisper audio in the background.
   const onGenerateTranscript = useCallback(() => {
     if (!track?.url) return;
     const runId = ++generationRunIdRef.current;
@@ -366,6 +372,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         durationSec: track.durationSec,
         trackId: track.id,
         pageUrl: track.pageUrl,
+        immediatePreview: true,
+      },
+      () => {
+        if (!isCancelled()) {
+          setGeneratingTranscript(false);
+          setGenerateTranscriptError(null);
+        }
       },
     ).then(() => {
       if (isCancelled()) return;
