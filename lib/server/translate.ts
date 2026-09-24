@@ -42,6 +42,13 @@ export function hasKeyedProvider(): boolean {
   );
 }
 
+const GERMAN_CHECK_RE =
+  /[äöüßÄÖÜ]|\b(und|der|die|das|nicht|mit|ist|sind|auch|eine|einen|ich|wir|sie|für|von|dass|über|wenn|haben|werden|oder|aber)\b/i;
+
+function looksLikeGerman(text: string): boolean {
+  return GERMAN_CHECK_RE.test(text);
+}
+
 export async function translate(
   text: string,
   targetLang: Lang,
@@ -49,21 +56,27 @@ export async function translate(
   engine: string = "auto",
 ): Promise<TranslationResult> {
   if (!text.trim()) return { text: null, source: "none" };
-  if (targetLang === sourceLang) return { text, source: "none" };
+  // Only skip translation if targetLang matches sourceLang AND the text does not look like German when target is English/Vietnamese
+  if (targetLang === sourceLang && (targetLang === "de" || !looksLikeGerman(text))) {
+    return { text, source: "none" };
+  }
 
-  const deepl = await translateWithDeepL(text, targetLang, sourceLang);
+  const effectiveSource: Lang =
+    targetLang !== "de" && looksLikeGerman(text) ? "de" : sourceLang === targetLang ? "de" : sourceLang;
+
+  const deepl = await translateWithDeepL(text, targetLang);
   if (deepl) return { text: deepl, source: "deepl" };
 
-  const google = await translateWithGoogle(text, targetLang, sourceLang);
+  const google = await translateWithGoogle(text, targetLang);
   if (google) return { text: google, source: "google" };
 
-  const llm = await translateWithLLM(text, targetLang, sourceLang, engine);
+  const llm = await translateWithLLM(text, targetLang, effectiveSource, engine);
   if (llm) return { text: llm, source: "anthropic" };
 
-  const gtx = await translateWithGoogleGTX(text, targetLang, sourceLang);
+  const gtx = await translateWithGoogleGTX(text, targetLang, "auto");
   if (gtx) return { text: gtx, source: "google" };
 
-  const free = await translateWithMyMemory(text, targetLang, sourceLang);
+  const free = await translateWithMyMemory(text, targetLang, effectiveSource);
   if (free) return { text: free, source: "mymemory" };
 
   return { text: null, source: "none" };
@@ -72,19 +85,10 @@ export async function translate(
 /** Longest string MyMemory accepts in one request. */
 const MYMEMORY_LIMIT = 500;
 
-/**
- * MyMemory: a public translation API with no key and a daily quota.
- *
- * It is the fallback rather than the default because quality is well below
- * DeepL, and because an anonymous quota is shared across everyone deploying
- * this. But it means a fresh clone translates captions out of the box, which
- * is the difference between the feature existing and not.
- */
 async function translateWithMyMemory(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
   const trimmed = text.trim();
   if (!trimmed) return null;
 
-  // Long input is split on sentence boundaries and reassembled.
   const parts: string[] = [];
   if (trimmed.length <= MYMEMORY_LIMIT) {
     parts.push(trimmed);
@@ -101,12 +105,12 @@ async function translateWithMyMemory(text: string, lang: Lang, sourceLang: Lang)
     if (buffer) parts.push(buffer.trim());
   }
 
+  const actualSource = lang !== "de" && looksLikeGerman(trimmed) ? "de" : sourceLang === lang ? "de" : sourceLang;
   const out: string[] = [];
   for (const part of parts) {
     try {
-      const params = new URLSearchParams({ q: part, langpair: `${sourceLang}|${lang}` });
+      const params = new URLSearchParams({ q: part, langpair: `${actualSource}|${lang}` });
       const email = process.env.MYMEMORY_EMAIL;
-      // Supplying a contact address raises the anonymous quota.
       if (email) params.set("de", email);
       const response = await fetch(`https://api.mymemory.translated.net/get?${params}`, {
         headers: { Accept: "application/json" },
@@ -120,7 +124,6 @@ async function translateWithMyMemory(text: string, lang: Lang, sourceLang: Lang)
       };
       const status = Number(data.responseStatus);
       const translated = data.responseData?.translatedText;
-      // The service reports quota and error conditions in the payload text.
       if (status !== 200 || !translated || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(translated)) {
         return null;
       }
@@ -134,7 +137,7 @@ async function translateWithMyMemory(text: string, lang: Lang, sourceLang: Lang)
   return out.join(" ") || null;
 }
 
-async function translateWithDeepL(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
+async function translateWithDeepL(text: string, lang: Lang): Promise<string | null> {
   const key = process.env.DEEPL_API_KEY;
   if (!key) return null;
   const host = process.env.DEEPL_API_HOST ?? "api-free.deepl.com";
@@ -147,7 +150,7 @@ async function translateWithDeepL(text: string, lang: Lang, sourceLang: Lang): P
       },
       body: JSON.stringify({
         text: [text],
-        source_lang: DEEPL_LANG[sourceLang].replace("-GB", ""),
+        // Omit source_lang so DeepL auto-detects German/English per sentence
         target_lang: DEEPL_LANG[lang],
       }),
     });
@@ -163,14 +166,15 @@ async function translateWithDeepL(text: string, lang: Lang, sourceLang: Lang): P
   }
 }
 
-async function translateWithGoogle(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
+async function translateWithGoogle(text: string, lang: Lang): Promise<string | null> {
   const key = process.env.GOOGLE_TRANSLATE_API_KEY;
   if (!key) return null;
   try {
     const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ q: text, source: sourceLang, target: lang, format: "text" }),
+      // Omit source so Google Cloud Translate auto-detects per sentence
+      body: JSON.stringify({ q: text, target: lang, format: "text" }),
     });
     if (!response.ok) {
       console.error("[translate] Google", response.status);
@@ -188,26 +192,31 @@ async function translateWithGoogle(text: string, lang: Lang, sourceLang: Lang): 
 
 const LANG_NAME: Record<Lang, string> = { de: "German", en: "English", vi: "Vietnamese" };
 
-async function translateWithLLM(text: string, lang: Lang, sourceLang: Lang, engine: string): Promise<string | null> {
+async function translateWithLLM(text: string, lang: Lang, _sourceLang: Lang, engine: string): Promise<string | null> {
   const result = await askLLM({
-    system: `You are a translator. Translate the ${LANG_NAME[sourceLang]} input into natural ${LANG_NAME[lang]}. Reply with the translation only, no quotes and no commentary.`,
+    system: `You are a professional translator. Translate the input (which may be in German or English) into natural ${LANG_NAME[lang]} (${lang}). Reply ONLY with the ${LANG_NAME[lang]} translation, no quotes and no commentary. Never reply in German if the target language is ${LANG_NAME[lang]}.`,
     user: text,
     maxTokens: 400,
   }, engine);
-  return result?.trim() ?? null;
+  const trimmed = result?.trim() ?? null;
+  if (trimmed && lang !== "de" && looksLikeGerman(trimmed) && looksLikeGerman(text)) {
+    return translateWithGoogleGTX(text, lang, "de");
+  }
+  return trimmed;
 }
 
 export async function translateWithGoogleGTX(
   text: string,
   lang: Lang,
-  sourceLang: Lang,
+  sourceLang: Lang | "auto" = "auto",
 ): Promise<string | null> {
   const trimmed = text.trim();
   if (!trimmed) return null;
   try {
+    const sl = sourceLang === lang ? "auto" : sourceLang;
     const params = new URLSearchParams({
       client: "gtx",
-      sl: sourceLang,
+      sl,
       tl: lang,
       dt: "t",
       q: trimmed,
@@ -232,12 +241,12 @@ export async function translateWithGoogleGTX(
 export async function translateBatchWithGoogleGTX(
   texts: string[],
   lang: Lang,
-  sourceLang: Lang,
+  _sourceLang?: Lang,
 ): Promise<string[]> {
   return Promise.all(
     texts.map(async (t) => {
       if (!t.trim()) return "";
-      const res = await translateWithGoogleGTX(t, lang, sourceLang);
+      const res = await translateWithGoogleGTX(t, lang, "auto");
       return res ?? "";
     }),
   );
@@ -248,8 +257,9 @@ export async function translateBatchWithLLM(texts: string[], lang: Lang, sourceL
   texts.forEach((t, i) => { inputObj[String(i)] = t; });
 
   const result = await askLLM({
-    system: `You are a translator. You will receive a JSON object of text snippets in ${LANG_NAME[sourceLang]}. Translate each snippet into natural ${LANG_NAME[lang]}.
-Return ONLY a JSON object where keys are the same indices and values are the translated strings. Do not combine or drop any snippets.`,
+    system: `You are a translator. You will receive a JSON object of text snippets (primarily German or bilingual German/English). Translate every snippet into natural ${LANG_NAME[lang]} (${lang}).
+IMPORTANT: Every single value in the returned JSON MUST be written in ${LANG_NAME[lang]}. Never leave German sentences untranslated when target is ${LANG_NAME[lang]}.
+Return ONLY a JSON object where keys are the same indices and values are the translated ${LANG_NAME[lang]} strings.`,
     user: JSON.stringify(inputObj),
     maxTokens: 3000,
     json: true,
@@ -263,13 +273,15 @@ Return ONLY a JSON object where keys are the same indices and values are the tra
       
       const parsed = JSON.parse(raw);
       if (typeof parsed === "object" && parsed !== null) {
-        // Map back to array based on original indices, and fill any missing lines via Google GTX
         const mapped = await Promise.all(
           texts.map(async (orig, i) => {
             const val = String(parsed[String(i)] || "").trim();
-            if (val) return val;
+            // If LLM returned empty, or returned untouched German when target is English/Vietnamese, re-translate with GTX
+            if (val && !(lang !== "de" && looksLikeGerman(val) && looksLikeGerman(orig))) {
+              return val;
+            }
             if (!orig.trim()) return "";
-            return (await translateWithGoogleGTX(orig, lang, sourceLang)) ?? "";
+            return (await translateWithGoogleGTX(orig, lang, "auto")) ?? val;
           }),
         );
         return mapped;
@@ -279,7 +291,6 @@ Return ONLY a JSON object where keys are the same indices and values are the tra
     }
   }
 
-  // Fallback to parallel Google GTX batch so translation never stops when LLM rate-limits
   return translateBatchWithGoogleGTX(texts, lang, sourceLang);
 }
 

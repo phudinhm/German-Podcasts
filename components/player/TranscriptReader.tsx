@@ -28,7 +28,7 @@ interface TranscriptReaderProps {
 }
 
 function translationFor(seg: CaptionSegment, lang: "de" | "en" | "vi"): string | null {
-  return seg.translations?.[lang] ?? seg.translation ?? null;
+  return seg.translations?.[lang] ?? null;
 }
 
 function formatSegTime(sec: number): string {
@@ -279,10 +279,7 @@ export function TranscriptReader({
         {segments.map((seg, idx) => {
           const isActive = seg.id === activeSegmentId;
           const showForSeg = showTranslation;
-          const translation = showForSeg
-            ? translationFor(seg, translationLang) ??
-              (seg.translations ? Object.values(seg.translations)[0] ?? null : null)
-            : null;
+          const translation = showForSeg ? translationFor(seg, translationLang) : null;
 
           const segDuration = Math.max(0.6, seg.end - seg.start);
           const segProgress = isActive

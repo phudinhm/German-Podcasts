@@ -166,7 +166,14 @@ export async function* transcribeAudioStream(
         form.set("model", attempt.model);
         form.set("response_format", "verbose_json");
         form.set("temperature", "0");
-        if (sourceLang) form.set("language", WHISPER_LANG[sourceLang]);
+        // Do not force a single `language` parameter on Whisper, because forcing `de`
+        // causes Whisper to translate spoken English segments into German (and forcing `en`
+        // translates spoken German into English) on bilingual podcasts like Coffee Break German or DW.
+        // A bilingual vocabulary prompt lets Whisper transcribe German as German and English as English.
+        form.set(
+          "prompt",
+          "Deutsch, English. Guten Tag, herzlich willkommen zum Deutsch-Podcast."
+        );
 
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
           method: "POST",

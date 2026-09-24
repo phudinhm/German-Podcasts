@@ -370,7 +370,6 @@ export function MiniPlayer() {
   const activeDockTrans =
     activeDockSeg?.translations?.vi ??
     activeDockSeg?.translations?.en ??
-    (activeDockSeg?.translations ? Object.values(activeDockSeg.translations)[0] : undefined) ??
     activeDockSeg?.translation ??
     null;
 

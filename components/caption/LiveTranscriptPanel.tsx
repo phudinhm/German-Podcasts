@@ -694,20 +694,17 @@ export function LiveTranscriptPanel({
                       })}
                     </p>
 
-                    {settings.showTranslation && seg.translations && Object.keys(seg.translations).length > 0 ? (
+                    {settings.showTranslation && seg.translations?.[targetTranslateLang] ? (
                       <div className="mt-2 space-y-1 border-l-2 border-[var(--accent)]/30 pl-2.5">
-                        {Object.entries(seg.translations).map(([lang, text]) => (
-                          <p
-                            key={lang}
-                            className="text-[var(--ink-soft)] italic select-text"
-                            style={{ fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.85))}px` }}
-                          >
-                            <span className="mr-1.5 font-sans font-medium text-[9px] uppercase tracking-wider text-[var(--accent)]/70 not-italic">
-                              {lang}
-                            </span>
-                            {text}
-                          </p>
-                        ))}
+                        <p
+                          className="text-[var(--ink-soft)] italic select-text"
+                          style={{ fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.85))}px` }}
+                        >
+                          <span className="mr-1.5 font-sans font-medium text-[9px] uppercase tracking-wider text-[var(--accent)]/70 not-italic">
+                            {targetTranslateLang}
+                          </span>
+                          {seg.translations[targetTranslateLang]}
+                        </p>
                       </div>
                     ) : settings.showTranslation && seg.translation ? (
                       <p
