@@ -14,6 +14,14 @@ import {
   FONT_FAMILIES,
   type CaptionSettingsState,
 } from "./CaptionSettings";
+import {
+  listVocabulary,
+  normalizeVocabWord,
+  saveVocabularyWord,
+  removeVocabularyWord,
+  type SavedWord,
+} from "@/lib/vocabulary";
+import { VocabularyModal } from "./VocabularyModal";
 
 // How long the collapsed floating bar stays fully visible after the last
 // caption update or interaction before fading, when auto-hide is on.
@@ -61,12 +69,33 @@ export function LiveTranscriptPanel({
   const [autoScroll, setAutoScroll] = useState(settings.autoScroll);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [selectedContext, setSelectedContext] = useState<{
+    sentence: string;
+    translation?: string;
+    timestamp: number;
+  } | null>(null);
   const [wordMeaning, setWordMeaning] = useState<string | null>(null);
   const [loadingWord, setLoadingWord] = useState(false);
+  const [savedWords, setSavedWords] = useState<Record<string, SavedWord>>({});
+  const [vocabModalOpen, setVocabModalOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [grammarNotes, setGrammarNotes] = useState<Record<string, string>>({});
   const [loadingGrammarId, setLoadingGrammarId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const syncVocab = () => {
+      const list = listVocabulary();
+      const map: Record<string, SavedWord> = {};
+      for (const item of list) {
+        map[item.normalizedWord] = item;
+      }
+      setSavedWords(map);
+    };
+    syncVocab();
+    window.addEventListener("hoerbar:vocab-changed", syncVocab);
+    return () => window.removeEventListener("hoerbar:vocab-changed", syncVocab);
+  }, []);
 
   const readAloud = (text: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -207,10 +236,29 @@ export function LiveTranscriptPanel({
     }
   };
 
-  const lookupWord = async (rawWord: string) => {
+  const lookupWord = async (rawWord: string, seg?: CaptionSegment) => {
     const clean = rawWord.replace(/[^a-zA-ZäöüÄÖÜß]/g, "");
     if (!clean || clean.length < 2) return;
     setSelectedWord(clean);
+    if (seg) {
+      const trans =
+        seg.translations?.[targetTranslateLang] ??
+        seg.translation ??
+        (seg.translations ? Object.values(seg.translations)[0] : undefined);
+      setSelectedContext({
+        sentence: seg.text,
+        translation: trans,
+        timestamp: Math.max(0, seg.start + transcriptOffsetSec),
+      });
+    } else {
+      setSelectedContext(null);
+    }
+    const norm = normalizeVocabWord(clean);
+    if (savedWords[norm]) {
+      setWordMeaning(savedWords[norm].meaning);
+      setLoadingWord(false);
+      return;
+    }
     setLoadingWord(true);
     setWordMeaning(null);
     try {
@@ -445,6 +493,14 @@ export function LiveTranscriptPanel({
           <div className="flex items-center gap-1.5">
             <button
               type="button"
+              onClick={() => setVocabModalOpen(true)}
+              className="btn px-2.5 py-1 text-[11.5px] font-semibold text-[var(--accent)]"
+              title="Mở sổ từ vựng đã lưu"
+            >
+              ⭐ Từ vựng ({Object.keys(savedWords).length})
+            </button>
+            <button
+              type="button"
               onClick={() => void copyAllText()}
               className="btn px-2.5 py-1 text-[11.5px]"
               title={t("caption.copyAll")}
@@ -473,17 +529,54 @@ export function LiveTranscriptPanel({
 
       {/* Selected word definition card */}
       {selectedWord && (
-        <div className="flex items-center gap-2 border-b border-[var(--rule)] bg-[var(--accent-soft)] px-4 py-2 text-[12.5px] text-[var(--ink)]">
-          <span className="font-semibold text-[var(--accent)]">{selectedWord}:</span>
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--rule)] bg-[var(--accent-soft)] px-4 py-2 text-[12.5px] text-[var(--ink)]">
+          <button
+            type="button"
+            onClick={() => readAloud(selectedWord)}
+            className="font-bold text-[var(--accent)] hover:underline"
+            title="Nghe phát âm"
+          >
+            🔊 {selectedWord}:
+          </button>
           {loadingWord ? (
             <span className="animate-pulse">{t("caption.translating")}</span>
           ) : (
-            <span>{wordMeaning || "N/A"}</span>
+            <span className="font-semibold">{wordMeaning || "N/A"}</span>
+          )}
+          {!loadingWord && (
+            <button
+              type="button"
+              onClick={() => {
+                const norm = normalizeVocabWord(selectedWord);
+                if (savedWords[norm]) {
+                  removeVocabularyWord(selectedWord);
+                } else {
+                  saveVocabularyWord({
+                    word: selectedWord,
+                    meaning: wordMeaning || selectedWord,
+                    contextSentence: selectedContext?.sentence,
+                    contextTranslation: selectedContext?.translation,
+                    showTitle: track?.showTitle,
+                    episodeTitle: track?.title,
+                    timestamp: selectedContext?.timestamp,
+                  });
+                }
+              }}
+              className={`ml-auto rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
+                savedWords[normalizeVocabWord(selectedWord)]
+                  ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                  : "bg-[var(--accent)] text-white hover:opacity-90"
+              }`}
+            >
+              {savedWords[normalizeVocabWord(selectedWord)]
+                ? "✓ Đã lưu (Bỏ lưu)"
+                : "⭐ Lưu từ vựng"}
+            </button>
           )}
           <button
             type="button"
             onClick={() => setSelectedWord(null)}
-            className="icon-btn ml-auto h-6 w-6 text-[13px]"
+            className="icon-btn h-6 w-6 text-[13px]"
           >
             ×
           </button>
@@ -581,13 +674,19 @@ export function LiveTranscriptPanel({
                     >
                       {seg.text.split(/(\s+)/).map((token, i) => {
                         if (/^\s+$/.test(token)) return <span key={i}>{token}</span>;
+                        const norm = normalizeVocabWord(token);
+                        const saved = norm ? savedWords[norm] : undefined;
                         return (
                           <button
                             key={i}
                             type="button"
-                            onClick={() => void lookupWord(token)}
-                            className="inline-block rounded-xs hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] px-0.5 transition cursor-pointer"
-                            title="Click to translate this word"
+                            onClick={() => void lookupWord(token, seg)}
+                            className={`inline-block rounded-xs px-0.5 transition cursor-pointer ${
+                              saved
+                                ? "bg-amber-500/15 text-[var(--accent)] underline decoration-amber-400 decoration-2 underline-offset-4 font-semibold"
+                                : "hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+                            }`}
+                            title={saved ? `⭐ ${saved.word}: ${saved.meaning}` : "Click to translate & save this word"}
                           >
                             {token}
                           </button>
@@ -664,6 +763,12 @@ export function LiveTranscriptPanel({
           </button>
         </div>
       )}
+
+      <VocabularyModal
+        open={vocabModalOpen}
+        onClose={() => setVocabModalOpen(false)}
+        onSeek={onSeek}
+      />
     </section>
   );
 }

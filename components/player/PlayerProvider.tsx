@@ -50,6 +50,7 @@ interface PlayerContextValue {
   stop: () => void;
   handle: PlayerHandle;
   mediaState: MediaElementState;
+  duration: number;
   retry: () => void;
   /** URL actually handed to the element, after the https upgrade. */
   src: string | null;
@@ -348,6 +349,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [track],
   );
 
+  const [videoMinimized, setVideoMinimized] = useState(false);
+  const [videoSize, setVideoSize] = useState<"sm" | "md" | "lg">("md");
+  const [videoCorner, setVideoCorner] = useState<"top-right" | "bottom-right">("top-right");
+
+  const isVideoTrack = Boolean(
+    track &&
+      (track.kind === "video" || /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(track.url || ""))
+  );
+
+  const duration = media.state.duration || 0;
+
   const value = useMemo<PlayerContextValue>(
     () => ({
       track,
@@ -355,6 +367,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       stop,
       handle,
       mediaState: media.state,
+      duration,
       retry: media.retry,
       src: media.src,
       setStage,
@@ -380,6 +393,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       stop,
       handle,
       media.state,
+      duration,
       media.retry,
       media.src,
       media.mediaRef,
@@ -397,12 +411,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     ],
   );
 
+  const sizeClasses =
+    videoSize === "sm"
+      ? "w-44 sm:w-56"
+      : videoSize === "lg"
+        ? "w-72 sm:w-[420px]"
+        : "w-56 sm:w-80";
+
+  const cornerClasses =
+    videoCorner === "top-right"
+      ? "top-14 right-3 sm:top-16 sm:right-5"
+      : "bottom-24 right-3 sm:bottom-28 sm:right-5";
+
   return (
     <PlayerContext.Provider value={value}>
       {children}
 
       {/* Mounted once, never unmounted by routing. */}
-      {track && track.kind === "audio" ? (
+      {track && !isVideoTrack ? (
         <audio
           ref={media.mediaRef as React.RefObject<HTMLAudioElement>}
           src={media.src ?? undefined}
@@ -411,23 +437,101 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         />
       ) : null}
 
-      {track && track.kind === "video" ? (
-        <div
-          ref={attachLayer}
-          className="fixed z-[60] overflow-hidden bg-black shadow-lg transition-[opacity] duration-150"
-          style={{ top: 0, left: 0, width: 0, height: 0 }}
-        >
-          <video
-            ref={media.mediaRef as React.RefObject<HTMLVideoElement>}
-            src={media.src ?? undefined}
-            poster={track.artwork ?? undefined}
-            playsInline
-            preload="metadata"
-            className="h-full w-full object-contain"
-          />
-        </div>
-      ) : null}
+      {track && isVideoTrack ? (
+        <>
+          {/* Minimized pill when user hides the floating video */}
+          {videoMinimized && (
+            <button
+              type="button"
+              onClick={() => setVideoMinimized(false)}
+              className={`fixed z-[90] ${cornerClasses} flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-zinc-950/90 px-3 py-1.5 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md transition hover:bg-zinc-900`}
+              title="Hiện lại cửa sổ video nhỏ bên cạnh"
+            >
+              <span>🎬</span>
+              <span>Hiện Video</span>
+            </button>
+          )}
 
+          {/* Side-by-side / Floating Small Video Player ("video nhỏ bên cạnh") */}
+          <div
+            ref={attachLayer}
+            className={`fixed z-[90] overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl transition-all duration-300 ${cornerClasses} ${
+              videoMinimized
+                ? "pointer-events-none h-0 w-0 opacity-0"
+                : `${sizeClasses} aspect-video opacity-100`
+            }`}
+          >
+            {/* Top floating video control bar (visible on hover / tap) */}
+            <div className="group relative h-full w-full">
+              <video
+                ref={media.mediaRef as React.RefObject<HTMLVideoElement>}
+                src={media.src ?? undefined}
+                poster={track.artwork ?? undefined}
+                playsInline
+                preload="metadata"
+                onClick={() => {
+                  if (handle.isPlaying()) handle.pause();
+                  else handle.play();
+                }}
+                className="h-full w-full cursor-pointer object-contain bg-black"
+              />
+
+              <div className="
+                absolute inset-x-0 top-0 flex items-center justify-between gap-1
+                bg-gradient-to-b from-black/80 via-black/40 to-transparent px-2.5 py-1.5
+                opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity
+              ">
+                <span className="truncate text-[10px] font-semibold text-amber-300">
+                  🎬 Video
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVideoSize((s) => (s === "sm" ? "md" : s === "md" ? "lg" : "sm"))
+                    }
+                    className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-white/30"
+                    title="Đổi kích thước video (Nhỏ / Vừa / Lớn)"
+                  >
+                    {videoSize.toUpperCase()}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVideoCorner((c) => (c === "top-right" ? "bottom-right" : "top-right"))
+                    }
+                    className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-white/30"
+                    title="Đổi vị trí (Trên / Dưới)"
+                  >
+                    ⇅
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = media.mediaRef.current as HTMLVideoElement | null;
+                      if (el && "requestPictureInPicture" in el) {
+                        void el.requestPictureInPicture().catch(() => {});
+                      }
+                    }}
+                    className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-white/30"
+                    title="Picture-in-Picture (PiP)"
+                  >
+                    ⧉
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVideoMinimized(true)}
+                    className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-rose-500/40"
+                    title="Thu nhỏ cửa sổ video"
+                  >
+                    —
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
     </PlayerContext.Provider>
   );
 }

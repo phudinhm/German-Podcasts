@@ -79,15 +79,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     else root.setAttribute("data-accent", next);
   }, []);
 
-  const resolved = theme === "system" ? (systemDark ? "dark" : "light") : theme;
+  const resolved: "light" | "dark" =
+    theme === "system"
+      ? systemDark
+        ? "dark"
+        : "light"
+      : theme === "light" || theme === "sepia"
+        ? "light"
+        : "dark";
 
-  // The browser paints its own chrome from this: the address bar on Android,
-  // the notch surround on iOS. Left alone it stays the light colour under a
-  // dark page, which is the one seam a user always notices.
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", resolved === "dark" ? "#0d0e11" : "#ffffff");
-  }, [resolved]);
+    if (meta) {
+      const colorMap: Record<Theme, string> = {
+        system: resolved === "dark" ? "#0d0e11" : "#ffffff",
+        light: "#ffffff",
+        sepia: "#f5eee2",
+        dark: "#0d0e11",
+        ocean: "#071321",
+        forest: "#071912",
+        midnight: "#000000",
+        rose: "#1a0911",
+      };
+      meta.setAttribute("content", colorMap[theme] ?? "#0d0e11");
+    }
+  }, [theme, resolved]);
 
   const value = useMemo(
     () => ({ theme, resolved, setTheme, accent, setAccent }),
