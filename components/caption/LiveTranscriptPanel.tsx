@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUi } from "@/lib/i18n";
+import { usePlayer } from "@/components/player/PlayerProvider";
 import {
   liveCaptionService,
   type CaptionSegment,
 } from "@/lib/liveCaption";
-import { usePlayer } from "@/components/player/PlayerProvider";
 import {
   CaptionSettings,
   captionThemeStyle,
@@ -25,6 +25,7 @@ interface LiveTranscriptPanelProps {
   onUpdateSettings: (settings: CaptionSettingsState) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  isFloating?: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -42,6 +43,7 @@ export function LiveTranscriptPanel({
   onUpdateSettings,
   isCollapsed = false,
   onToggleCollapse,
+  isFloating = false,
 }: LiveTranscriptPanelProps) {
   const { t, lang } = useUi();
   const {
@@ -262,9 +264,9 @@ export function LiveTranscriptPanel({
     const activeSeg = segments.find((s) => s.id === activeSegmentId) ?? segments[segments.length - 1];
     return (
       <div
-        className={`card glass-panel flex items-center gap-3 px-3.5 py-2 shadow-lg transition-opacity duration-500 ${
+        className={`card flex items-center gap-3 px-3.5 py-2 transition-opacity duration-500 ${
           dimmed ? "opacity-35 hover:opacity-100" : "opacity-100"
-        }`}
+        } ${isFloating ? "backdrop-blur-2xl bg-[var(--paper-raised)]/90 dark:bg-[var(--paper-raised)]/80 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-[var(--rule)]/50" : ""}`}
         style={captionThemeStyle(settings.captionTheme)}
         onMouseEnter={resetHideTimer}
         onFocus={resetHideTimer}
@@ -298,11 +300,11 @@ export function LiveTranscriptPanel({
   }
 
   return (
-    <section
-      className="card glass-panel mt-4 flex flex-col overflow-hidden"
+    <section 
+      className={`card mt-4 flex flex-col overflow-hidden ${isFloating ? "backdrop-blur-2xl bg-[var(--paper-raised)]/90 dark:bg-[var(--paper-raised)]/80 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-[var(--rule)]/50" : ""}`} 
       style={captionThemeStyle(settings.captionTheme)}
     >
-      <div className="border-b border-[var(--rule)] bg-[var(--surface)] p-3.5">
+      <div className={`border-b border-[var(--rule)] p-3.5 ${isFloating ? "bg-[var(--surface)]/60" : "bg-[var(--surface)]"}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <h3 className="text-[15px] font-semibold text-[var(--ink)]">

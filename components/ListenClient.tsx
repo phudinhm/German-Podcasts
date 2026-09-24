@@ -91,6 +91,7 @@ export function ListenClient() {
   const [feed, setFeed] = useState<FeedResult | null>(null);
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [visible, setVisible] = useState(PAGE_SIZE);
+  const [feedSearch, setFeedSearch] = useState("");
 
   const [searches, setSearches] = useState<RecentSearch[]>([]);
   const [shows, setShows] = useState<SavedShow[]>([]);
@@ -554,10 +555,14 @@ export function ListenClient() {
     });
   }, [requestedFeed, openFeed, closeFeedView]);
 
-  const episodes = useMemo(
-    () => sortEpisodes(feed?.episodes ?? [], sort, recents),
-    [feed, sort, recents],
-  );
+  const episodes = useMemo(() => {
+    let list = feed?.episodes ?? [];
+    if (feedSearch) {
+      const lower = feedSearch.toLowerCase();
+      list = list.filter((e) => e.title.toLowerCase().includes(lower));
+    }
+    return sortEpisodes(list, sort, recents);
+  }, [feed, sort, recents, feedSearch]);
 
   // Loads the next page itself once the sentinel below the list scrolls
   // near view, rather than waiting for someone to find and tap a button -
@@ -1028,9 +1033,37 @@ export function ListenClient() {
                   </span>
                 ) : null}
               </div>
-            </div>
+                {feed.episodes.length > 5 && (
+                  <div className="relative mt-2 sm:mt-0 sm:w-64">
+                    <input
+                      type="text"
+                      className="field w-full pl-8 pr-8"
+                      placeholder={t("feed.searchInN", { n: feed.episodes.length })}
+                      value={feedSearch}
+                      onChange={(e) => setFeedSearch(e.target.value)}
+                    />
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-lg opacity-50" aria-hidden>
+                      🔍
+                    </span>
+                    {feedSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setFeedSearch("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
-          <ul>
+          {episodes.length === 0 && feedSearch ? (
+            <p className="py-8 text-center text-[13.5px] text-[var(--ink-faint)]">
+              {t("feed.noMatch")}
+            </p>
+          ) : (
+            <ul>
             {episodes.slice(0, visible).map((episode) => {
               const id = episode.guid || episode.url;
               const remembered = recents.find((item) => item.id === id);
@@ -1126,6 +1159,7 @@ export function ListenClient() {
               );
             })}
           </ul>
+          )}
 
           {visible < episodes.length ? (
             <div ref={loadMoreRef} className="mt-3 flex justify-center py-4">
@@ -1210,46 +1244,47 @@ export function ListenClient() {
       {(scrolledDown || feed || (results && results.length > 0)) && (
         <aside
           aria-label="Quick navigation"
-          className="fixed left-3 z-40 flex items-center gap-1.5 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/90 px-2 py-1 shadow-lg backdrop-blur-md transition-all duration-300 sm:left-6"
+          className="fixed left-3 z-40 flex items-center justify-center rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/90 p-0 shadow-lg backdrop-blur-md transition-all duration-300 sm:left-6 sm:gap-1.5 sm:px-2 sm:py-1"
           style={{
             bottom: playing
               ? "calc(76px + env(safe-area-inset-bottom, 14px))"
               : "calc(16px + env(safe-area-inset-bottom, 0px))",
           }}
         >
-          {feed ? (
-            <button
-              type="button"
-              onClick={backToResultsOrBrowse}
-              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
-              title={results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
-            >
-              <span aria-hidden>←</span>
-              <span>{t("common.back")}</span>
-            </button>
-          ) : results && results.length > 0 ? (
-            <button
-              type="button"
-              onClick={browse}
-              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
-              title={t("listen.backToBrowse")}
-            >
-              <span aria-hidden>←</span>
-              <span>{t("common.back")}</span>
-            </button>
-          ) : null}
+          <span className="hidden sm:inline-flex">
+            {feed ? (
+              <button
+                type="button"
+                onClick={backToResultsOrBrowse}
+                className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
+                title={results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
+              >
+                <span aria-hidden>←</span>
+                <span>{t("common.back")}</span>
+              </button>
+            ) : results && results.length > 0 ? (
+              <button
+                type="button"
+                onClick={browse}
+                className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
+                title={t("listen.backToBrowse")}
+              >
+                <span aria-hidden>←</span>
+                <span>{t("common.back")}</span>
+              </button>
+            ) : null}
+          </span>
 
-          {scrolledDown && (
-            <button
-              type="button"
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
-              title={t("common.scrollToTop")}
-            >
-              <span aria-hidden>↑</span>
-              <span>{t("common.scrollToTop")}</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="flex h-11 w-11 items-center justify-center rounded-full text-[14px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95 sm:h-auto sm:w-auto sm:gap-1 sm:px-2.5 sm:py-1 sm:text-[12px]"
+            title={t("common.scrollToTop")}
+            aria-label={t("common.scrollToTop")}
+          >
+            <span aria-hidden>↑</span>
+            <span className="hidden sm:inline">{t("common.scrollToTop")}</span>
+          </button>
         </aside>
       )}
     </div>

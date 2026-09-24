@@ -37,17 +37,7 @@ function formatTime(seconds: number): string {
 
 export function MiniPlayer() {
   const { t } = useUi();
-  const {
-    track,
-    handle,
-    stop,
-    mediaState,
-    inlineVisible,
-    setFullscreenOpen,
-    onGenerateTranscript,
-    generatingTranscript,
-    generateTranscriptError,
-  } = usePlayer();
+  const { track, handle, stop, mediaState, inlineVisible } = usePlayer();
   const pathname = usePathname();
 
   const [playing, setPlaying] = useState(false);
@@ -64,6 +54,7 @@ export function MiniPlayer() {
 
   // iPhone / Mobile Bottom Sheet state
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [favorited, setFavorited] = useState(false);
 
   useEffect(() => {
@@ -98,6 +89,10 @@ export function MiniPlayer() {
   const timeRef = useRef<HTMLSpanElement | null>(null);
   const popFillRef = useRef<HTMLDivElement | null>(null);
   const popTimeRef = useRef<HTMLSpanElement | null>(null);
+  const mobileFillRef = useRef<HTMLDivElement | null>(null);
+  const mobileSheetFillRef = useRef<HTMLDivElement | null>(null);
+  const mobileSheetTimeRef = useRef<HTMLSpanElement | null>(null);
+  const mobileSheetDurRef = useRef<HTMLSpanElement | null>(null);
 
   // Increased PiP window height for captions & transcripts
   const popout = usePopout({ width: 440, height: 260 });
@@ -160,9 +155,15 @@ export function MiniPlayer() {
       const percent = duration > 0 ? `${Math.min(100, (time / duration) * 100)}%` : "0%";
       if (fillRef.current) fillRef.current.style.width = percent;
       if (popFillRef.current) popFillRef.current.style.width = percent;
+      if (mobileFillRef.current) mobileFillRef.current.style.width = percent;
+      if (mobileSheetFillRef.current) mobileSheetFillRef.current.style.width = percent;
+      
       const label = formatTime(time);
       if (timeRef.current) timeRef.current.textContent = label;
       if (popTimeRef.current) popTimeRef.current.textContent = label;
+      if (mobileSheetTimeRef.current) mobileSheetTimeRef.current.textContent = label;
+      if (mobileSheetDurRef.current) mobileSheetDurRef.current.textContent = formatTime(duration);
+      
       const isPlaying = handle.isPlaying();
       if (isPlaying !== last) {
         last = isPlaying;
@@ -188,7 +189,26 @@ export function MiniPlayer() {
     }, 400);
   };
 
-  if (!track) return null;
+  const mobileTabBar = (
+    <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-[var(--paper-raised)]/90 backdrop-blur-xl border-t border-[var(--rule)] pb-[env(safe-area-inset-bottom,14px)] pt-1.5 flex items-center justify-around shadow-[0_-4px_16px_rgba(0,0,0,0.05)]">
+      <Link href="/" className={`flex flex-col items-center gap-0.5 w-16 transition-colors ${pathname === "/" ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
+        <span className="text-[22px] leading-none">🎧</span>
+        <span className="text-[10px] font-medium">{t("nav.listenTab")}</span>
+      </Link>
+      <Link href="/library" className={`flex flex-col items-center gap-0.5 w-16 transition-colors ${pathname.startsWith("/library") ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
+        <span className="text-[22px] leading-none">📚</span>
+        <span className="text-[10px] font-medium">{t("nav.libraryTab")}</span>
+      </Link>
+      <Link href="/about" className={`flex flex-col items-center gap-0.5 w-16 transition-colors ${pathname.startsWith("/about") ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
+        <span className="text-[22px] leading-none">ℹ️</span>
+        <span className="text-[10px] font-medium">{t("nav.aboutTab")}</span>
+      </Link>
+    </div>
+  );
+
+  if (!track) {
+    return mobileTabBar;
+  }
 
   const hasVideoLayer = track.kind !== "audio";
   const onListen = pathname === "/";
@@ -449,17 +469,6 @@ export function MiniPlayer() {
                     </button>
                   )}
 
-                  {/* Full-screen now-playing button */}
-                  <button
-                    type="button"
-                    onClick={() => setFullscreenOpen(true)}
-                    className="icon-btn h-7 w-7 text-[13px]"
-                    title={t("player.fullscreen")}
-                    aria-label={t("player.fullscreen")}
-                  >
-                    ⛶
-                  </button>
-
                   {/* Close button */}
                   <button
                     type="button"
@@ -496,19 +505,26 @@ export function MiniPlayer() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. MOBILE IPHONE DOCK (Dedicated Native iOS Style with Safe-Area Insets)   */}
+      {/* 2. MOBILE IPHONE DOCK (Elevated above Tab Bar)                             */}
       {/* ========================================================================= */}
+      {mobileTabBar}
       <div
         data-dock="mobile-iphone"
-        className="fixed bottom-0 inset-x-0 z-50 sm:hidden bg-black/90 dark:bg-black/95 text-white backdrop-blur-2xl border-t border-white/15 pb-[calc(0.5rem+env(safe-area-inset-bottom,14px))] pt-2.5 px-3.5 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]"
+        className="fixed inset-x-0 z-[45] sm:hidden bg-black/90 dark:bg-black/95 text-white backdrop-blur-2xl border-t border-white/15 pt-2 pb-2 px-3.5 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] transition-transform"
+        style={{ bottom: "calc(50px + env(safe-area-inset-bottom, 14px))" }}
       >
+        {/* Module D: Thin progress bar on dock */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/10">
+          <div ref={mobileFillRef} className="h-full bg-[var(--accent-ring)]" style={{ width: 0 }} />
+        </div>
+
         <div className="flex items-center justify-between gap-3">
-          {/* Tapping track info opens the slide-up drawer */}
+          {/* Tapping track info opens the full sheet */}
           <div
             onClick={() => setMobileDrawerOpen(true)}
             className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
           >
-            <Art src={track.artwork} alt="" size={42} seed={track.showTitle || track.title} />
+            <Art src={track.artwork} alt="" size={40} seed={track.showTitle || track.title} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13.5px] font-semibold leading-tight text-zinc-50">
                 {track.title}
@@ -520,16 +536,7 @@ export function MiniPlayer() {
             </div>
           </div>
 
-          {/* Large touch targets for iPhone */}
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
-              className="btn h-10 w-10 rounded-full p-0 text-[12px] text-zinc-300 hover:text-white"
-              aria-label="-10s"
-            >
-              -10
-            </button>
             <button
               type="button"
               onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
@@ -538,128 +545,170 @@ export function MiniPlayer() {
             >
               {playing ? "❚❚" : "▶"}
             </button>
-            <button
-              type="button"
-              onClick={() => setMobileDrawerOpen((v) => !v)}
-              className="btn h-10 w-10 rounded-full p-0 text-[13px] text-zinc-300 hover:text-white"
-              aria-label={t("caption.openSheet")}
-              title={t("caption.openSheet")}
-            >
-              <span aria-hidden>&#8801;</span>
-            </button>
-            <button
-              type="button"
-              onClick={toggleFav}
-              className={`btn h-10 w-10 rounded-full p-0 text-[15px] transition ${
-                favorited ? "text-rose-400 scale-105" : "text-zinc-400 hover:text-rose-400"
-              }`}
-              aria-label={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
-              title={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
-            >
-              {favorited ? "❤️" : "🤍"}
-            </button>
           </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. MOBILE IPHONE BOTTOM SHEET (Slide-up Drawer for Caption & Transcript)   */}
+      {/* 3. MOBILE FULL-SCREEN SHEET (Now Playing / Transcript)                     */}
       {/* ========================================================================= */}
       {mobileDrawerOpen && (
         <div className="fixed inset-0 z-[60] sm:hidden flex flex-col justify-end bg-black/60 backdrop-blur-xs">
           {/* Backdrop click closes */}
           <div className="flex-1" onClick={() => setMobileDrawerOpen(false)} />
 
-          {/* Slide-up Card */}
-          <div className="w-full max-h-[75vh] overflow-y-auto rounded-t-3xl bg-[var(--paper-raised)] p-4 shadow-2xl border-t border-[var(--rule)] pb-[calc(1.5rem+env(safe-area-inset-bottom,20px))]">
-            {/* Grab handle indicator */}
-            <div className="w-12 h-1.5 rounded-full bg-[var(--rule)] mx-auto mb-3" />
+          {/* Full Slide-up Sheet */}
+          <div
+            className="w-full h-[92vh] flex flex-col rounded-t-[32px] bg-[var(--paper-raised)] shadow-2xl border-t border-[var(--rule)]"
+            onTouchStart={(e) => {
+              const startY = e.touches[0].clientY;
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                if (moveEvent.touches[0].clientY - startY > 100) {
+                  setMobileDrawerOpen(false);
+                  cleanup();
+                }
+              };
+              const cleanup = () => {
+                document.removeEventListener("touchmove", handleTouchMove);
+                document.removeEventListener("touchend", cleanup);
+              };
+              document.addEventListener("touchmove", handleTouchMove, { passive: true });
+              document.addEventListener("touchend", cleanup);
+            }}
+          >
+            {/* Grab handle */}
+            <div className="w-12 h-1.5 rounded-full bg-[var(--rule)] mx-auto mt-3 mb-2 shrink-0" />
 
-            <div className="flex items-center justify-between pb-2 border-b border-[var(--rule)]">
-              <div className="min-w-0">
-                <h4 className="truncate text-[14.5px] font-semibold text-[var(--ink)]">{track.title}</h4>
-                <p className="truncate text-[12px] text-[var(--ink-faint)]">{track.showTitle}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileDrawerOpen(false);
-                    setFullscreenOpen(true);
-                  }}
-                  className="icon-btn text-[15px]"
-                  title={t("player.fullscreen")}
-                  aria-label={t("player.fullscreen")}
-                >
-                  ⛶
-                </button>
+            <div className="flex-1 overflow-y-auto thin-scroll pb-[calc(2rem+env(safe-area-inset-bottom,20px))] px-6 flex flex-col">
+              {/* Header / Hero Section */}
+              <div className="flex justify-between items-center mb-6 mt-2 shrink-0">
+                <span className="text-[12px] font-semibold text-[var(--ink-faint)] uppercase tracking-wider">
+                  {t("player.nowPlaying")}
+                </span>
                 <button
                   type="button"
                   onClick={() => setMobileDrawerOpen(false)}
-                  className="icon-btn text-[18px]"
-                  aria-label={t("common.close")}
+                  className="icon-btn bg-[var(--surface)] text-[16px]"
+                  aria-label={t("player.closeFullPlayer")}
                 >
-                  ×
+                  ↓
                 </button>
               </div>
-            </div>
 
-            {/* Running transcript. Live caption itself is desktop-only - it
-                needs a microphone or a shared browser tab, neither of which
-                is a good fit here, and it was the thing that kept prompting
-                for mic access on iPhone Chrome. */}
-            <div className="mt-3 space-y-2">
-              <h5 className="text-[12.5px] font-semibold text-[var(--ink)]">
-                {t("caption.transcript")} ({transcriptList.length})
-              </h5>
-              <div className="max-h-48 overflow-y-auto space-y-2 rounded-xl border border-[var(--rule)] p-2">
+              {/* Artwork - Large */}
+              <div className="w-full aspect-square max-w-[280px] mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl shrink-0 border border-[var(--rule)]">
+                <Art src={track.artwork} alt="" size={280} seed={track.showTitle || track.title} />
+              </div>
+
+              {/* Title & Info */}
+              <div className="flex justify-between items-start gap-4 mb-6 shrink-0">
+                <div className="min-w-0">
+                  <h2 className="text-[20px] font-bold text-[var(--ink)] leading-tight mb-1">
+                    {track.title}
+                  </h2>
+                  <p className="text-[15px] text-[var(--accent)] font-medium truncate">
+                    {track.showTitle}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleFav}
+                  className={`icon-btn shrink-0 text-[20px] transition ${
+                    favorited ? "text-rose-500 scale-110" : "text-[var(--ink-faint)] hover:text-rose-500"
+                  }`}
+                >
+                  {favorited ? "❤️" : "🤍"}
+                </button>
+              </div>
+
+              {/* Scrubber */}
+              <div className="mb-8 shrink-0">
+                <div className="h-1.5 w-full bg-[var(--rule)] rounded-full overflow-hidden relative">
+                  <div ref={mobileSheetFillRef} className="absolute left-0 top-0 bottom-0 bg-[var(--accent)]" style={{ width: 0 }} />
+                </div>
+                <div className="flex justify-between mt-2 text-[11px] font-mono font-medium text-[var(--ink-faint)]">
+                  <span ref={mobileSheetTimeRef}>0:00</span>
+                  <span ref={mobileSheetDurRef}>0:00</span>
+                </div>
+              </div>
+
+              {/* Transport Controls */}
+              <div className="flex items-center justify-center gap-6 mb-10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
+                  className="icon-btn h-14 w-14 text-[16px] bg-[var(--surface)] hover:scale-105 transition"
+                >
+                  -10
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
+                  className="btn-primary h-20 w-20 rounded-full text-[28px] shadow-lg hover:scale-105 transition flex items-center justify-center"
+                >
+                  {playing ? "❚❚" : "▶"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handle.seekTo(handle.getTime() + 30, true)}
+                  className="icon-btn h-14 w-14 text-[16px] bg-[var(--surface)] hover:scale-105 transition"
+                >
+                  +30
+                </button>
+              </div>
+
+              {/* Tools row (Speed) */}
+              <div className="flex items-center justify-between mb-8 pb-6 border-b border-[var(--rule)] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const speeds = [0.8, 1, 1.2, 1.5, 2];
+                    const next = speeds[(speeds.indexOf(playbackRate) + 1) % speeds.length] || 1;
+                    setPlaybackRate(next);
+                    handle.setRate(next);
+                  }}
+                  className="chip bg-[var(--surface)] px-4 py-2 hover:bg-[var(--rule)] transition"
+                >
+                  {playbackRate}x {t("player.speed")}
+                </button>
+                <AudioVisualizer isPlaying={playing} barCount={6} />
+              </div>
+
+              {/* Interactive Transcript */}
+              <div className="flex-1 min-h-[200px]">
+                <h3 className="text-[15px] font-bold text-[var(--ink)] mb-4 sticky top-0 bg-[var(--paper-raised)] py-2">
+                  {t("caption.transcript")} ({transcriptList.length})
+                </h3>
+                
                 {transcriptList.length === 0 ? (
-                  <div className="space-y-2 p-2 text-center">
-                    {generatingTranscript ? (
-                      <p className="text-[12px] text-[var(--ink-faint)]">{t("caption.generating")}</p>
-                    ) : (
-                      <>
-                        <p className="text-[12px] text-[var(--ink-faint)]">{t("caption.noTranscript")}</p>
-                        {generateTranscriptError ? (
-                          <p className="text-[11px] text-rose-500">
-                            {generateTranscriptError === "too-large"
-                              ? t("caption.generateTooLarge")
-                              : generateTranscriptError === "no-key"
-                                ? t("caption.generateNoProvider")
-                                : t("caption.generateFailed")}
-                          </p>
-                        ) : null}
-                        {track.url ? (
-                          <button
-                            type="button"
-                            onClick={onGenerateTranscript}
-                            className="btn btn-primary px-3 py-1 text-[11.5px]"
-                          >
-                            {t("caption.generateTranscript")}
-                          </button>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
+                  <p className="p-4 text-[14px] text-[var(--ink-faint)] text-center bg-[var(--surface)] rounded-2xl">
+                    {t("caption.desktopOnly")}
+                  </p>
                 ) : (
-                  transcriptList.map((s) => (
-                    <div
-                      key={s.id}
-                      onClick={() => {
-                        handle.seekTo(s.start, true);
-                        setMobileDrawerOpen(false);
-                      }}
-                      className="p-2 rounded-lg hover:bg-[var(--surface)] text-[12.5px] cursor-pointer"
-                    >
-                      <span className="font-mono text-[11px] font-semibold text-[var(--accent)] mr-2">
-                        ▶ {formatTime(s.start)}
-                      </span>
-                      <span className="font-medium text-[var(--ink)]">{s.text}</span>
-                      {s.translation && (
-                        <p className="text-[11.5px] text-[var(--ink-faint)] mt-0.5">{s.translation}</p>
-                      )}
-                    </div>
-                  ))
+                  <div className="space-y-3">
+                    {transcriptList.map((s) => (
+                      <div
+                        key={s.id}
+                        onClick={() => {
+                          handle.seekTo(s.start, true);
+                        }}
+                        className="p-3 rounded-xl hover:bg-[var(--surface)] active:scale-[0.98] transition cursor-pointer"
+                      >
+                        <span className="font-mono text-[12px] font-bold text-[var(--accent)] block mb-1">
+                          {formatTime(s.start)}
+                        </span>
+                        <span className="text-[15px] font-medium text-[var(--ink)] leading-snug block">
+                          {s.text}
+                        </span>
+                        {/* Hiển thị dịch từng câu theo yêu cầu mới nhất */}
+                        {s.translation && (
+                          <span className="text-[14px] text-[var(--ink-soft)] mt-1.5 block pl-3 border-l-2 border-[var(--rule)]">
+                            {s.translation}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>

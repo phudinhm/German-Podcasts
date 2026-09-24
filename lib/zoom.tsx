@@ -6,7 +6,17 @@ export const ZOOM_KEY = "hoerbar.zoom.v1";
 export const DEFAULT_ZOOM = 1.0;
 export const ZOOM_STEPS = [0.85, 0.92, 1.0, 1.12, 1.25, 1.38, 1.5];
 
-export const ZOOM_SCRIPT = `(function(){try{var z=localStorage.getItem("hoerbar.zoom.v1");if(z){var val=parseFloat(z);if(val>=0.7&&val<=2.0){document.documentElement.style.zoom=val;document.documentElement.style.setProperty("--page-zoom",String(val));}}}catch(e){}})();`;
+/**
+ * Inline script that runs before first paint.
+ *
+ * Sets `html { font-size: <val * 100>% }` instead of the non-standard `zoom`
+ * property, which breaks touch coordinates on Safari iOS, distorts fixed-
+ * position layouts, and desynchronises media queries.
+ *
+ * Because Tailwind sizing utilities are rem-based, scaling the root font-size
+ * naturally scales the entire page without any of those side-effects.
+ */
+export const ZOOM_SCRIPT = `(function(){try{var z=localStorage.getItem("hoerbar.zoom.v1");if(z){var v=parseFloat(z);if(v>=0.7&&v<=2.0){document.documentElement.style.fontSize=(v*100)+"%";}}}catch(e){}})();`;
 
 export interface ZoomContextValue {
   zoom: number;
@@ -28,6 +38,16 @@ export function useZoom(): ZoomContextValue {
   return useContext(ZoomContext);
 }
 
+function applyZoom(val: number) {
+  if (typeof document === "undefined") return;
+  try {
+    // rem-based scaling: 1.0 → 100%, 1.25 → 125%, etc.
+    document.documentElement.style.fontSize = (val * 100) + "%";
+  } catch {
+    // Fallback
+  }
+}
+
 export function ZoomProvider({ children }: { children: ReactNode }) {
   const [zoom, setZoomState] = useState<number>(DEFAULT_ZOOM);
 
@@ -46,16 +66,6 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
       // Storage unavailable
     }
   }, []);
-
-  const applyZoom = (val: number) => {
-    if (typeof document === "undefined") return;
-    try {
-      document.documentElement.style.zoom = String(val);
-      document.documentElement.style.setProperty("--page-zoom", String(val));
-    } catch {
-      // Fallback
-    }
-  };
 
   const setZoom = useCallback((level: number) => {
     const clamped = Math.min(1.8, Math.max(0.75, Math.round(level * 100) / 100));

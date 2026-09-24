@@ -86,7 +86,6 @@ const en = {
   "player.jumpToTime": "Jump to time",
   "player.back10": "Back 10 seconds",
   "player.forward30": "Forward 30 seconds",
-  "player.speed": "Speed",
   "player.loop": "Loop",
   "player.looping": "Looping",
   "player.setPoint": "set",
@@ -141,7 +140,6 @@ const en = {
 
 
 
-  "player.nowPlaying": "Now playing",
   "player.miniOpen": "Open",
   "player.miniClose": "Stop",
   "player.collapse": "Tuck away",
@@ -208,6 +206,7 @@ const en = {
   "listen.moreTopics": "+{count} more",
   "listen.fewerTopics": "Fewer",
   "caption.toggle": "Live Caption",
+  "caption.desktopOnly": "Live caption is available on desktop web.",
   "caption.transcript": "Running Transcript",
   "caption.aiPolish": "AI Polished",
   "caption.translating": "Translating…",
@@ -275,6 +274,16 @@ const en = {
   "theme.zoomIn": "Zoom in",
   "theme.zoomOut": "Zoom out",
   "theme.zoomReset": "Reset zoom",
+  "player.nowPlaying": "Now Playing",
+  "player.speed": "Speed",
+  "player.openFullPlayer": "Open full player",
+  "player.closeFullPlayer": "Close",
+  "feed.searchEpisodes": "Search episodes...",
+  "feed.searchInN": "Search in {n} episodes...",
+  "feed.noMatch": "No episodes match your search.",
+  "nav.listenTab": "Listen",
+  "nav.libraryTab": "Library",
+  "nav.aboutTab": "About",
 } as const;
 
 export type UiKey = keyof typeof en;
@@ -360,7 +369,6 @@ const de: Record<UiKey, string> = {
   "player.jumpToTime": "Zu Zeitpunkt springen",
   "player.back10": "10 Sekunden zurück",
   "player.forward30": "30 Sekunden vor",
-  "player.speed": "Tempo",
   "player.loop": "Schleife",
   "player.looping": "Schleife läuft",
   "player.setPoint": "setzen",
@@ -406,7 +414,6 @@ const de: Record<UiKey, string> = {
   "review.doneOne": "1 Karte geschafft.",
   "review.savedWithout": "ohne Übersetzung gespeichert",
   "review.listenAgain": "an der Stelle anhören",
-  "player.nowPlaying": "Läuft gerade",
   "player.miniOpen": "Öffnen",
   "player.miniClose": "Stoppen",
   "player.queue": "Folge",
@@ -458,6 +465,7 @@ const de: Record<UiKey, string> = {
   "sort.shortest": "Kürzeste zuerst",
   "sort.unplayed": "Ungehörte zuerst",
   "caption.toggle": "Live-Untertitel",
+  "caption.desktopOnly": "Live-Untertitel sind im Desktop-Web verfügbar.",
   "caption.transcript": "Mitlaufendes Transkript",
   "caption.aiPolish": "KI-optimiert",
   "caption.translating": "Übersetzen…",
@@ -525,6 +533,16 @@ const de: Record<UiKey, string> = {
   "theme.zoomIn": "Vergrößern",
   "theme.zoomOut": "Verkleinern",
   "theme.zoomReset": "Zurücksetzen",
+  "player.nowPlaying": "Aktuelle Wiedergabe",
+  "player.speed": "Tempo",
+  "player.openFullPlayer": "Player öffnen",
+  "player.closeFullPlayer": "Schließen",
+  "feed.searchEpisodes": "Episoden suchen...",
+  "feed.searchInN": "Suche in {n} Episoden...",
+  "feed.noMatch": "Keine passenden Episoden.",
+  "nav.listenTab": "Hören",
+  "nav.libraryTab": "Bibliothek",
+  "nav.aboutTab": "Info",
 };
 
 const vi: Record<UiKey, string> = {
@@ -608,7 +626,6 @@ const vi: Record<UiKey, string> = {
   "player.jumpToTime": "Nhảy đến thời điểm",
   "player.back10": "Lùi 10 giây",
   "player.forward30": "Tiến 30 giây",
-  "player.speed": "Tốc độ",
   "player.loop": "Lặp",
   "player.looping": "Đang lặp",
   "player.setPoint": "đặt",
@@ -654,7 +671,6 @@ const vi: Record<UiKey, string> = {
   "review.doneOne": "Xong 1 thẻ.",
   "review.savedWithout": "đã lưu mà không có bản dịch",
   "review.listenAgain": "nghe lại đoạn đó",
-  "player.nowPlaying": "Đang phát",
   "player.miniOpen": "Mở",
   "player.miniClose": "Dừng",
   "player.queue": "Tập",
@@ -706,6 +722,7 @@ const vi: Record<UiKey, string> = {
   "sort.shortest": "Ngắn nhất trước",
   "sort.unplayed": "Chưa nghe trước",
   "caption.toggle": "Phụ đề trực tiếp",
+  "caption.desktopOnly": "Phụ đề trực tiếp chỉ khả dụng trên web máy tính.",
   "caption.transcript": "Bản ghi lời thoại",
   "caption.aiPolish": "AI trau chuốt",
   "caption.translating": "Đang dịch…",
@@ -773,6 +790,16 @@ const vi: Record<UiKey, string> = {
   "theme.zoomIn": "Phóng to",
   "theme.zoomOut": "Thu nhỏ",
   "theme.zoomReset": "Đặt lại 100%",
+  "player.nowPlaying": "Đang phát",
+  "player.speed": "Tốc độ",
+  "player.openFullPlayer": "Mở trình phát",
+  "player.closeFullPlayer": "Đóng",
+  "feed.searchEpisodes": "Tìm tập...",
+  "feed.searchInN": "Tìm trong {n} tập...",
+  "feed.noMatch": "Không tìm thấy tập phù hợp.",
+  "nav.listenTab": "Nghe",
+  "nav.libraryTab": "Thư viện",
+  "nav.aboutTab": "Giới thiệu",
 };
 
 export const STRINGS: Record<UiLang, Record<UiKey, string>> = { en, de, vi };
