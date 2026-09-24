@@ -167,7 +167,14 @@ export async function generateTranscript(
   audioUrl: string,
   sourceLang: SpokenLang,
   isCancelled: () => boolean,
-  meta?: { title?: string; showTitle?: string; description?: string; durationSec?: number | null },
+  meta?: {
+    title?: string;
+    showTitle?: string;
+    description?: string;
+    durationSec?: number | null;
+    trackId?: string;
+    pageUrl?: string;
+  },
   onReady?: () => void,
 ): Promise<{ ok: true } | { ok: false; error: GenerateTranscriptError }> {
   let notifiedReady = false;
@@ -206,19 +213,6 @@ export async function generateTranscript(
 
   let totalSegments = 0;
 
-  // Fast 4-second preview timer: if the user speeds up audio (1.5x / 2.0x) or
-  // upstream CDN takes >4s for the first Whisper chunk, immediately show contextual
-  // preview segments so the transcript panel is never blank, then replace seamlessly
-  // when the first Whisper chunk arrives.
-  const previewTimer =
-    typeof window !== "undefined"
-      ? window.setTimeout(() => {
-          if (!isCancelled() && totalSegments === 0 && liveCaptionService.getTranscript().length === 0) {
-            applyClientFallback();
-          }
-        }, 4000)
-      : undefined;
-
   const res = await fetch("/api/transcribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -229,11 +223,12 @@ export async function generateTranscript(
       showTitle: meta?.showTitle,
       description: meta?.description,
       durationSec: meta?.durationSec,
+      trackId: meta?.trackId,
+      pageUrl: meta?.pageUrl,
     }),
   }).catch(() => null);
 
   if (!res || !res.ok || !res.body) {
-    if (previewTimer) clearTimeout(previewTimer);
     return applyClientFallback();
   }
 
@@ -242,10 +237,8 @@ export async function generateTranscript(
   let buffer = "";
 
   const pushRealSegments = (incoming: FetchedSegment[]) => {
-    if (previewTimer) clearTimeout(previewTimer);
     const mapped = incoming.map((s) => ({ ...s, isFinal: true }));
     if (totalSegments === 0) {
-      // First real AI chunk: replace any temporary preview cleanly
       liveCaptionService.loadTranscript(mapped);
     } else {
       liveCaptionService.appendTranscript(mapped);
@@ -258,7 +251,6 @@ export async function generateTranscript(
   try {
     while (true) {
       if (isCancelled()) {
-        if (previewTimer) clearTimeout(previewTimer);
         reader.cancel();
         return totalSegments > 0 ? { ok: true } : { ok: false, error: "transcription-failed" };
       }
@@ -274,7 +266,6 @@ export async function generateTranscript(
         try {
           const data = JSON.parse(line) as { segments?: FetchedSegment[]; error?: string; reason?: string };
           if (data.error) {
-            if (previewTimer) clearTimeout(previewTimer);
             if (totalSegments > 0) {
               notifyReady();
               return { ok: true };
@@ -301,14 +292,12 @@ export async function generateTranscript(
       }
     }
   } catch {
-    if (previewTimer) clearTimeout(previewTimer);
     if (totalSegments > 0) {
       notifyReady();
       return { ok: true };
     }
   }
 
-  if (previewTimer) clearTimeout(previewTimer);
   if (isCancelled()) return { ok: false, error: "transcription-failed" };
   if (totalSegments === 0) {
     return applyClientFallback();

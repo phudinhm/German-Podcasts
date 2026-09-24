@@ -190,9 +190,31 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
     } catch {
       continue;
     }
+    const itemGuid = tag(item, "guid") ?? safeUrl;
+    const itemPageUrl = tag(item, "link") ?? undefined;
+    const itemTranscripts = extractTranscripts(item);
+
+    // Automatically attach official DW LearnGerman / Nicos Weg transcript reference
+    if (
+      itemTranscripts.length === 0 &&
+      (/dw\.com|akamaihd\.net|nicosweg/i.test(safeUrl) ||
+        (itemPageUrl && /learngerman\.dw\.com/i.test(itemPageUrl)))
+    ) {
+      const dwMatch =
+        itemPageUrl?.match(/\/l-(\d{6,9})(?:[/?#]|$)/i) ??
+        (/^\d{6,9}$/.test(itemGuid.trim()) ? [null, itemGuid.trim()] : null);
+      if (dwMatch?.[1]) {
+        itemTranscripts.push({
+          url: `https://learngerman.dw.com/de/dw-transcript/l-${dwMatch[1]}`,
+          type: "text/vtt",
+          language: "de",
+        });
+      }
+    }
+
     episodes.push({
-      guid: tag(item, "guid") ?? safeUrl,
-      pageUrl: tag(item, "link") ?? undefined,
+      guid: itemGuid,
+      pageUrl: itemPageUrl,
       title: tag(item, "title") ?? "Ohne Titel",
       description: (tag(item, "description") ?? tag(item, "itunes:summary") ?? "").slice(0, 600),
       url: safeUrl,
@@ -200,7 +222,7 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
       durationSec: parseDuration(tag(item, "itunes:duration")),
       publishedAt: tag(item, "pubDate"),
       image: attr(item, "itunes:image", "href"),
-      transcripts: extractTranscripts(item),
+      transcripts: itemTranscripts,
     });
   }
 

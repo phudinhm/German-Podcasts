@@ -1,5 +1,6 @@
 import type { SpokenLang } from "../language";
 import type { TranscriptSegment } from "./transcript";
+import { fetchDwOfficialTranscript, resolveDwLessonId } from "./dwLearnGerman";
 
 /**
  * Auto-generated transcripts, for episodes whose feed publishes none.
@@ -38,6 +39,8 @@ export interface TranscribeMeta {
   showTitle?: string;
   description?: string;
   durationSec?: number | null;
+  trackId?: string;
+  pageUrl?: string;
 }
 
 export function hasTranscriptionProvider(): boolean {
@@ -483,6 +486,24 @@ export async function* transcribeAudioStream(
   signal?: AbortSignal,
   meta?: TranscribeMeta
 ): AsyncGenerator<TranscriptSegment[], void, unknown> {
+  // Tier 0: Official DW LearnGerman / Nicos Weg millisecond WebVTT & Manuscript resolver
+  try {
+    const dwLessonId = await resolveDwLessonId({
+      audioUrl: audioUrl.toString(),
+      pageUrl: meta?.pageUrl,
+      trackId: meta?.trackId,
+    });
+    if (dwLessonId) {
+      const dwSegments = await fetchDwOfficialTranscript(dwLessonId, meta?.durationSec);
+      if (dwSegments && dwSegments.length > 0) {
+        yield dwSegments;
+        return;
+      }
+    }
+  } catch {
+    // Continue to standard audio transcription pipeline if DW GraphQL fails
+  }
+
   const rawGroqKeys = (process.env.GROQ_API_KEY ?? "")
     .split(",")
     .map((k) => k.trim())
@@ -605,7 +626,7 @@ export async function* transcribeAudioStream(
   };
 
   const reader = response.body.getReader();
-  let currentTargetSize = isMp4 ? 12 * 1024 * 1024 : FIRST_CHUNK_BYTES;
+  let currentTargetSize = isMp4 ? 24 * 1024 * 1024 : FIRST_CHUNK_BYTES;
   let currentBuffer = new Uint8Array(currentTargetSize);
   let offset = 0;
   let chunkIndex = 0;

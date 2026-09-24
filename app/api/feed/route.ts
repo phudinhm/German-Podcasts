@@ -59,6 +59,17 @@ async function readPrefix(response: Response, limit: number): Promise<string> {
   return total < limit ? text : truncateToLastEntry(text);
 }
 
+const DW_FEED_ALIASES: Record<string, string> = {
+  "https://rss.dw.com/xml/rss_de_nicos-weg-video-a1":
+    "https://rss.dw.com/xml/DKpodcast_nicosweg_video_A1_de",
+  "https://rss.dw.com/xml/rss_de_nicos-weg-video-a2":
+    "https://rss.dw.com/xml/DKpodcast_nicosweg_video_A2_de",
+  "https://rss.dw.com/xml/rss_de_nicos-weg-video-b1":
+    "https://rss.dw.com/xml/DKpodcast_nicosweg_video_B1_de",
+  "https://rss.dw.com/xml/DKpodcast_topthema_de":
+    "https://rss.dw.com/xml/DKpodcast_topthemamitvokabeln_de",
+};
+
 export async function POST(request: Request) {
   let feedUrl: string;
   try {
@@ -68,6 +79,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   if (!feedUrl) return NextResponse.json({ error: "url is required" }, { status: 400 });
+
+  if (DW_FEED_ALIASES[feedUrl]) {
+    feedUrl = DW_FEED_ALIASES[feedUrl];
+  }
 
   let url: URL;
   try {

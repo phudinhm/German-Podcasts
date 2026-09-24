@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { assertPublicUrl } from "@/lib/server/feed";
 import { parseTranscript } from "@/lib/server/transcript";
+import { extractDwLessonIdSync, fetchDwOfficialTranscript } from "@/lib/server/dwLearnGerman";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   if (!url) return NextResponse.json({ error: "url is required" }, { status: 400 });
+
+  const dwLessonId = extractDwLessonIdSync({ pageUrl: url });
+  if (dwLessonId) {
+    const dwSegments = await fetchDwOfficialTranscript(dwLessonId);
+    if (dwSegments && dwSegments.length > 0) {
+      const segments = dwSegments.map((seg, index) => ({
+        id: `dw-${dwLessonId}-${index}`,
+        start: seg.start,
+        end: seg.end,
+        text: seg.text,
+        isFinal: true,
+      }));
+      return NextResponse.json(
+        { segments },
+        { headers: { "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400" } },
+      );
+    }
+  }
 
   let parsed: URL;
   try {

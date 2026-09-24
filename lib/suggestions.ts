@@ -62,8 +62,8 @@ export const SUGGESTIONS: Suggestion[] = [
     topics: ["Easy German", "German Learning"],
   },
   {
-    query: "https://rss.dw.com/xml/DKpodcast_topthema_de",
-    feedUrl: "https://rss.dw.com/xml/DKpodcast_topthema_de",
+    query: "https://rss.dw.com/xml/DKpodcast_topthemamitvokabeln_de",
+    feedUrl: "https://rss.dw.com/xml/DKpodcast_topthemamitvokabeln_de",
     label: "Top-Thema mit Vokabeln (DW)",
     publisher: "Deutsche Welle",
     lang: "de",
@@ -72,8 +72,8 @@ export const SUGGESTIONS: Suggestion[] = [
     topics: ["Easy German", "German Learning", "News"],
   },
   {
-    query: "https://rss.dw.com/xml/rss_de_nicos-weg-video-a1",
-    feedUrl: "https://rss.dw.com/xml/rss_de_nicos-weg-video-a1",
+    query: "https://rss.dw.com/xml/DKpodcast_nicosweg_video_A1_de",
+    feedUrl: "https://rss.dw.com/xml/DKpodcast_nicosweg_video_A1_de",
     label: "DW Nicos Weg (A1)",
     publisher: "Deutsche Welle",
     lang: "de",
@@ -83,8 +83,8 @@ export const SUGGESTIONS: Suggestion[] = [
     video: true,
   },
   {
-    query: "https://rss.dw.com/xml/rss_de_nicos-weg-video-a2",
-    feedUrl: "https://rss.dw.com/xml/rss_de_nicos-weg-video-a2",
+    query: "https://rss.dw.com/xml/DKpodcast_nicosweg_video_A2_de",
+    feedUrl: "https://rss.dw.com/xml/DKpodcast_nicosweg_video_A2_de",
     label: "DW Nicos Weg (A2)",
     publisher: "Deutsche Welle",
     lang: "de",
@@ -94,8 +94,8 @@ export const SUGGESTIONS: Suggestion[] = [
     video: true,
   },
   {
-    query: "https://rss.dw.com/xml/rss_de_nicos-weg-video-b1",
-    feedUrl: "https://rss.dw.com/xml/rss_de_nicos-weg-video-b1",
+    query: "https://rss.dw.com/xml/DKpodcast_nicosweg_video_B1_de",
+    feedUrl: "https://rss.dw.com/xml/DKpodcast_nicosweg_video_B1_de",
     label: "DW Nicos Weg (B1)",
     publisher: "Deutsche Welle",
     lang: "de",

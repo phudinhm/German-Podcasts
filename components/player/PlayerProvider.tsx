@@ -326,6 +326,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             showTitle: track.showTitle,
             description: track.description,
             durationSec: track.durationSec,
+            trackId: track.id,
+            pageUrl: track.pageUrl,
           },
         );
         if (isCancelled()) return;
@@ -362,6 +364,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         showTitle: track.showTitle,
         description: track.description,
         durationSec: track.durationSec,
+        trackId: track.id,
+        pageUrl: track.pageUrl,
       },
     ).then(() => {
       if (isCancelled()) return;

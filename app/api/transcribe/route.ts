@@ -27,6 +27,8 @@ export async function POST(request: Request) {
   let showTitle: string | undefined;
   let description: string | undefined;
   let durationSec: number | null | undefined;
+  let trackId: string | undefined;
+  let pageUrl: string | undefined;
   try {
     const body = (await request.json()) as {
       audioUrl?: string;
@@ -35,6 +37,8 @@ export async function POST(request: Request) {
       showTitle?: string;
       description?: string;
       durationSec?: number | null;
+      trackId?: string;
+      pageUrl?: string;
     };
     audioUrl = (body.audioUrl ?? "").trim();
     sourceLang = body.sourceLang === "de" || body.sourceLang === "en" ? body.sourceLang : undefined;
@@ -42,6 +46,8 @@ export async function POST(request: Request) {
     showTitle = body.showTitle;
     description = body.description;
     durationSec = body.durationSec;
+    trackId = body.trackId;
+    pageUrl = body.pageUrl;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -64,7 +70,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const meta = { title, showTitle, description, durationSec };
+  const meta = { title, showTitle, description, durationSec, trackId, pageUrl };
 
   let stream: AsyncGenerator<TranscriptSegment[], void, unknown>;
   try {
