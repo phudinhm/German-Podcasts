@@ -44,7 +44,14 @@ export function LiveTranscriptPanel({
   onToggleCollapse,
 }: LiveTranscriptPanelProps) {
   const { t, lang } = useUi();
-  const { track, onGenerateTranscript, generatingTranscript, generateTranscriptError } = usePlayer();
+  const {
+    track,
+    onGenerateTranscript,
+    generatingTranscript,
+    generateTranscriptError,
+    transcriptOffsetSec,
+    setTranscriptOffsetSec,
+  } = usePlayer();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [autoScroll, setAutoScroll] = useState(settings.autoScroll);
@@ -89,9 +96,12 @@ export function LiveTranscriptPanel({
     return unsub;
   }, []);
 
-  // Determine active segment based on current playback time
+  // Determine active segment based on current playback time, corrected for
+  // any country-inserted ad break pushing the real audio out of step with
+  // the transcript's own timestamps (see the sync control in CaptionSettings).
+  const contentTime = currentTime - transcriptOffsetSec;
   const activeSegmentId = segments.find(
-    (s) => currentTime >= s.start - 0.5 && currentTime <= s.end + 0.5,
+    (s) => contentTime >= s.start - 0.5 && contentTime <= s.end + 0.5,
   )?.id;
 
   // Smart Auto-scroll: auto scroll to active item unless user deliberately scrolled away
@@ -308,6 +318,9 @@ export function LiveTranscriptPanel({
               settings={settings}
               onChange={onUpdateSettings}
               compact
+              sourceLang={track?.sourceLang}
+              syncOffsetSec={transcriptOffsetSec}
+              onSyncOffsetChange={setTranscriptOffsetSec}
             />
             {onToggleCollapse && (
               <button
@@ -457,8 +470,9 @@ export function LiveTranscriptPanel({
                     <button
                       type="button"
                       onClick={() => {
-                        // 0.25s pre-roll buffer so the very first word or consonant is never cut off
-                        const target = Math.max(0, seg.start - 0.25);
+                        // 0.25s pre-roll buffer so the very first word or consonant is never cut off,
+                        // plus the sync offset to convert back from transcript time to real audio time.
+                        const target = Math.max(0, seg.start - 0.25 + transcriptOffsetSec);
                         onSeek(target);
                       }}
                       className="font-mono text-[11px] font-semibold text-[var(--ink-faint)] group-hover:text-[var(--accent)] rounded bg-[var(--surface)] px-1.5 py-0.5 transition active:scale-95 flex items-center gap-1"
