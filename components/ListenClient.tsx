@@ -664,7 +664,7 @@ export function ListenClient() {
           ref={playerRef}
           className={`card mt-6 overflow-hidden transition-all duration-300 ${
             freezePane
-              ? "sticky top-3 z-30 shadow-2xl backdrop-blur-xl bg-[var(--paper-raised)]/95 border border-[var(--accent)]/40 ring-1 ring-[var(--accent)]/20"
+              ? "sticky top-3 z-30 glass-panel border-[var(--accent)]/40 ring-1 ring-[var(--accent)]/20"
               : ""
           }`}
         >
@@ -913,10 +913,10 @@ export function ListenClient() {
       {/* ---------------- results ---------------- */}
       {results && results.length > 0 && !feed ? (
         <section className="mt-6 relative">
-          <div className="sticky top-[env(safe-area-inset-top,0)] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--bg)]/90 px-2 py-3 backdrop-blur-xl">
+          <div className="sticky top-[env(safe-area-inset-top,0)] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--paper)]/75 px-3 py-3 backdrop-blur-2xl border-b border-[var(--rule)]/40 shadow-sm">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2 py-1 rounded bg-[var(--surface)] shadow-xs"
+              className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2 py-1 rounded bg-[var(--surface)]/80 backdrop-blur-md shadow-sm border border-[var(--rule)]/50"
               onClick={browse}
             >
               <span aria-hidden>←</span>
@@ -977,10 +977,10 @@ export function ListenClient() {
       {/* ---------------- episodes ---------------- */}
       {feed ? (
         <section className="mt-4 relative">
-          <div className="sticky top-[env(safe-area-inset-top,0)] z-20 -mx-2 mb-2 flex items-center justify-between gap-2 bg-[var(--bg)]/90 px-2 py-3 backdrop-blur-xl">
+          <div className="sticky top-[env(safe-area-inset-top,0)] z-20 -mx-2 mb-3 flex items-center justify-between gap-2 bg-[var(--paper)]/75 px-3 py-3 backdrop-blur-2xl border-b border-[var(--rule)]/40 shadow-sm">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2 py-1 rounded bg-[var(--surface)] shadow-xs"
+              className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2 py-1 rounded bg-[var(--surface)]/80 backdrop-blur-md shadow-sm border border-[var(--rule)]/50"
               onClick={backToResultsOrBrowse}
             >
               <span aria-hidden>←</span>
@@ -1244,7 +1244,7 @@ export function ListenClient() {
       {(scrolledDown || feed || (results && results.length > 0)) && (
         <aside
           aria-label="Quick navigation"
-          className="fixed left-3 z-40 flex items-center justify-center rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/90 p-0 shadow-lg backdrop-blur-md transition-all duration-300 sm:left-6 sm:gap-1.5 sm:px-2 sm:py-1"
+          className="fixed left-3 z-40 flex items-center justify-center rounded-full border border-[var(--rule)]/50 bg-[var(--paper-raised)]/75 p-0 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl transition-all duration-300 sm:left-6 sm:gap-1.5 sm:px-2 sm:py-1"
           style={{
             bottom: playing
               ? "calc(76px + env(safe-area-inset-bottom, 14px))"

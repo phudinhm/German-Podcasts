@@ -5,6 +5,8 @@ import { useUi } from "@/lib/i18n";
 import { liveCaptionService, type CaptionSegment } from "@/lib/liveCaption";
 import { usePlayer } from "./PlayerProvider";
 
+import { FONT_FAMILIES, type FontFamily, type CaptionTheme, captionThemeStyle } from "../caption/CaptionSettings";
+
 interface TranscriptReaderProps {
   currentTime: number;
   onSeek: (seconds: number) => void;
@@ -17,6 +19,8 @@ interface TranscriptReaderProps {
    * the view snapping back to the current one on every segment change. */
   autoScroll: boolean;
   fontSize: number;
+  fontFamily: FontFamily;
+  theme: CaptionTheme;
 }
 
 function translationFor(seg: CaptionSegment, lang: "de" | "en" | "vi"): string | null {
@@ -41,6 +45,8 @@ export function TranscriptReader({
   translationLang,
   autoScroll,
   fontSize,
+  fontFamily,
+  theme,
 }: TranscriptReaderProps) {
   const { t } = useUi();
   const { track, onGenerateTranscript, generatingTranscript, generateTranscriptError, transcriptOffsetSec } =
@@ -53,9 +59,6 @@ export function TranscriptReader({
     return liveCaptionService.onTranscript(setSegments);
   }, []);
 
-  // The transcript's own clock, once a dynamically inserted ad break (its
-  // length varying by country, sometimes by request) has pushed the real
-  // audio out of step with it - see the sync control in CaptionSettings.
   const contentTime = currentTime - transcriptOffsetSec;
 
   const activeSegmentId = segments.find(
@@ -67,19 +70,39 @@ export function TranscriptReader({
     activeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [activeSegmentId, autoScroll]);
 
+  // Determine colors based on theme using the CSS variables from captionThemeStyle
+  // By default (modern), TranscriptReader is inside a dark FullscreenPlayer.
+  // When a theme is selected, the CSS variables like --ink and --ink-soft will be redefined.
+  
+  // For the default "modern" theme, we want white text on the dark player background.
+  // For other themes, we use the theme's defined --ink.
+  const isModern = theme === "modern";
+  
+  const inactiveColor = isModern ? "text-white/40" : "text-[var(--ink-faint)]";
+  const activeColor = isModern ? "text-white" : "text-[var(--ink)]";
+  const hoverColor = isModern ? "hover:text-white/70" : "hover:text-[var(--ink-soft)]";
+  const translationColor = isModern ? "text-white/60" : "text-[var(--ink-soft)]";
+  const borderColor = isModern ? "border-white/20" : "border-[var(--rule)]";
+  const generatingText = isModern ? "text-white" : "text-[var(--ink)]";
+  const generatingHint = isModern ? "text-white/50" : "text-[var(--ink-soft)]";
+  const errorText = isModern ? "text-rose-300" : "text-rose-600";
+  const btnClasses = isModern 
+    ? "bg-white text-black" 
+    : "bg-[var(--ink)] text-[var(--surface)]";
+
   if (segments.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center rounded-xl" style={captionThemeStyle(theme)}>
         {generatingTranscript ? (
           <>
-            <p className="text-[15px] font-medium text-white">{t("caption.generating")}</p>
-            <p className="max-w-xs text-[12.5px] text-white/50">{t("caption.generatingHint")}</p>
+            <p className={`text-[15px] font-medium ${generatingText}`}>{t("caption.generating")}</p>
+            <p className={`max-w-xs text-[12.5px] ${generatingHint}`}>{t("caption.generatingHint")}</p>
           </>
         ) : (
           <>
-            <p className="text-[14px] text-white/50">{t("caption.noTranscript")}</p>
+            <p className={`text-[14px] ${generatingHint}`}>{t("caption.noTranscript")}</p>
             {generateTranscriptError ? (
-              <p className="max-w-xs text-[12px] text-rose-300">
+              <p className={`max-w-xs text-[12px] ${errorText}`}>
                 {generateTranscriptError === "too-large"
                   ? t("caption.generateTooLarge")
                   : generateTranscriptError === "no-key"
@@ -91,7 +114,7 @@ export function TranscriptReader({
               <button
                 type="button"
                 onClick={onGenerateTranscript}
-                className="rounded-full bg-white px-4 py-1.5 text-[12.5px] font-medium text-black transition active:scale-95"
+                className={`rounded-full px-4 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${btnClasses}`}
               >
                 {t("caption.generateTranscript")}
               </button>
@@ -103,11 +126,11 @@ export function TranscriptReader({
   }
 
   return (
-    <div className="h-full overflow-y-auto px-6 sm:px-10" style={{ scrollbarWidth: "none" }}>
+    <div className={`h-full overflow-y-auto px-6 sm:px-10 transition-colors duration-500 rounded-xl ${!isModern ? "bg-[var(--surface)]" : ""}`} style={{ ...captionThemeStyle(theme), scrollbarWidth: "none" }}>
       <div className="mx-auto max-w-xl py-[38vh]">
         <p
-          className="text-center font-medium text-white/40"
-          style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
+          className={`text-center font-medium ${inactiveColor}`}
+          style={{ fontSize: `${fontSize}px`, lineHeight: 1.7, fontFamily: FONT_FAMILIES[fontFamily] }}
         >
           {segments.map((seg) => {
             const isActive = seg.id === activeSegmentId;
@@ -118,15 +141,15 @@ export function TranscriptReader({
                   ref={isActive ? activeRef : null}
                   onClick={() => onSeek(Math.max(0, seg.start - 0.25 + transcriptOffsetSec))}
                   className={`cursor-pointer transition-colors duration-300 ${
-                    isActive ? "font-semibold text-white" : "hover:text-white/70"
+                    isActive ? `font-semibold ${activeColor}` : hoverColor
                   }`}
                 >
                   {seg.text}
                 </span>
                 {translation ? (
                   <span
-                    className="mx-1 block py-1 text-white/45"
-                    style={{ fontSize: `${Math.max(13, Math.round(fontSize * 0.68))}px`, lineHeight: 1.5 }}
+                    className={`mx-1 block py-1 mt-1 italic border-l-2 pl-3 ${translationColor} ${borderColor}`}
+                    style={{ fontSize: `${Math.max(13, Math.round(fontSize * 0.72))}px`, lineHeight: 1.5 }}
                   >
                     {translation}
                   </span>

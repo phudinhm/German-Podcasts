@@ -67,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
         <UiLangProvider>
           <PlayerProvider>
-          <header className="sticky top-0 z-40 border-b border-[var(--rule)] bg-[color-mix(in_oklab,var(--paper)_92%,transparent)] backdrop-blur">
+          <header className="sticky top-0 z-40 glass-panel border-x-0 border-t-0">
             <Nav />
           </header>
 

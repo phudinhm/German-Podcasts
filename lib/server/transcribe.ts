@@ -37,74 +37,127 @@ export function hasTranscriptionProvider(): boolean {
   return Boolean(process.env.GROQ_API_KEY);
 }
 
-export async function transcribeAudio(audioUrl: URL, sourceLang?: SpokenLang): Promise<TranscribeResult> {
+export async function* transcribeAudioStream(
+  audioUrl: URL,
+  sourceLang?: SpokenLang,
+  signal?: AbortSignal
+): AsyncGenerator<TranscriptSegment[], void, unknown> {
   const key = process.env.GROQ_API_KEY;
-  if (!key) return { ok: false, reason: "no-key" };
+  if (!key) throw new Error("no-key");
 
-  let buffer: ArrayBuffer;
-  let contentType: string;
+  let response: Response;
   try {
-    const response = await fetch(audioUrl, {
+    response = await fetch(audioUrl, {
       headers: { "User-Agent": "Hoerbar/0.1 (transcription)" },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       redirect: "follow",
+      signal
     });
-    if (!response.ok) return { ok: false, reason: "fetch-failed" };
-
-    buffer = await response.arrayBuffer();
-    contentType = response.headers.get("content-type") ?? "audio/mpeg";
+    if (!response.ok || !response.body) throw new Error("fetch-failed");
   } catch {
-    return { ok: false, reason: "fetch-failed" };
+    throw new Error("fetch-failed");
   }
 
-  try {
-    const chunks: Blob[] = [];
-    for (let i = 0; i < buffer.byteLength; i += MAX_AUDIO_BYTES) {
-      chunks.push(new Blob([buffer.slice(i, i + MAX_AUDIO_BYTES)], { type: contentType }));
+  const contentType = response.headers.get("content-type") ?? "audio/mpeg";
+
+  const transcribeChunk = async (chunk: Blob, index: number) => {
+    const form = new FormData();
+    form.set("file", chunk, `episode_part_${index}.mp3`);
+    form.set("model", GROQ_MODEL);
+    form.set("response_format", "verbose_json");
+    if (sourceLang) form.set("language", WHISPER_LANG[sourceLang]);
+
+    const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+      signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      console.error(`[transcribe] Groq chunk ${index}`, res.status, await res.text().catch(() => ""));
+      throw new Error("transcription-failed");
     }
 
-    const transcribeChunk = async (chunk: Blob, index: number) => {
-      const form = new FormData();
-      form.set("file", chunk, `episode_part_${index}.mp3`);
-      form.set("model", GROQ_MODEL);
-      form.set("response_format", "verbose_json");
-      if (sourceLang) form.set("language", WHISPER_LANG[sourceLang]);
-
-      const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}` },
-        body: form,
-        signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
-      });
-      if (!response.ok) {
-        console.error(`[transcribe] Groq chunk ${index}`, response.status, await response.text().catch(() => ""));
-        throw new Error("transcription-failed");
-      }
-
-      const data = (await response.json()) as {
-        segments?: Array<{ start: number; end: number; text: string }>;
-        text?: string;
-      };
-
-      const segments = (data.segments ?? [])
-        .map((seg) => ({ start: seg.start, end: seg.end, text: seg.text.trim() }))
-        .filter((seg) => seg.text.length > 0);
-
-      if (segments.length === 0 && data.text?.trim()) {
-        segments.push({ start: 0, end: Number.MAX_SAFE_INTEGER, text: data.text.trim() });
-      }
-      return segments;
+    const data = (await res.json()) as {
+      segments?: Array<{ start: number; end: number; text: string }>;
+      text?: string;
     };
 
-    const chunkResults = await Promise.all(chunks.map((c, i) => transcribeChunk(c, i)));
+    const segments = (data.segments ?? [])
+      .map((seg) => ({ start: seg.start, end: seg.end, text: seg.text.trim() }))
+      .filter((seg) => seg.text.length > 0);
 
-    const finalSegments: TranscriptSegment[] = [];
-    let currentTimeOffset = 0;
+    if (segments.length === 0 && data.text?.trim()) {
+      segments.push({ start: 0, end: Number.MAX_SAFE_INTEGER, text: data.text.trim() });
+    }
+    return { index, segments };
+  };
 
-    for (const chunkSegments of chunkResults) {
+  const reader = response.body.getReader();
+  let currentBuffer = new Uint8Array(MAX_AUDIO_BYTES);
+  let offset = 0;
+  let chunkIndex = 0;
+  const chunkPromises: Promise<{ index: number; segments: TranscriptSegment[] }>[] = [];
+  let isDownloadDone = false;
+  let downloadError: Error | null = null;
+
+  const flushChunk = (buffer: Uint8Array, length: number, index: number) => {
+    const blob = new Blob([buffer.slice(0, length)], { type: contentType });
+    chunkPromises.push(transcribeChunk(blob, index));
+  };
+
+  // Run download in the background so we can yield chunks as soon as they are pushed and resolved!
+  const downloadTask = (async () => {
+    try {
+      while (true) {
+        if (signal?.aborted) {
+          reader.cancel();
+          break;
+        }
+        const { done, value } = await reader.read();
+        if (done) {
+          if (offset > 0) flushChunk(currentBuffer, offset, chunkIndex);
+          break;
+        }
+        
+        let valueOffset = 0;
+        while (valueOffset < value.length) {
+          const remainingSpace = MAX_AUDIO_BYTES - offset;
+          const bytesToCopy = Math.min(remainingSpace, value.length - valueOffset);
+          currentBuffer.set(value.subarray(valueOffset, valueOffset + bytesToCopy), offset);
+          offset += bytesToCopy;
+          valueOffset += bytesToCopy;
+
+          if (offset === MAX_AUDIO_BYTES) {
+            flushChunk(currentBuffer, offset, chunkIndex++);
+            currentBuffer = new Uint8Array(MAX_AUDIO_BYTES);
+            offset = 0;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[transcribe] Reader failed:", error);
+      downloadError = new Error("fetch-failed");
+    } finally {
+      isDownloadDone = true;
+    }
+  })();
+
+  let currentTimeOffset = 0;
+  let yieldedCount = 0;
+
+  while (!isDownloadDone || yieldedCount < chunkPromises.length) {
+    if (signal?.aborted) break;
+    if (downloadError) throw downloadError;
+    
+    if (yieldedCount < chunkPromises.length) {
+      const chunkResult = await chunkPromises[yieldedCount];
+      const chunkSegments = chunkResult.segments;
+      yieldedCount++;
+      
       if (chunkSegments.length === 0) continue;
       
       let maxEndInChunk = 0;
+      const finalSegments: TranscriptSegment[] = [];
       for (const seg of chunkSegments) {
         if (seg.end !== Number.MAX_SAFE_INTEGER) {
           maxEndInChunk = Math.max(maxEndInChunk, seg.end);
@@ -116,11 +169,13 @@ export async function transcribeAudio(audioUrl: URL, sourceLang?: SpokenLang): P
         });
       }
       currentTimeOffset += maxEndInChunk;
+      yield finalSegments;
+    } else {
+      // Wait for a short time before checking again if a new chunk was pushed or download finished
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
-
-    return { ok: true, segments: finalSegments };
-  } catch (error) {
-    console.error("[transcribe] Failed:", error);
-    return { ok: false, reason: "transcription-failed" };
   }
+
+  // Ensure download task is fully awaited so we don't leave unhandled rejections, though it catches internally
+  await downloadTask;
 }

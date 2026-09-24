@@ -10,6 +10,7 @@ import {
 import {
   CaptionSettings,
   captionThemeStyle,
+  FONT_FAMILIES,
   type CaptionSettingsState,
 } from "./CaptionSettings";
 
@@ -266,7 +267,7 @@ export function LiveTranscriptPanel({
       <div
         className={`card flex items-center gap-3 px-3.5 py-2 transition-opacity duration-500 ${
           dimmed ? "opacity-35 hover:opacity-100" : "opacity-100"
-        } ${isFloating ? "backdrop-blur-2xl bg-[var(--paper-raised)]/90 dark:bg-[var(--paper-raised)]/80 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-[var(--rule)]/50" : ""}`}
+        } ${isFloating ? "glass-panel" : ""}`}
         style={captionThemeStyle(settings.captionTheme)}
         onMouseEnter={resetHideTimer}
         onFocus={resetHideTimer}
@@ -301,7 +302,7 @@ export function LiveTranscriptPanel({
 
   return (
     <section 
-      className={`card mt-4 flex flex-col overflow-hidden ${isFloating ? "backdrop-blur-2xl bg-[var(--paper-raised)]/90 dark:bg-[var(--paper-raised)]/80 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-[var(--rule)]/50" : ""}`} 
+      className={`card mt-4 flex flex-col overflow-hidden ${isFloating ? "glass-panel" : ""}`} 
       style={captionThemeStyle(settings.captionTheme)}
     >
       <div className={`border-b border-[var(--rule)] p-3.5 ${isFloating ? "bg-[var(--surface)]/60" : "bg-[var(--surface)]"}`}>
@@ -496,7 +497,7 @@ export function LiveTranscriptPanel({
                   </div>
 
                   {/* German text & Vietnamese translation */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0" style={{ fontFamily: FONT_FAMILIES[settings.fontFamily] }}>
                     <p
                       className="font-medium text-[var(--ink)] select-text"
                       style={{
@@ -521,14 +522,14 @@ export function LiveTranscriptPanel({
                     </p>
 
                     {settings.showTranslation && (settings.translationVisibility === "all" || isActive) && seg.translations ? (
-                      <div className="mt-1 space-y-0.5">
+                      <div className="mt-2 space-y-1 border-l-2 border-[var(--accent)]/30 pl-2.5">
                         {Object.entries(seg.translations).map(([lang, text]) => (
                           <p
                             key={lang}
-                            className="text-[var(--ink-soft)] select-text"
-                            style={{ fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.8))}px` }}
+                            className="text-[var(--ink-soft)] italic select-text"
+                            style={{ fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.85))}px` }}
                           >
-                            <span className="mr-1.5 font-mono text-[10px] uppercase text-[var(--ink-faint)]">
+                            <span className="mr-1.5 font-sans font-medium text-[9px] uppercase tracking-wider text-[var(--accent)]/70 not-italic">
                               {lang}
                             </span>
                             {text}
@@ -537,9 +538,9 @@ export function LiveTranscriptPanel({
                       </div>
                     ) : settings.showTranslation && (settings.translationVisibility === "all" || isActive) && seg.translation ? (
                       <p
-                        className="mt-1 text-[var(--ink-soft)] select-text"
+                        className="mt-2 border-l-2 border-[var(--accent)]/30 pl-2.5 text-[var(--ink-soft)] italic select-text"
                         style={{
-                          fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.8))}px`,
+                          fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.85))}px`,
                         }}
                       >
                         {seg.translation}

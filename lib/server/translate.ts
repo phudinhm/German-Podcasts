@@ -46,6 +46,7 @@ export async function translate(
   text: string,
   targetLang: Lang,
   sourceLang: Lang = "de",
+  engine: string = "auto",
 ): Promise<TranslationResult> {
   if (!text.trim()) return { text: null, source: "none" };
   if (targetLang === sourceLang) return { text, source: "none" };
@@ -56,8 +57,8 @@ export async function translate(
   const google = await translateWithGoogle(text, targetLang, sourceLang);
   if (google) return { text: google, source: "google" };
 
-  const anthropic = await translateWithAnthropic(text, targetLang, sourceLang);
-  if (anthropic) return { text: anthropic, source: "anthropic" };
+  const llm = await translateWithLLM(text, targetLang, sourceLang, engine);
+  if (llm) return { text: llm, source: "anthropic" };
 
   const free = await translateWithMyMemory(text, targetLang, sourceLang);
   if (free) return { text: free, source: "mymemory" };
@@ -184,13 +185,43 @@ async function translateWithGoogle(text: string, lang: Lang, sourceLang: Lang): 
 
 const LANG_NAME: Record<Lang, string> = { de: "German", en: "English", vi: "Vietnamese" };
 
-async function translateWithAnthropic(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
-  const result = await askClaude({
+async function translateWithLLM(text: string, lang: Lang, sourceLang: Lang, engine: string): Promise<string | null> {
+  const result = await askLLM({
     system: `You are a translator. Translate the ${LANG_NAME[sourceLang]} input into natural ${LANG_NAME[lang]}. Reply with the translation only, no quotes and no commentary.`,
     user: text,
     maxTokens: 400,
-  });
+  }, engine);
   return result?.trim() ?? null;
+}
+
+export async function translateBatchWithLLM(texts: string[], lang: Lang, sourceLang: Lang, engine: string): Promise<string[] | null> {
+  const inputObj: Record<string, string> = {};
+  texts.forEach((t, i) => { inputObj[String(i)] = t; });
+
+  const result = await askLLM({
+    system: `You are a translator. You will receive a JSON object of text snippets in ${LANG_NAME[sourceLang]}. Translate each snippet into natural ${LANG_NAME[lang]}.
+Return ONLY a JSON object where keys are the same indices and values are the translated strings. Do not combine or drop any snippets.`,
+    user: JSON.stringify(inputObj),
+    maxTokens: 2500,
+    json: true,
+  }, engine);
+  if (!result) return null;
+  
+  try {
+    let raw = result.trim();
+    if (raw.startsWith("```json")) raw = raw.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+    if (raw.startsWith("```")) raw = raw.replace(/^```\n?/, "").replace(/\n?```$/, "");
+    
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null) {
+      // Map it back to array based on the original indices
+      return texts.map((_, i) => String(parsed[String(i)] || ""));
+    }
+    return null;
+  } catch (e) {
+    console.error("[translateBatchWithLLM] failed to parse JSON:", e);
+    return null;
+  }
 }
 
 export interface ClaudeRequest {

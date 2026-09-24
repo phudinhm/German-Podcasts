@@ -122,6 +122,11 @@ class LiveCaptionService {
     this.notifyTranscript();
   }
 
+  public appendTranscript(segments: CaptionSegment[]) {
+    this.currentTranscript = [...this.currentTranscript, ...segments];
+    this.notifyTranscript();
+  }
+
   /**
    * Fills in one language's worth of auto-translated lines as they come
    * back, without disturbing anything already loaded - translation happens
