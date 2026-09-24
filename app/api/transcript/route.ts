@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { assertPublicUrl } from "@/lib/server/feed";
 import { parseTranscript } from "@/lib/server/transcript";
 import { extractDwLessonIdSync, fetchDwOfficialTranscript } from "@/lib/server/dwLearnGerman";
+import { splitLongTranscriptSegments } from "@/lib/server/transcribe";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
   if (dwLessonId) {
     const dwSegments = await fetchDwOfficialTranscript(dwLessonId);
     if (dwSegments && dwSegments.length > 0) {
-      const segments = dwSegments.map((seg, index) => ({
+      const segments = splitLongTranscriptSegments(dwSegments).map((seg, index) => ({
         id: `dw-${dwLessonId}-${index}`,
         start: seg.start,
         end: seg.end,
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  const segments = parseTranscript(body, type).map((seg, index) => ({
+  const segments = splitLongTranscriptSegments(parseTranscript(body, type)).map((seg, index) => ({
     id: `pub-${index}`,
     start: seg.start,
     end: seg.end,

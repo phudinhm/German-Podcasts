@@ -311,7 +311,7 @@ export function TranscriptReader({
                 key={seg.id}
                 ref={isActive ? activeRef : null}
                 onClick={() => onSeek(Math.max(0, seg.start - 0.2 + transcriptOffsetSec))}
-                className={`group relative overflow-hidden cursor-pointer rounded-2xl px-4 py-3.5 transition-all duration-300 text-center ${
+                className={`group relative overflow-visible cursor-pointer rounded-2xl px-4 py-3.5 transition-all duration-300 text-center ${
                   isActive
                     ? isModern
                       ? "bg-white/[0.13] shadow-xl ring-1 ring-amber-300/35 backdrop-blur-md scale-[1.015]"
@@ -450,7 +450,7 @@ export function TranscriptReader({
 
               {translation ? (
                 <p
-                  className={`relative z-10 mt-2 font-normal leading-relaxed italic select-text transition-all ${
+                  className={`relative z-10 mt-2 whitespace-pre-wrap break-words font-normal leading-relaxed italic select-text transition-all ${
                     isModern ? "text-amber-200/90 font-medium" : "text-[var(--accent)] font-medium"
                   }`}
                   style={{

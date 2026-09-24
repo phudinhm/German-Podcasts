@@ -194,9 +194,9 @@ const LANG_NAME: Record<Lang, string> = { de: "German", en: "English", vi: "Viet
 
 async function translateWithLLM(text: string, lang: Lang, _sourceLang: Lang, engine: string): Promise<string | null> {
   const result = await askLLM({
-    system: `You are a professional translator. Translate the input (which may be in German or English) into natural ${LANG_NAME[lang]} (${lang}). Reply ONLY with the ${LANG_NAME[lang]} translation, no quotes and no commentary. Never reply in German if the target language is ${LANG_NAME[lang]}.`,
+    system: `You are a professional translator. Translate the entire input (which may be in German or English) completely into natural ${LANG_NAME[lang]} (${lang}). Do not omit or summarize any clause. Reply ONLY with the complete ${LANG_NAME[lang]} translation, no quotes and no commentary. Never reply in German if the target language is ${LANG_NAME[lang]}.`,
     user: text,
-    maxTokens: 400,
+    maxTokens: 1200,
   }, engine);
   const trimmed = result?.trim() ?? null;
   if (trimmed && lang !== "de" && looksLikeGerman(trimmed) && looksLikeGerman(text)) {
@@ -205,12 +205,12 @@ async function translateWithLLM(text: string, lang: Lang, _sourceLang: Lang, eng
   return trimmed;
 }
 
-export async function translateWithGoogleGTX(
-  text: string,
+async function fetchSingleGTXChunk(
+  chunk: string,
   lang: Lang,
   sourceLang: Lang | "auto" = "auto",
 ): Promise<string | null> {
-  const trimmed = text.trim();
+  const trimmed = chunk.trim();
   if (!trimmed) return null;
   try {
     const sl = sourceLang === lang ? "auto" : sourceLang;
@@ -238,6 +238,37 @@ export async function translateWithGoogleGTX(
   }
 }
 
+export async function translateWithGoogleGTX(
+  text: string,
+  lang: Lang,
+  sourceLang: Lang | "auto" = "auto",
+): Promise<string | null> {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  if (trimmed.length <= 350) {
+    return fetchSingleGTXChunk(trimmed, lang, sourceLang);
+  }
+  // Split long multi-sentence text into <=350-char sentence groups so URL length or GTX chunking never cuts off the end
+  const sentences = trimmed.split(/(?<=[.!?…;])\s+/);
+  const chunks: string[] = [];
+  let current = "";
+  for (const s of sentences) {
+    if ((current + " " + s).trim().length > 350 && current) {
+      chunks.push(current.trim());
+      current = s;
+    } else {
+      current = `${current} ${s}`.trim();
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+
+  const translatedParts = await Promise.all(
+    chunks.map((c) => fetchSingleGTXChunk(c, lang, sourceLang))
+  );
+  const joined = translatedParts.filter(Boolean).join(" ").trim();
+  return joined || null;
+}
+
 export async function translateBatchWithGoogleGTX(
   texts: string[],
   lang: Lang,
@@ -257,11 +288,11 @@ export async function translateBatchWithLLM(texts: string[], lang: Lang, sourceL
   texts.forEach((t, i) => { inputObj[String(i)] = t; });
 
   const result = await askLLM({
-    system: `You are a translator. You will receive a JSON object of text snippets (primarily German or bilingual German/English). Translate every snippet into natural ${LANG_NAME[lang]} (${lang}).
+    system: `You are a translator. You will receive a JSON object of text snippets (primarily German or bilingual German/English). Translate every snippet COMPLETELY without omitting any sentence or clause into natural ${LANG_NAME[lang]} (${lang}).
 IMPORTANT: Every single value in the returned JSON MUST be written in ${LANG_NAME[lang]}. Never leave German sentences untranslated when target is ${LANG_NAME[lang]}.
-Return ONLY a JSON object where keys are the same indices and values are the translated ${LANG_NAME[lang]} strings.`,
+Return ONLY a JSON object where keys are the same indices and values are the complete translated ${LANG_NAME[lang]} strings.`,
     user: JSON.stringify(inputObj),
-    maxTokens: 3000,
+    maxTokens: 4096,
     json: true,
   }, engine);
 

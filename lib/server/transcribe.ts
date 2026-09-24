@@ -18,14 +18,14 @@ const GROQ_MODELS = ["whisper-large-v3-turbo", "whisper-large-v3"] as const;
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"] as const;
 
 /**
- * Ultra-fast progressive chunking (after stripping ID3v2 cover art):
- * - Chunk 0 is 1.25 MB of pure audio (~80 seconds of speech) -> transcribes in ~0.5s!
- * - Chunk 1 is 3 MB (~3 minutes of speech).
- * - Subsequent chunks are 6 MB (~6.5 minutes each).
+ * Ultra-fast progressive chunking (after stripping ID3v2 cover art and Xing/Info frame):
+ * - Chunk 0 is 768 KB of pure audio (~46 seconds of speech) -> transcribes in ~0.4s!
+ * - Chunk 1 is 2.5 MB (~2.5 minutes of speech).
+ * - Subsequent chunks are 5.5 MB (~6 minutes each).
  */
-const FIRST_CHUNK_BYTES = Math.floor(1.25 * 1024 * 1024);
-const SECOND_CHUNK_BYTES = 3 * 1024 * 1024;
-const SUBSEQUENT_CHUNK_BYTES = 6 * 1024 * 1024;
+const FIRST_CHUNK_BYTES = 768 * 1024;
+const SECOND_CHUNK_BYTES = Math.floor(2.5 * 1024 * 1024);
+const SUBSEQUENT_CHUNK_BYTES = Math.floor(5.5 * 1024 * 1024);
 const MAX_TOTAL_BYTES = 64 * 1024 * 1024;
 const MIN_VALID_CHUNK_BYTES = 16 * 1024;
 const TRANSCRIBE_TIMEOUT_MS = 38_000;
@@ -416,23 +416,116 @@ async function transcribeChunkWithExternalAi(
 const BITRATES_MPEG1_L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
 const SAMPLE_RATES_MPEG1 = [44100, 48000, 32000, 0];
 
+function isXingOrInfoFrame(buffer: Uint8Array, frameStart: number, frameLength: number): boolean {
+  const end = Math.min(buffer.length - 4, frameStart + Math.min(frameLength, 64));
+  for (let p = frameStart + 4; p <= end; p++) {
+    // "Xing" (58 69 6e 67), "Info" (49 6e 66 6f), or "VBRI" (56 42 52 49)
+    if (
+      (buffer[p] === 0x58 && buffer[p + 1] === 0x69 && buffer[p + 2] === 0x6e && buffer[p + 3] === 0x67) ||
+      (buffer[p] === 0x49 && buffer[p + 1] === 0x6e && buffer[p + 2] === 0x66 && buffer[p + 3] === 0x6f) ||
+      (buffer[p] === 0x56 && buffer[p + 1] === 0x42 && buffer[p + 2] === 0x52 && buffer[p + 3] === 0x49)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
- * Finds the first valid MPEG-1 Layer 3 frame sync header in a buffer so
- * mid-stream chunks never start with partial frame bytes that confuse decoders.
+ * Finds the first valid MPEG-1 Layer 3 audio frame sync header in a buffer,
+ * automatically skipping any leading Xing / Info / VBRI metadata frame (which
+ * declares the full-file byte length and can cause decoders to reject a chunk).
  */
 function findFirstMp3SyncOffset(buffer: Uint8Array, startFrom = 0): number {
-  for (let i = startFrom; i < Math.min(buffer.length - 4, startFrom + 16384); i++) {
+  for (let i = startFrom; i < Math.min(buffer.length - 4, startFrom + 32768); i++) {
     if (buffer[i] === 0xff && (buffer[i + 1] & 0xe0) === 0xe0) {
       const version = (buffer[i + 1] >> 3) & 0x03;
       const layer = (buffer[i + 1] >> 1) & 0x03;
       const bitrateIdx = (buffer[i + 2] >> 4) & 0x0f;
       const srateIdx = (buffer[i + 2] >> 2) & 0x03;
+      const padding = (buffer[i + 2] >> 1) & 0x01;
       if (version === 3 && layer === 1 && bitrateIdx > 0 && bitrateIdx < 15 && srateIdx < 3) {
+        const sampleRate = SAMPLE_RATES_MPEG1[srateIdx];
+        const bitrate = BITRATES_MPEG1_L3[bitrateIdx] * 1000;
+        const frameLength = Math.floor((144 * bitrate) / sampleRate) + padding;
+        if (frameLength > 0 && isXingOrInfoFrame(buffer, i, frameLength)) {
+          // Skip the Xing/Info header frame so Chunk 0 starts directly on real audio
+          i += frameLength - 1;
+          continue;
+        }
         return i;
       }
     }
   }
   return startFrom;
+}
+
+/**
+ * Splits overly long transcript segments (> 135 chars) into bite-sized 1-sentence
+ * or 1-clause segments with proportionally interpolated timestamps so captions
+ * and translations are never cut off or overwhelming on screen.
+ */
+export function splitLongTranscriptSegments(
+  segments: TranscriptSegment[],
+  maxChars = 135
+): TranscriptSegment[] {
+  const out: TranscriptSegment[] = [];
+  for (const seg of segments) {
+    const text = seg.text.trim();
+    if (!text) continue;
+    if (text.length <= maxChars) {
+      out.push({ ...seg, text });
+      continue;
+    }
+
+    // First split by sentence endings (. ! ? …)
+    let rawParts = text
+      .split(/(?<=[.!?…])\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    // If any single sentence is still > maxChars, split on clause boundaries (, ; – —)
+    const parts: string[] = [];
+    for (const part of rawParts) {
+      if (part.length <= maxChars) {
+        parts.push(part);
+      } else {
+        const clauses = part
+          .split(/(?<=[,;–—])\s+/)
+          .map((c) => c.trim())
+          .filter(Boolean);
+        let acc = "";
+        for (const c of clauses) {
+          if ((acc + " " + c).trim().length > maxChars && acc) {
+            parts.push(acc.trim());
+            acc = c;
+          } else {
+            acc = `${acc} ${c}`.trim();
+          }
+        }
+        if (acc.trim()) parts.push(acc.trim());
+      }
+    }
+
+    if (parts.length <= 1) {
+      out.push({ ...seg, text });
+      continue;
+    }
+
+    const totalDur = Math.max(1.5, (seg.end > seg.start ? seg.end - seg.start : parts.length * 3.5));
+    const totalLen = parts.reduce((sum, p) => sum + p.length, 0) || 1;
+    let cursor = seg.start;
+
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      const d = i === parts.length - 1 ? Math.max(0.8, seg.end - cursor) : Math.max(0.8, (p.length / totalLen) * totalDur);
+      const start = Math.round(cursor * 100) / 100;
+      const end = Math.round((cursor + d) * 100) / 100;
+      out.push({ start, end, text: p });
+      cursor += d;
+    }
+  }
+  return out;
 }
 
 /**
@@ -545,18 +638,24 @@ export async function* transcribeAudioStream(
     slice: Uint8Array,
     index: number,
     chunkDuration: number,
+    allowSplit = true,
   ): Promise<{ index: number; segments: TranscriptSegment[]; chunkDuration: number }> => {
-    const alignedSlice = !isMp4 && index > 0 ? slice.slice(findFirstMp3SyncOffset(slice, 0)) : slice;
+    const syncOffset = !isMp4 ? findFirstMp3SyncOffset(slice, 0) : 0;
+    const alignedSlice =
+      syncOffset > 0 && syncOffset < slice.length - 4096 ? slice.slice(syncOffset) : slice;
     const mime = isMp4 ? "video/mp4" : contentType.includes("audio") ? contentType : "audio/mpeg";
     const ext = isMp4 ? "mp4" : "mp3";
     const blob = new Blob([alignedSlice as BlobPart], { type: mime });
 
     // Tier 1 & 2: Groq Whisper Turbo & Large-v3 across all available keys
+    // Give Chunk 0 (index === 0, the start of the episode) 4 retry attempts so it never drops!
     if (rawGroqKeys.length > 0) {
-      const modelsToTry =
+      const baseModels =
         sourceLang === "en"
           ? ["whisper-large-v3-turbo", "distil-whisper-large-v3-en", "whisper-large-v3"]
           : [GROQ_MODELS[index % GROQ_MODELS.length], GROQ_MODELS[(index + 1) % GROQ_MODELS.length]];
+      const modelsToTry =
+        index === 0 ? [...baseModels, ...baseModels] : baseModels;
 
       for (let attemptIdx = 0; attemptIdx < modelsToTry.length; attemptIdx++) {
         if (signal?.aborted) throw new Error("transcription-failed");
@@ -564,7 +663,7 @@ export async function* transcribeAudioStream(
         const apiKey = rawGroqKeys[(index + attemptIdx) % rawGroqKeys.length];
 
         if (attemptIdx > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 250 * attemptIdx));
+          await new Promise((resolve) => setTimeout(resolve, 350 * attemptIdx));
         }
 
         try {
@@ -602,7 +701,7 @@ export async function* transcribeAudioStream(
             segments.push({ start: 0, end: chunkDuration || Number.MAX_SAFE_INTEGER, text: data.text.trim() });
           }
           if (segments.length > 0) {
-            return { index, segments, chunkDuration };
+            return { index, segments: splitLongTranscriptSegments(segments), chunkDuration };
           }
         } catch {
           // Try next model/provider
@@ -613,13 +712,44 @@ export async function* transcribeAudioStream(
     // Tier 3: Google Gemini Multimodal (gemini-2.5-flash -> gemini-2.0-flash -> gemini-1.5-flash)
     const geminiSegments = await transcribeChunkWithGemini(alignedSlice, mime, chunkDuration, signal);
     if (geminiSegments && geminiSegments.length > 0) {
-      return { index, segments: geminiSegments, chunkDuration };
+      return { index, segments: splitLongTranscriptSegments(geminiSegments), chunkDuration };
     }
 
     // Tier 4: Deepgram / OpenAI Whisper / HuggingFace Inference
     const externalSegments = await transcribeChunkWithExternalAi(alignedSlice, mime, ext, chunkDuration, signal);
     if (externalSegments && externalSegments.length > 0) {
-      return { index, segments: externalSegments, chunkDuration };
+      return { index, segments: splitLongTranscriptSegments(externalSegments), chunkDuration };
+    }
+
+    // Sub-chunk Split Recovery for Chunk 0: if the opening chunk failed as a whole,
+    // split it into two smaller halves (~380 KB each) and transcribe them so the start is NEVER lost!
+    if (allowSplit && !isMp4 && index === 0 && alignedSlice.byteLength >= 180 * 1024) {
+      const mid = Math.floor(alignedSlice.byteLength / 2);
+      const syncMid = findFirstMp3SyncOffset(alignedSlice, mid);
+      const splitPoint = syncMid > mid && syncMid < alignedSlice.byteLength - 16384 ? syncMid : mid;
+      const sliceA = alignedSlice.slice(0, splitPoint);
+      const sliceB = alignedSlice.slice(splitPoint);
+      const durA = estimateMp3Duration(sliceA) || chunkDuration / 2;
+      const durB = estimateMp3Duration(sliceB) || chunkDuration / 2;
+
+      const combined: TranscriptSegment[] = [];
+      try {
+        const resA = await transcribeChunk(sliceA, 0, durA, false);
+        combined.push(...resA.segments);
+      } catch {}
+      try {
+        const resB = await transcribeChunk(sliceB, 0, durB, false);
+        combined.push(
+          ...resB.segments.map((s) => ({
+            start: Math.round((s.start + durA) * 100) / 100,
+            end: Math.round((s.end + durA) * 100) / 100,
+            text: s.text,
+          }))
+        );
+      } catch {}
+      if (combined.length > 0) {
+        return { index, segments: splitLongTranscriptSegments(combined), chunkDuration };
+      }
     }
 
     throw new Error("transcription-failed");
@@ -645,11 +775,14 @@ export async function* transcribeAudioStream(
   let isDownloadDone = false;
   let downloadError: Error | null = null;
   let inFlightCount = 0;
+  let chunk0Finished = false;
   const MAX_CONCURRENT_TRANSCRIBES = 2;
 
   const pumpParallelTranscriptions = () => {
     for (const item of rawQueue) {
       if (inFlightCount >= MAX_CONCURRENT_TRANSCRIBES) break;
+      // Exclusive priority for Chunk 0 (0:00 - 0:46): never start Chunk 1+ while Chunk 0 is still running!
+      if (item.index > 0 && !chunk0Finished) break;
       if (!item.promise) {
         inFlightCount++;
         const startDelay = inFlightCount > 1 ? 350 : 0;
@@ -663,6 +796,9 @@ export async function* transcribeAudioStream(
           } catch (error) {
             return { ok: false, error };
           } finally {
+            if (item.index === 0) {
+              chunk0Finished = true;
+            }
             inFlightCount--;
             pumpParallelTranscriptions();
           }
@@ -783,7 +919,7 @@ export async function* transcribeAudioStream(
   while (!isDownloadDone || processedCount < rawQueue.length) {
     if (signal?.aborted) break;
     if (downloadError && !hasYieldedAny) {
-      yield await yieldUltimateFallback();
+      yield splitLongTranscriptSegments(await yieldUltimateFallback());
       return;
     }
 
@@ -798,6 +934,11 @@ export async function* transcribeAudioStream(
             (value) => ({ ok: true as const, value }),
             (error) => ({ ok: false as const, error })
           );
+
+      if (item.index === 0 && !chunk0Finished) {
+        chunk0Finished = true;
+        pumpParallelTranscriptions();
+      }
 
       if (outcome.ok) {
         const chunkSegments = outcome.value.segments;
@@ -822,7 +963,7 @@ export async function* transcribeAudioStream(
           const step = measuredDuration > 0 ? measuredDuration : maxEndInChunk;
           currentTimeOffset += step;
           hasYieldedAny = true;
-          yield finalSegments;
+          yield splitLongTranscriptSegments(finalSegments);
         }
       } else {
         if (item.duration > 0) {
@@ -839,6 +980,6 @@ export async function* transcribeAudioStream(
   // Tier 5 & 6 Guarantee: if no segments could be extracted from audio/video bytes,
   // synthesize transcript via AI LLM (Groq LLaMA / Pollinations Free AI) or structured show notes!
   if (!hasYieldedAny && !signal?.aborted) {
-    yield await yieldUltimateFallback();
+    yield splitLongTranscriptSegments(await yieldUltimateFallback());
   }
 }

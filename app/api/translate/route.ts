@@ -22,12 +22,12 @@ export async function POST(request: Request) {
       sourceLang?: string;
       engine?: string;
     };
-    text = (body.text ?? "").trim().slice(0, 2000);
+    text = (body.text ?? "").trim().slice(0, 4000);
     lang = toLang(body.lang ?? body.targetLang, "vi");
     sourceLang = toLang(body.sourceLang, "de");
     engine = body.engine ?? "auto";
     if (Array.isArray(body.texts)) {
-      texts = body.texts.slice(0, 60).map((item) => String(item).slice(0, 400));
+      texts = body.texts.slice(0, 60).map((item) => String(item).slice(0, 2500));
     }
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
