@@ -130,6 +130,10 @@ export async function* transcribeAudioStream(
   }
 
   const contentType = response.headers.get("content-type") || "audio/mpeg";
+  const isMp4 =
+    contentType.includes("mp4") ||
+    contentType.includes("m4a") ||
+    /\.(mp4|m4a|mov|webm)$/i.test(audioUrl.pathname);
 
   const transcribeChunk = async (
     slice: Uint8Array,
@@ -137,8 +141,10 @@ export async function* transcribeAudioStream(
     chunkDuration: number,
   ): Promise<{ index: number; segments: TranscriptSegment[]; chunkDuration: number }> => {
     // Align mid-stream MP3 slices to the first frame sync word so decoders never choke
-    const alignedSlice = index > 0 ? slice.slice(findFirstMp3SyncOffset(slice, 0)) : slice;
-    const blob = new Blob([alignedSlice as BlobPart], { type: contentType.includes("audio") ? contentType : "audio/mpeg" });
+    const alignedSlice = !isMp4 && index > 0 ? slice.slice(findFirstMp3SyncOffset(slice, 0)) : slice;
+    const mime = isMp4 ? "video/mp4" : contentType.includes("audio") ? contentType : "audio/mpeg";
+    const ext = isMp4 ? "mp4" : "mp3";
+    const blob = new Blob([alignedSlice as BlobPart], { type: mime });
 
     // Try models with automatic fallback & backoff (whisper-large-v3-turbo and whisper-large-v3 have separate rate limits!)
     const attempts: Array<{ model: string; delayMs: number }> = [
@@ -156,7 +162,7 @@ export async function* transcribeAudioStream(
 
       try {
         const form = new FormData();
-        form.set("file", blob, `episode_part_${index}.mp3`);
+        form.set("file", blob, `episode_part_${index}.${ext}`);
         form.set("model", attempt.model);
         form.set("response_format", "verbose_json");
         form.set("temperature", "0");
@@ -197,7 +203,8 @@ export async function* transcribeAudioStream(
   };
 
   const reader = response.body.getReader();
-  let currentTargetSize = FIRST_CHUNK_BYTES;
+  // MP4 containers have a single moov atom and cannot be split into byte chunks
+  let currentTargetSize = isMp4 ? 24 * 1024 * 1024 : FIRST_CHUNK_BYTES;
   let currentBuffer = new Uint8Array(currentTargetSize);
   let offset = 0;
   let chunkIndex = 0;
@@ -211,8 +218,8 @@ export async function* transcribeAudioStream(
   const enqueueChunk = (buffer: Uint8Array, length: number, index: number) => {
     if (length < MIN_VALID_CHUNK_BYTES && index > 0) return;
     const slice = buffer.slice(0, length);
-    const duration = estimateMp3Duration(slice);
-    if (duration < 0.4 && index > 0) return;
+    const duration = isMp4 ? 0 : estimateMp3Duration(slice);
+    if (!isMp4 && duration < 0.4 && index > 0) return;
     rawQueue.push({ slice, index, duration });
   };
 

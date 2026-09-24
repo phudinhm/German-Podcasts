@@ -91,7 +91,11 @@ export function classifyInput(raw: string): InputKind {
   }
 
   // A URL that already looks like a feed.
-  if (/\.(xml|rss|atom)$/i.test(url.pathname) || /\/(feed|rss|podcast)\/?$/i.test(url.pathname)) {
+  if (
+    host.startsWith("rss.") ||
+    /\.(xml|rss|atom)$/i.test(url.pathname) ||
+    /\/(feed|rss|podcast|xml)(\/|$)/i.test(url.pathname)
+  ) {
     return { kind: "feed", url: url.toString() };
   }
 
