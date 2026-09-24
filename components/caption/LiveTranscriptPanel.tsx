@@ -266,9 +266,9 @@ export function LiveTranscriptPanel({
     const activeSeg = segments.find((s) => s.id === activeSegmentId) ?? segments[segments.length - 1];
     return (
       <div
-        className={`card flex items-center gap-3 px-3.5 py-2 transition-opacity duration-500 ${
+        className={`card flex items-center gap-3 px-3.5 py-2 transition-opacity duration-500 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-xl rounded-full ${
           dimmed ? "opacity-35 hover:opacity-100" : "opacity-100"
-        } ${isFloating ? "glass-panel" : ""}`}
+        }`}
         style={captionThemeStyle(settings.captionTheme)}
         onMouseEnter={resetHideTimer}
         onFocus={resetHideTimer}
@@ -303,10 +303,10 @@ export function LiveTranscriptPanel({
 
   return (
     <section 
-      className={`card mt-4 flex flex-col overflow-hidden ${isFloating ? "glass-panel" : ""}`} 
+      className={`card mt-4 flex flex-col overflow-hidden bg-[var(--paper-raised)] border border-[var(--rule)] shadow-2xl rounded-2xl`} 
       style={captionThemeStyle(settings.captionTheme)}
     >
-      <div className={`border-b border-[var(--rule)] p-3.5 ${isFloating ? "bg-[var(--surface)]/60" : "bg-[var(--surface)]"}`}>
+      <div className="border-b border-[var(--rule)] p-3.5 bg-[var(--surface)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <h3 className="text-[15px] font-semibold text-[var(--ink)]">

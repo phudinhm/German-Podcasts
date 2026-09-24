@@ -315,113 +315,204 @@ async function askOpenAIFormat(
   }
 }
 
-async function askGemini(request: ClaudeRequest, key: string, model: string): Promise<string | null> {
-  try {
-    const payload: any = {
-      system_instruction: { parts: { text: request.system } },
-      contents: [
-        { role: "user", parts: [{ text: request.user }] }
-      ],
-      generationConfig: {
-        maxOutputTokens: request.maxTokens ?? 512,
+const GEMINI_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3-flash-preview",
+  "gemini-2.5-flash-lite",
+];
+
+async function askGemini(request: ClaudeRequest, key: string): Promise<string | null> {
+  const payload: any = {
+    system_instruction: { parts: [{ text: request.system }] },
+    contents: [
+      { role: "user", parts: [{ text: request.user }] }
+    ],
+    generationConfig: {
+      maxOutputTokens: request.maxTokens ?? 2048,
+    }
+  };
+  if (request.json) {
+    payload.generationConfig.responseMimeType = "application/json";
+  }
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        console.error(`[gemini ${model}]`, response.status, await response.text());
+        continue;
       }
-    };
-    if (request.json) {
-      payload.generationConfig.responseMimeType = "application/json";
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return text;
+    } catch (error) {
+      console.error(`[gemini ${model}] failed:`, error);
     }
+  }
+  return null;
+}
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+/** Parallel multi-engine race: executes available AI engines concurrently and returns whichever responds fastest! */
+async function askParallel(request: ClaudeRequest): Promise<string | null> {
+  const candidates: Array<Promise<string>> = [];
 
-    if (!response.ok) {
-      console.error(`[gemini ${model}]`, response.status, await response.text());
-      return null;
-    }
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-  } catch (error) {
-    console.error(`[gemini ${model}] request failed:`, error);
+  if (process.env.GEMINI_API_KEY) {
+    candidates.push(
+      askGemini(request, process.env.GEMINI_API_KEY).then((res) => {
+        if (!res) throw new Error("Gemini failed");
+        return res;
+      })
+    );
+  }
+
+  if (process.env.GROQ_API_KEY) {
+    candidates.push(
+      askOpenAIFormat(
+        request,
+        "https://api.groq.com/openai/v1/chat/completions",
+        process.env.GROQ_API_KEY,
+        "llama-3.3-70b-versatile"
+      ).then((res) => {
+        if (!res) throw new Error("Groq failed");
+        return res;
+      })
+    );
+  }
+
+  if (process.env.DEEPSEEK_API_KEY) {
+    candidates.push(
+      askOpenAIFormat(
+        request,
+        "https://api.deepseek.com/chat/completions",
+        process.env.DEEPSEEK_API_KEY,
+        "deepseek-chat"
+      ).then((res) => {
+        if (!res) throw new Error("DeepSeek failed");
+        return res;
+      })
+    );
+  }
+
+  if (process.env.OPENAI_API_KEY) {
+    candidates.push(
+      askOpenAIFormat(
+        request,
+        "https://api.openai.com/v1/chat/completions",
+        process.env.OPENAI_API_KEY,
+        "gpt-4o"
+      ).then((res) => {
+        if (!res) throw new Error("OpenAI failed");
+        return res;
+      })
+    );
+  }
+
+  if (process.env.OPENROUTER_API_KEY) {
+    candidates.push(
+      askOpenAIFormat(
+        request,
+        "https://openrouter.ai/api/v1/chat/completions",
+        process.env.OPENROUTER_API_KEY,
+        "anthropic/claude-3.5-sonnet"
+      ).then((res) => {
+        if (!res) throw new Error("OpenRouter failed");
+        return res;
+      })
+    );
+  }
+
+  if (process.env.ANTHROPIC_API_KEY) {
+    candidates.push(
+      askClaude(request).then((res) => {
+        if (!res) throw new Error("Claude failed");
+        return res;
+      })
+    );
+  }
+
+  if (candidates.length === 0) return null;
+
+  try {
+    return await Promise.any(candidates);
+  } catch {
     return null;
   }
 }
 
 export async function askLLM(request: ClaudeRequest, engine: string = "auto"): Promise<string | null> {
-  // Determine engine
-  let activeEngine = engine;
-  if (activeEngine === "auto") {
-    if (process.env.GEMINI_API_KEY) activeEngine = "gemini";
-    else if (process.env.GROQ_API_KEY) activeEngine = "groq";
-    else if (process.env.DEEPSEEK_API_KEY) activeEngine = "deepseek";
-    else if (process.env.OPENAI_API_KEY) activeEngine = "openai";
-    else if (process.env.ANTHROPIC_API_KEY) activeEngine = "anthropic";
-    else if (process.env.OPENROUTER_API_KEY) activeEngine = "openrouter";
+  // If engine is auto or parallel, race available engines for maximum speed and 0 downtime
+  if (engine === "auto" || engine === "parallel") {
+    const fastResult = await askParallel(request);
+    if (fastResult) return fastResult;
   }
 
-  switch (activeEngine) {
+  switch (engine) {
     case "gemini":
       if (process.env.GEMINI_API_KEY) {
-        return askGemini(
-          request,
-          process.env.GEMINI_API_KEY,
-          "gemini-1.5-flash"
-        );
+        const res = await askGemini(request, process.env.GEMINI_API_KEY);
+        if (res) return res;
       }
       break;
     case "groq":
       if (process.env.GROQ_API_KEY) {
-        return askOpenAIFormat(
+        const res = await askOpenAIFormat(
           request,
           "https://api.groq.com/openai/v1/chat/completions",
           process.env.GROQ_API_KEY,
           "llama-3.3-70b-versatile"
         );
+        if (res) return res;
       }
       break;
     case "deepseek":
       if (process.env.DEEPSEEK_API_KEY) {
-        return askOpenAIFormat(
+        const res = await askOpenAIFormat(
           request,
           "https://api.deepseek.com/chat/completions",
           process.env.DEEPSEEK_API_KEY,
           "deepseek-chat"
         );
+        if (res) return res;
       }
       break;
     case "openai":
       if (process.env.OPENAI_API_KEY) {
-        return askOpenAIFormat(
+        const res = await askOpenAIFormat(
           request,
           "https://api.openai.com/v1/chat/completions",
           process.env.OPENAI_API_KEY,
           "gpt-4o"
         );
+        if (res) return res;
       }
       break;
     case "openrouter":
       if (process.env.OPENROUTER_API_KEY) {
-        return askOpenAIFormat(
+        const res = await askOpenAIFormat(
           request,
           "https://openrouter.ai/api/v1/chat/completions",
           process.env.OPENROUTER_API_KEY,
           "anthropic/claude-3.5-sonnet"
         );
+        if (res) return res;
       }
       break;
     case "anthropic":
       if (process.env.ANTHROPIC_API_KEY) {
-        return askClaude(request);
+        const res = await askClaude(request);
+        if (res) return res;
       }
       break;
   }
-  
-  // Fallback
-  if (process.env.GEMINI_API_KEY) {
-    return askGemini(request, process.env.GEMINI_API_KEY, "gemini-1.5-flash");
-  }
-  return askClaude(request);
+
+  // Fallback: try parallel race of all available keys
+  return askParallel(request);
 }
 
 /** Pulls the first JSON object or array out of a model reply. */

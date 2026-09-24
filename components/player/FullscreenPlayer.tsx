@@ -166,18 +166,18 @@ export function FullscreenPlayer() {
       />
       <div aria-hidden className="pointer-events-none fixed inset-0 bg-black/75" />
 
-      <div className="relative mx-auto flex h-full w-full max-w-2xl flex-col px-4 pb-4 pt-3 sm:px-6">
+      <div className="relative mx-auto flex h-full w-full max-w-2xl flex-col px-4 pt-[max(env(safe-area-inset-top,0px),16px)] pb-[max(env(safe-area-inset-bottom,0px),20px)] sm:px-6">
         <div className="flex shrink-0 items-center justify-between py-1">
           <button
             type="button"
             onClick={() => setFullscreenOpen(false)}
-            className="icon-btn text-[18px]"
+            className="icon-btn text-[20px] active:scale-95"
             aria-label={t("player.exitFullscreen")}
             title={t("player.exitFullscreen")}
           >
             ⌄
           </button>
-          <p className="max-w-[55%] truncate text-[12px] font-medium uppercase tracking-wide text-[var(--ink-faint)]">
+          <p className="max-w-[55%] truncate text-[12px] font-medium uppercase tracking-wider text-[var(--ink-faint)]">
             {track.showTitle}
           </p>
           <button
@@ -186,7 +186,7 @@ export function FullscreenPlayer() {
               setShowSettings((v) => !v);
               resetAutoHide();
             }}
-            className="icon-btn text-[13px] font-semibold"
+            className={`icon-btn text-[13px] font-semibold transition ${showSettings ? "bg-white/20 text-white" : ""}`}
             aria-expanded={showSettings}
             title={t("caption.textSize")}
           >
@@ -195,7 +195,18 @@ export function FullscreenPlayer() {
         </div>
 
         {showSettings ? (
-          <div className="mt-2 shrink-0 rounded-xl bg-[var(--surface)] p-2">
+          <div className="absolute left-4 right-4 top-16 z-30 rounded-2xl bg-[var(--surface)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--rule)]">
+              <span className="text-[13px] font-semibold text-[var(--ink)]">{t("common.settings")}</span>
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                className="icon-btn text-[16px]"
+                aria-label={t("common.close")}
+              >
+                ×
+              </button>
+            </div>
             <CaptionSettings
               settings={settings}
               onChange={handleUpdateSettings}

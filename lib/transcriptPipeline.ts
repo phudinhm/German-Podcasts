@@ -3,11 +3,10 @@
 import { liveCaptionService } from "./liveCaption";
 import { translationTargetsFor, type SpokenLang } from "./language";
 
-/** How many lines of a transcript get auto-translated. Increased to 5000
- * to support podcasts longer than 1 hour. */
+/** How many lines of a transcript get auto-translated. */
 const AUTO_TRANSLATE_MAX_LINES = 5000;
-/** Lines per translation request - matches /api/translate's own batch cap. */
-const TRANSLATE_CHUNK_SIZE = 40;
+/** Lines per translation request - smaller chunks return much faster from AI models. */
+const TRANSLATE_CHUNK_SIZE = 25;
 
 interface TranslatableSegment {
   id: string;
@@ -15,13 +14,8 @@ interface TranslatableSegment {
 }
 
 /**
- * Translates every line into whichever two languages the audio itself isn't
- * already in, in chunks, updating the shared transcript as each chunk comes
- * back rather than waiting for the whole thing.
- *
- * Shared between the two ways a transcript gets loaded - fetched from the
- * feed, or generated from the audio - so both end up translated the same
- * way with one implementation to keep correct.
+ * Translates transcript lines, prioritizing the user's chosen language first,
+ * updating the shared transcript in real-time as each chunk arrives.
  */
 export async function autoTranslateSegments(
   segments: TranslatableSegment[],
@@ -29,16 +23,28 @@ export async function autoTranslateSegments(
   isCancelled: () => boolean,
 ): Promise<void> {
   let engine = "auto";
+  let preferredLang: "de" | "en" | "vi" = "vi";
   try {
     const raw = window.localStorage.getItem("hoerbar.caption.settings.v1");
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.translationEngine) engine = parsed.translationEngine;
+      if (parsed.translationLang && parsed.translationLang !== "auto") {
+        preferredLang = parsed.translationLang;
+      }
     }
   } catch {}
 
+  const targets = translationTargetsFor(sourceLang);
+  // Prioritize user's preferred target language first so it displays immediately
+  const orderedTargets = [
+    preferredLang,
+    ...targets.filter((t) => t !== preferredLang),
+  ].filter((t) => targets.includes(t));
+
   const toTranslate = segments.slice(0, AUTO_TRANSLATE_MAX_LINES);
-  for (const targetLang of translationTargetsFor(sourceLang)) {
+
+  for (const targetLang of orderedTargets) {
     for (let i = 0; i < toTranslate.length; i += TRANSLATE_CHUNK_SIZE) {
       if (isCancelled()) return;
       const chunk = toTranslate.slice(i, i + TRANSLATE_CHUNK_SIZE);
@@ -52,7 +58,9 @@ export async function autoTranslateSegments(
       const updates = chunk
         .map((seg, idx) => ({ id: seg.id, text: data.texts?.[idx] ?? "" }))
         .filter((update) => update.text);
-      liveCaptionService.setSegmentTranslations(targetLang, updates);
+      if (updates.length > 0) {
+        liveCaptionService.setSegmentTranslations(targetLang, updates);
+      }
     }
   }
 }

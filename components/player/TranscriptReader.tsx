@@ -54,7 +54,7 @@ export function TranscriptReader({
   const { track, onGenerateTranscript, generatingTranscript, generateTranscriptError, transcriptOffsetSec } =
     usePlayer();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
-  const activeRef = useRef<HTMLSpanElement | null>(null);
+  const activeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setSegments(liveCaptionService.getTranscript());
@@ -128,40 +128,55 @@ export function TranscriptReader({
   }
 
   return (
-    <div className={`h-full overflow-y-auto px-6 sm:px-10 transition-colors duration-500 rounded-xl ${!isModern ? "bg-[var(--surface)]" : ""}`} style={{ ...captionThemeStyle(theme), scrollbarWidth: "none" }}>
-      <div className="mx-auto max-w-xl py-[38vh]">
-        <p
-          className={`text-center font-medium ${inactiveColor}`}
-          style={{ fontSize: `${fontSize}px`, lineHeight: 1.7, fontFamily: FONT_FAMILIES[fontFamily] }}
-        >
-          {segments.map((seg) => {
-            const isActive = seg.id === activeSegmentId;
-            const showForSeg = showTranslation && (translationVisibility === "all" || isActive);
-            const translation = showForSeg ? translationFor(seg, translationLang) : null;
-            return (
-              <span key={seg.id}>
-                <span
-                  ref={isActive ? activeRef : null}
-                  onClick={() => onSeek(Math.max(0, seg.start - 0.25 + transcriptOffsetSec))}
-                  className={`cursor-pointer transition-colors duration-300 ${
-                    isActive ? `font-semibold ${activeColor}` : hoverColor
+    <div
+      className={`h-full overflow-y-auto px-4 sm:px-8 transition-colors duration-500 rounded-2xl ${
+        !isModern ? "bg-[var(--surface)]" : ""
+      }`}
+      style={{ ...captionThemeStyle(theme), scrollbarWidth: "none" }}
+    >
+      <div className="mx-auto max-w-xl py-[30vh] space-y-2">
+        {segments.map((seg) => {
+          const isActive = seg.id === activeSegmentId;
+          const showForSeg = showTranslation && (translationVisibility === "all" || isActive);
+          const translation = showForSeg ? translationFor(seg, translationLang) : null;
+
+          return (
+            <div
+              key={seg.id}
+              ref={isActive ? activeRef : null}
+              onClick={() => onSeek(Math.max(0, seg.start - 0.25 + transcriptOffsetSec))}
+              className={`group cursor-pointer rounded-2xl px-4 py-3 transition-all duration-300 text-center ${
+                isActive
+                  ? isModern
+                    ? "bg-white/12 shadow-lg ring-1 ring-white/20 backdrop-blur-md scale-[1.02]"
+                    : "bg-[var(--paper-raised)] shadow-md ring-1 ring-[var(--accent)]/30 scale-[1.02]"
+                  : "opacity-45 hover:opacity-85 hover:bg-white/5 active:scale-[0.99]"
+              }`}
+            >
+              <p
+                className={`font-semibold leading-relaxed transition-colors duration-300 select-text ${
+                  isActive ? activeColor : inactiveColor
+                }`}
+                style={{ fontSize: `${fontSize}px`, fontFamily: FONT_FAMILIES[fontFamily] }}
+              >
+                {seg.text}
+              </p>
+
+              {translation ? (
+                <p
+                  className={`mt-2 font-normal leading-relaxed italic select-text transition-all ${
+                    isModern ? "text-amber-200/90 font-medium" : "text-[var(--accent)] font-medium"
                   }`}
+                  style={{
+                    fontSize: `${Math.max(13, Math.round(fontSize * 0.82))}px`,
+                  }}
                 >
-                  {seg.text}
-                </span>
-                {translation ? (
-                  <span
-                    className={`mx-1 block py-1 mt-1 italic border-l-2 pl-3 ${translationColor} ${borderColor}`}
-                    style={{ fontSize: `${Math.max(13, Math.round(fontSize * 0.72))}px`, lineHeight: 1.5 }}
-                  >
-                    {translation}
-                  </span>
-                ) : null}
-                {" "}
-              </span>
-            );
-          })}
-        </p>
+                  {translation}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

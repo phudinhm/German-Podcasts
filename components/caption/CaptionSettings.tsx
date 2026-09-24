@@ -105,7 +105,7 @@ export interface CaptionSettingsState {
    * lists first for the episode's own spoken language. */
   translationLang: TranslationLangPreference;
   translationVisibility: "all" | "active";
-  translationEngine: "auto" | "gemini" | "groq" | "deepseek" | "anthropic" | "openai" | "openrouter";
+  translationEngine: "auto" | "parallel" | "gemini" | "groq" | "deepseek" | "anthropic" | "openai" | "openrouter";
 }
 
 const STORAGE_KEY = "hoerbar.caption.settings.v1";
@@ -299,8 +299,9 @@ export function CaptionSettings({
             title="AI Translation Engine"
           >
             <option value="auto">Auto Engine</option>
-            <option value="gemini">Gemini</option>
-            <option value="groq">Groq</option>
+            <option value="parallel">⚡ Song song (Parallel AI)</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="groq">Groq (Llama 3.3)</option>
             <option value="deepseek">DeepSeek</option>
             <option value="anthropic">Claude</option>
             <option value="openai">GPT-4o</option>
