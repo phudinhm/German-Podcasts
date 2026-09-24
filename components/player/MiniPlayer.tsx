@@ -37,7 +37,7 @@ function formatTime(seconds: number): string {
 
 export function MiniPlayer() {
   const { t } = useUi();
-  const { track, handle, stop, mediaState, inlineVisible } = usePlayer();
+  const { track, handle, stop, mediaState, inlineVisible, setFullscreenOpen } = usePlayer();
   const pathname = usePathname();
 
   const [playing, setPlaying] = useState(false);
@@ -52,9 +52,6 @@ export function MiniPlayer() {
   const [currentCaption, setCurrentCaption] = useState<CaptionSegment | null>(null);
   const [transcriptList, setTranscriptList] = useState<CaptionSegment[]>([]);
 
-  // iPhone / Mobile Bottom Sheet state
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
   const [favorited, setFavorited] = useState(false);
 
   useEffect(() => {
@@ -90,9 +87,6 @@ export function MiniPlayer() {
   const popFillRef = useRef<HTMLDivElement | null>(null);
   const popTimeRef = useRef<HTMLSpanElement | null>(null);
   const mobileFillRef = useRef<HTMLDivElement | null>(null);
-  const mobileSheetFillRef = useRef<HTMLDivElement | null>(null);
-  const mobileSheetTimeRef = useRef<HTMLSpanElement | null>(null);
-  const mobileSheetDurRef = useRef<HTMLSpanElement | null>(null);
 
   // Increased PiP window height for captions & transcripts
   const popout = usePopout({ width: 440, height: 260 });
@@ -156,14 +150,11 @@ export function MiniPlayer() {
       if (fillRef.current) fillRef.current.style.width = percent;
       if (popFillRef.current) popFillRef.current.style.width = percent;
       if (mobileFillRef.current) mobileFillRef.current.style.width = percent;
-      if (mobileSheetFillRef.current) mobileSheetFillRef.current.style.width = percent;
-      
+
       const label = formatTime(time);
       if (timeRef.current) timeRef.current.textContent = label;
       if (popTimeRef.current) popTimeRef.current.textContent = label;
-      if (mobileSheetTimeRef.current) mobileSheetTimeRef.current.textContent = label;
-      if (mobileSheetDurRef.current) mobileSheetDurRef.current.textContent = formatTime(duration);
-      
+
       const isPlaying = handle.isPlaying();
       if (isPlaying !== last) {
         last = isPlaying;
@@ -348,8 +339,10 @@ export function MiniPlayer() {
     );
   }
 
-  // Hide desktop dock if inline player is on screen, but keep iPhone bottom bar accessible
-  if (inlineVisible && !mobileDrawerOpen) {
+  // Hide the dock if the inline player is on screen - the full-screen "now
+  // playing" view is a separate overlay (mounted once in the layout) and
+  // stays reachable regardless, so there is nothing here it needs to wait for.
+  if (inlineVisible) {
     return null;
   }
 
@@ -457,6 +450,17 @@ export function MiniPlayer() {
                     &#128204;
                   </button>
 
+                  {/* Full-screen now-playing button */}
+                  <button
+                    type="button"
+                    onClick={() => setFullscreenOpen(true)}
+                    className="icon-btn h-7 w-7 text-[13px]"
+                    title={t("player.fullscreen")}
+                    aria-label={t("player.fullscreen")}
+                  >
+                    ⛶
+                  </button>
+
                   {/* Popout PiP button */}
                   {popout.supported && (
                     <button
@@ -519,9 +523,11 @@ export function MiniPlayer() {
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          {/* Tapping track info opens the full sheet */}
+          {/* Tapping track info opens the full "now playing" screen - the
+              one place with the reading-mode transcript, translation picker,
+              sync offset and auto-hide, rather than a second, thinner copy. */}
           <div
-            onClick={() => setMobileDrawerOpen(true)}
+            onClick={() => setFullscreenOpen(true)}
             className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
           >
             <Art src={track.artwork} alt="" size={40} seed={track.showTitle || track.title} />
@@ -548,173 +554,6 @@ export function MiniPlayer() {
           </div>
         </div>
       </div>
-
-      {/* ========================================================================= */}
-      {/* 3. MOBILE FULL-SCREEN SHEET (Now Playing / Transcript)                     */}
-      {/* ========================================================================= */}
-      {mobileDrawerOpen && (
-        <div className="fixed inset-0 z-[60] sm:hidden flex flex-col justify-end bg-black/60 backdrop-blur-xs">
-          {/* Backdrop click closes */}
-          <div className="flex-1" onClick={() => setMobileDrawerOpen(false)} />
-
-          {/* Full Slide-up Sheet */}
-          <div
-            className="w-full h-[92vh] flex flex-col rounded-t-[32px] bg-[var(--paper-raised)] shadow-2xl border-t border-[var(--rule)]"
-            onTouchStart={(e) => {
-              const startY = e.touches[0].clientY;
-              const handleTouchMove = (moveEvent: TouchEvent) => {
-                if (moveEvent.touches[0].clientY - startY > 100) {
-                  setMobileDrawerOpen(false);
-                  cleanup();
-                }
-              };
-              const cleanup = () => {
-                document.removeEventListener("touchmove", handleTouchMove);
-                document.removeEventListener("touchend", cleanup);
-              };
-              document.addEventListener("touchmove", handleTouchMove, { passive: true });
-              document.addEventListener("touchend", cleanup);
-            }}
-          >
-            {/* Grab handle */}
-            <div className="w-12 h-1.5 rounded-full bg-[var(--rule)] mx-auto mt-3 mb-2 shrink-0" />
-
-            <div className="flex-1 overflow-y-auto thin-scroll pb-[calc(2rem+env(safe-area-inset-bottom,20px))] px-6 flex flex-col">
-              {/* Header / Hero Section */}
-              <div className="flex justify-between items-center mb-6 mt-2 shrink-0">
-                <span className="text-[12px] font-semibold text-[var(--ink-faint)] uppercase tracking-wider">
-                  {t("player.nowPlaying")}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setMobileDrawerOpen(false)}
-                  className="icon-btn bg-[var(--surface)] text-[16px]"
-                  aria-label={t("player.closeFullPlayer")}
-                >
-                  ↓
-                </button>
-              </div>
-
-              {/* Artwork - Large */}
-              <div className="w-full aspect-square max-w-[280px] mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl shrink-0 border border-[var(--rule)]">
-                <Art src={track.artwork} alt="" size={280} seed={track.showTitle || track.title} />
-              </div>
-
-              {/* Title & Info */}
-              <div className="flex justify-between items-start gap-4 mb-6 shrink-0">
-                <div className="min-w-0">
-                  <h2 className="text-[20px] font-bold text-[var(--ink)] leading-tight mb-1">
-                    {track.title}
-                  </h2>
-                  <p className="text-[15px] text-[var(--accent)] font-medium truncate">
-                    {track.showTitle}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={toggleFav}
-                  className={`icon-btn shrink-0 text-[20px] transition ${
-                    favorited ? "text-rose-500 scale-110" : "text-[var(--ink-faint)] hover:text-rose-500"
-                  }`}
-                >
-                  {favorited ? "❤️" : "🤍"}
-                </button>
-              </div>
-
-              {/* Scrubber */}
-              <div className="mb-8 shrink-0">
-                <div className="h-1.5 w-full bg-[var(--rule)] rounded-full overflow-hidden relative">
-                  <div ref={mobileSheetFillRef} className="absolute left-0 top-0 bottom-0 bg-[var(--accent)]" style={{ width: 0 }} />
-                </div>
-                <div className="flex justify-between mt-2 text-[11px] font-mono font-medium text-[var(--ink-faint)]">
-                  <span ref={mobileSheetTimeRef}>0:00</span>
-                  <span ref={mobileSheetDurRef}>0:00</span>
-                </div>
-              </div>
-
-              {/* Transport Controls */}
-              <div className="flex items-center justify-center gap-6 mb-10 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
-                  className="icon-btn h-14 w-14 text-[16px] bg-[var(--surface)] hover:scale-105 transition"
-                >
-                  -10
-                </button>
-                <button
-                  type="button"
-                  onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
-                  className="btn-primary h-20 w-20 rounded-full text-[28px] shadow-lg hover:scale-105 transition flex items-center justify-center"
-                >
-                  {playing ? "❚❚" : "▶"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handle.seekTo(handle.getTime() + 30, true)}
-                  className="icon-btn h-14 w-14 text-[16px] bg-[var(--surface)] hover:scale-105 transition"
-                >
-                  +30
-                </button>
-              </div>
-
-              {/* Tools row (Speed) */}
-              <div className="flex items-center justify-between mb-8 pb-6 border-b border-[var(--rule)] shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const speeds = [0.8, 1, 1.2, 1.5, 2];
-                    const next = speeds[(speeds.indexOf(playbackRate) + 1) % speeds.length] || 1;
-                    setPlaybackRate(next);
-                    handle.setRate(next);
-                  }}
-                  className="chip bg-[var(--surface)] px-4 py-2 hover:bg-[var(--rule)] transition"
-                >
-                  {playbackRate}x {t("player.speed")}
-                </button>
-                <AudioVisualizer isPlaying={playing} barCount={6} />
-              </div>
-
-              {/* Interactive Transcript */}
-              <div className="flex-1 min-h-[200px]">
-                <h3 className="text-[15px] font-bold text-[var(--ink)] mb-4 sticky top-0 bg-[var(--paper-raised)] py-2">
-                  {t("caption.transcript")} ({transcriptList.length})
-                </h3>
-                
-                {transcriptList.length === 0 ? (
-                  <p className="p-4 text-[14px] text-[var(--ink-faint)] text-center bg-[var(--surface)] rounded-2xl">
-                    {t("caption.desktopOnly")}
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {transcriptList.map((s) => (
-                      <div
-                        key={s.id}
-                        onClick={() => {
-                          handle.seekTo(s.start, true);
-                        }}
-                        className="p-3 rounded-xl hover:bg-[var(--surface)] active:scale-[0.98] transition cursor-pointer"
-                      >
-                        <span className="font-mono text-[12px] font-bold text-[var(--accent)] block mb-1">
-                          {formatTime(s.start)}
-                        </span>
-                        <span className="text-[15px] font-medium text-[var(--ink)] leading-snug block">
-                          {s.text}
-                        </span>
-                        {/* Hiển thị dịch từng câu theo yêu cầu mới nhất */}
-                        {s.translation && (
-                          <span className="text-[14px] text-[var(--ink-soft)] mt-1.5 block pl-3 border-l-2 border-[var(--rule)]">
-                            {s.translation}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
