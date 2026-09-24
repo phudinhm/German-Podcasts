@@ -75,9 +75,26 @@ const CAPTION_THEME_SWATCH: Record<CaptionTheme, CSSProperties> = {
   blackInk: { background: "#000000" },
 };
 
+export type FontFamily = "sans" | "serif" | "mono" | "rounded";
+
+export const FONT_FAMILIES: Record<FontFamily, string> = {
+  sans: "var(--font-body)",
+  serif: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
+  mono: "var(--font-mono)",
+  rounded: "ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, Manjari, 'Arial Rounded MT', 'Arial Rounded MT Bold', Calibri, source-sans-pro, sans-serif",
+};
+
+export const FONT_LABELS: Record<FontFamily, string> = {
+  sans: "Modern",
+  serif: "Classic",
+  mono: "Typewriter",
+  rounded: "Rounded",
+};
+
 export interface CaptionSettingsState {
   fontSize: number; // in pixels, e.g. 14, 16, 18, 22, 26, 32
   lineHeight: number; // e.g. 1.4, 1.7, 2.0
+  fontFamily: FontFamily;
   showTranslation: boolean;
   autoScroll: boolean;
   captionTheme: CaptionTheme;
@@ -87,6 +104,8 @@ export interface CaptionSettingsState {
    * `showTranslation` is on. "auto" takes whichever `translationTargetsFor`
    * lists first for the episode's own spoken language. */
   translationLang: TranslationLangPreference;
+  translationVisibility: "all" | "active";
+  translationEngine: "auto" | "gemini" | "groq" | "deepseek" | "anthropic" | "openai" | "openrouter";
 }
 
 const STORAGE_KEY = "hoerbar.caption.settings.v1";
@@ -94,11 +113,14 @@ const STORAGE_KEY = "hoerbar.caption.settings.v1";
 export const DEFAULT_CAPTION_SETTINGS: CaptionSettingsState = {
   fontSize: 18,
   lineHeight: 1.6,
+  fontFamily: "sans",
   showTranslation: true,
   autoScroll: true,
   captionTheme: "modern",
   autoHide: true,
   translationLang: "auto",
+  translationVisibility: "all",
+  translationEngine: "auto",
 };
 
 export function loadCaptionSettings(): CaptionSettingsState {
@@ -194,6 +216,29 @@ export function CaptionSettings({
         </button>
       </div>
 
+      <div className="flex items-center gap-1 rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-0.5">
+        {(Object.keys(FONT_FAMILIES) as FontFamily[]).map((family) => {
+          const active = settings.fontFamily === family;
+          return (
+            <button
+              key={family}
+              type="button"
+              onClick={() => update({ fontFamily: family })}
+              aria-pressed={active}
+              className={`rounded px-2.5 py-1 text-[11.5px] transition ${
+                active
+                  ? "bg-[var(--ink)] text-[var(--paper-raised)] font-medium"
+                  : "text-[var(--ink-soft)] hover:bg-[var(--paper-raised)]"
+              }`}
+              style={{ fontFamily: FONT_FAMILIES[family] }}
+              title={FONT_LABELS[family]}
+            >
+              {FONT_LABELS[family]}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Bilingual translation toggle */}
       <button
         type="button"
@@ -234,6 +279,34 @@ export function CaptionSettings({
           })}
         </div>
       ) : null}
+
+      {/* Translation visibility & Engine */}
+      {settings.showTranslation && (
+        <div className="flex items-center gap-2">
+          <select
+            value={settings.translationVisibility}
+            onChange={(e) => update({ translationVisibility: e.target.value as "all" | "active" })}
+            className="rounded border border-[var(--rule)] bg-[var(--surface)] px-1.5 py-1 text-[11px] text-[var(--ink)] outline-none cursor-pointer"
+            title="Translation visibility"
+          >
+            <option value="all">Dịch tất cả (All)</option>
+            <option value="active">Chỉ dịch dòng hiện tại (Active)</option>
+          </select>
+          <select
+            value={settings.translationEngine}
+            onChange={(e) => update({ translationEngine: e.target.value as any })}
+            className="rounded border border-[var(--rule)] bg-[var(--surface)] px-1.5 py-1 text-[11px] text-[var(--ink)] outline-none cursor-pointer"
+            title="AI Translation Engine"
+          >
+            <option value="auto">Auto Engine</option>
+            <option value="gemini">Gemini</option>
+            <option value="groq">Groq</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="anthropic">Claude</option>
+            <option value="openai">GPT-4o</option>
+          </select>
+        </div>
+      )}
 
       {/* Auto-scroll toggle - off lets someone read back through past lines
           (or ahead) without the view snapping back to the current one on

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { assertPublicUrl } from "@/lib/server/feed";
-import { hasTranscriptionProvider, transcribeAudio } from "@/lib/server/transcribe";
+import { hasTranscriptionProvider, transcribeAudioStream } from "@/lib/server/transcribe";
 import type { SpokenLang } from "@/lib/language";
+import type { TranscriptSegment } from "@/lib/server/transcript";
 
 export const runtime = "nodejs";
 // Groq is fast, but a long episode plus the fetch that precedes it can still
@@ -44,19 +45,44 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await transcribeAudio(parsed, sourceLang);
-  if (!result.ok) {
-    const status = result.reason === "too-large" ? 413 : 502;
-    return NextResponse.json({ error: result.reason, reason: result.reason }, { status });
+  let stream: AsyncGenerator<TranscriptSegment[], void, unknown>;
+  try {
+    stream = transcribeAudioStream(parsed, sourceLang, request.signal);
+  } catch (err) {
+    const error = err as Error;
+    const status = error.message === "too-large" ? 413 : 502;
+    return NextResponse.json({ error: error.message, reason: error.message }, { status });
   }
 
-  const segments = result.segments.map((seg, index) => ({
-    id: `gen-${index}`,
-    start: seg.start,
-    end: seg.end,
-    text: seg.text,
-    isFinal: true,
-  }));
+  const encoder = new TextEncoder();
+  const readable = new ReadableStream({
+    async start(controller) {
+      try {
+        let globalIndex = 0;
+        for await (const chunkSegments of stream) {
+          const segments = chunkSegments.map((seg) => ({
+            id: `gen-${globalIndex++}`,
+            start: seg.start,
+            end: seg.end,
+            text: seg.text,
+            isFinal: true,
+          }));
+          controller.enqueue(encoder.encode(JSON.stringify({ segments }) + "\n"));
+        }
+      } catch (err) {
+        console.error("[transcribe] stream error", err);
+        controller.enqueue(encoder.encode(JSON.stringify({ error: "transcription-failed", reason: "transcription-failed" }) + "\n"));
+      } finally {
+        controller.close();
+      }
+    }
+  });
 
-  return NextResponse.json({ segments });
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "application/x-ndjson",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive"
+    }
+  });
 }

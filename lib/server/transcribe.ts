@@ -17,16 +17,11 @@ const GROQ_MODEL = "whisper-large-v3-turbo";
 
 /**
  * Groq's free tier caps request bodies at 25MB. A podcast encoded at a
- * typical 128kbps fits about 25 minutes in that budget, so anything bigger
- * is split into MAX_CHUNKS byte-range pieces and transcribed in parallel
- * instead of being turned away outright - between them they still cover
- * most long episodes (about 100 minutes at 128kbps, or several hours at a
- * talk show's usual 64kbps). Only something bigger than that combined
- * ceiling is declined up front with a clear reason.
+ * typical 128kbps fits about 25 minutes in that budget; longer or
+ * higher-bitrate episodes are turned down up front with a clear reason
+ * rather than attempted and failed partway through.
  */
-const MAX_CHUNK_BYTES = 24 * 1024 * 1024;
-const MAX_CHUNKS = 4;
-const MAX_AUDIO_BYTES = MAX_CHUNK_BYTES * MAX_CHUNKS;
+const MAX_AUDIO_BYTES = 24 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 25_000;
 const TRANSCRIBE_TIMEOUT_MS = 55_000;
 
@@ -42,162 +37,145 @@ export function hasTranscriptionProvider(): boolean {
   return Boolean(process.env.GROQ_API_KEY);
 }
 
-/**
- * One Whisper call for a single audio blob. Returns its segments alongside
- * how many seconds of audio it actually covered, which the chunked path
- * below needs to know where the next chunk's segments pick up.
- */
-async function transcribeBlob(
-  key: string,
-  audio: Blob,
+export async function* transcribeAudioStream(
+  audioUrl: URL,
   sourceLang?: SpokenLang,
-): Promise<{ segments: TranscriptSegment[]; duration: number } | null> {
+  signal?: AbortSignal
+): AsyncGenerator<TranscriptSegment[], void, unknown> {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error("no-key");
+
+  let response: Response;
   try {
+    response = await fetch(audioUrl, {
+      headers: { "User-Agent": "Hoerbar/0.1 (transcription)" },
+      redirect: "follow",
+      signal
+    });
+    if (!response.ok || !response.body) throw new Error("fetch-failed");
+  } catch {
+    throw new Error("fetch-failed");
+  }
+
+  const contentType = response.headers.get("content-type") ?? "audio/mpeg";
+
+  const transcribeChunk = async (chunk: Blob, index: number) => {
     const form = new FormData();
-    form.set("file", audio, "episode.mp3");
+    form.set("file", chunk, `episode_part_${index}.mp3`);
     form.set("model", GROQ_MODEL);
     form.set("response_format", "verbose_json");
     if (sourceLang) form.set("language", WHISPER_LANG[sourceLang]);
 
-    const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}` },
       body: form,
       signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
     });
-    if (!response.ok) {
-      console.error("[transcribe] Groq", response.status, await response.text().catch(() => ""));
-      return null;
+    if (!res.ok) {
+      console.error(`[transcribe] Groq chunk ${index}`, res.status, await res.text().catch(() => ""));
+      throw new Error("transcription-failed");
     }
 
-    const data = (await response.json()) as {
+    const data = (await res.json()) as {
       segments?: Array<{ start: number; end: number; text: string }>;
       text?: string;
-      duration?: number;
     };
 
-    const segments: TranscriptSegment[] = (data.segments ?? [])
+    const segments = (data.segments ?? [])
       .map((seg) => ({ start: seg.start, end: seg.end, text: seg.text.trim() }))
       .filter((seg) => seg.text.length > 0);
 
     if (segments.length === 0 && data.text?.trim()) {
       segments.push({ start: 0, end: Number.MAX_SAFE_INTEGER, text: data.text.trim() });
     }
+    return { index, segments };
+  };
 
-    // Whisper's own duration is exact; a silent chunk with neither that nor
-    // any segments falls back to a 128kbps estimate from the blob's own
-    // size, so the chunk after it doesn't start from zero again.
-    const duration = data.duration ?? segments.at(-1)?.end ?? audio.size / 16_000;
-
-    return { segments, duration };
-  } catch (error) {
-    console.error("[transcribe] Groq request failed:", error);
-    return null;
-  }
-}
-
-async function fetchAndTranscribeChunk(
-  key: string,
-  audioUrl: URL,
-  start: number,
-  end: number,
-  sourceLang?: SpokenLang,
-): Promise<{ segments: TranscriptSegment[]; duration: number } | null> {
-  try {
-    const response = await fetch(audioUrl, {
-      headers: { "User-Agent": "Hoerbar/0.1 (transcription)", Range: `bytes=${start}-${end}` },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      redirect: "follow",
-    });
-    if (!response.ok) return null;
-    const buffer = await response.arrayBuffer();
-    const audio = new Blob([buffer], { type: response.headers.get("content-type") ?? "audio/mpeg" });
-    return transcribeBlob(key, audio, sourceLang);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Fetches MAX_CHUNK_BYTES-sized byte ranges in parallel - not sequentially,
- * since several chunks run one after another would risk the route's own
- * function-duration limit even though Whisper itself is fast - then stitches
- * the segments back together using each chunk's own measured duration as
- * the next one's time offset.
- */
-async function transcribeInChunks(
-  key: string,
-  audioUrl: URL,
-  totalBytes: number,
-  sourceLang?: SpokenLang,
-): Promise<TranscribeResult> {
-  const chunkCount = Math.min(MAX_CHUNKS, Math.ceil(totalBytes / MAX_CHUNK_BYTES));
-  const chunkResults = await Promise.all(
-    Array.from({ length: chunkCount }, (_, i) => {
-      const start = i * MAX_CHUNK_BYTES;
-      const end = Math.min(start + MAX_CHUNK_BYTES, totalBytes) - 1;
-      return fetchAndTranscribeChunk(key, audioUrl, start, end, sourceLang);
-    }),
-  );
-
-  // Any one chunk failing leaves a silent gap with no way to tell the
-  // listener where it is, so the whole attempt is reported as failed rather
-  // than returned partial.
-  if (chunkResults.some((result) => result === null)) {
-    return { ok: false, reason: "transcription-failed" };
-  }
-
+  const reader = response.body.getReader();
+  let currentBuffer = new Uint8Array(MAX_AUDIO_BYTES);
   let offset = 0;
-  const segments: TranscriptSegment[] = [];
-  for (const result of chunkResults as Array<{ segments: TranscriptSegment[]; duration: number }>) {
-    for (const seg of result.segments) {
-      segments.push({ start: seg.start + offset, end: seg.end + offset, text: seg.text });
+  let chunkIndex = 0;
+  const chunkPromises: Promise<{ index: number; segments: TranscriptSegment[] }>[] = [];
+  let isDownloadDone = false;
+  let downloadError: Error | null = null;
+
+  const flushChunk = (buffer: Uint8Array, length: number, index: number) => {
+    const blob = new Blob([buffer.slice(0, length)], { type: contentType });
+    chunkPromises.push(transcribeChunk(blob, index));
+  };
+
+  // Run download in the background so we can yield chunks as soon as they are pushed and resolved!
+  const downloadTask = (async () => {
+    try {
+      while (true) {
+        if (signal?.aborted) {
+          reader.cancel();
+          break;
+        }
+        const { done, value } = await reader.read();
+        if (done) {
+          if (offset > 0) flushChunk(currentBuffer, offset, chunkIndex);
+          break;
+        }
+        
+        let valueOffset = 0;
+        while (valueOffset < value.length) {
+          const remainingSpace = MAX_AUDIO_BYTES - offset;
+          const bytesToCopy = Math.min(remainingSpace, value.length - valueOffset);
+          currentBuffer.set(value.subarray(valueOffset, valueOffset + bytesToCopy), offset);
+          offset += bytesToCopy;
+          valueOffset += bytesToCopy;
+
+          if (offset === MAX_AUDIO_BYTES) {
+            flushChunk(currentBuffer, offset, chunkIndex++);
+            currentBuffer = new Uint8Array(MAX_AUDIO_BYTES);
+            offset = 0;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[transcribe] Reader failed:", error);
+      downloadError = new Error("fetch-failed");
+    } finally {
+      isDownloadDone = true;
     }
-    offset += result.duration;
+  })();
+
+  let currentTimeOffset = 0;
+  let yieldedCount = 0;
+
+  while (!isDownloadDone || yieldedCount < chunkPromises.length) {
+    if (signal?.aborted) break;
+    if (downloadError) throw downloadError;
+    
+    if (yieldedCount < chunkPromises.length) {
+      const chunkResult = await chunkPromises[yieldedCount];
+      const chunkSegments = chunkResult.segments;
+      yieldedCount++;
+      
+      if (chunkSegments.length === 0) continue;
+      
+      let maxEndInChunk = 0;
+      const finalSegments: TranscriptSegment[] = [];
+      for (const seg of chunkSegments) {
+        if (seg.end !== Number.MAX_SAFE_INTEGER) {
+          maxEndInChunk = Math.max(maxEndInChunk, seg.end);
+        }
+        finalSegments.push({
+          start: seg.start + currentTimeOffset,
+          end: seg.end === Number.MAX_SAFE_INTEGER ? Number.MAX_SAFE_INTEGER : seg.end + currentTimeOffset,
+          text: seg.text
+        });
+      }
+      currentTimeOffset += maxEndInChunk;
+      yield finalSegments;
+    } else {
+      // Wait for a short time before checking again if a new chunk was pushed or download finished
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
   }
 
-  return { ok: true, segments };
-}
-
-export async function transcribeAudio(audioUrl: URL, sourceLang?: SpokenLang): Promise<TranscribeResult> {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return { ok: false, reason: "no-key" };
-
-  const head = await fetch(audioUrl, {
-    method: "HEAD",
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  }).catch(() => null);
-  const declaredLength = Number(head?.headers.get("content-length") ?? NaN);
-  const totalBytes = Number.isFinite(declaredLength) ? declaredLength : null;
-
-  if (totalBytes !== null && totalBytes > MAX_AUDIO_BYTES) {
-    return { ok: false, reason: "too-large" };
-  }
-
-  // A declared size bigger than one request's limit is split into ranged
-  // chunks below; anything else (it fits, or the feed never said how big it
-  // is) goes through the same single request this has always made.
-  if (totalBytes !== null && totalBytes > MAX_CHUNK_BYTES) {
-    return transcribeInChunks(key, audioUrl, totalBytes, sourceLang);
-  }
-
-  let audio: Blob;
-  try {
-    const response = await fetch(audioUrl, {
-      headers: { "User-Agent": "Hoerbar/0.1 (transcription)" },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      redirect: "follow",
-    });
-    if (!response.ok) return { ok: false, reason: "fetch-failed" };
-
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength > MAX_AUDIO_BYTES) return { ok: false, reason: "too-large" };
-    audio = new Blob([buffer], { type: response.headers.get("content-type") ?? "audio/mpeg" });
-  } catch {
-    return { ok: false, reason: "fetch-failed" };
-  }
-
-  const result = await transcribeBlob(key, audio, sourceLang);
-  if (!result) return { ok: false, reason: "transcription-failed" };
-  return { ok: true, segments: result.segments };
+  // Ensure download task is fully awaited so we don't leave unhandled rejections, though it catches internally
+  await downloadTask;
 }

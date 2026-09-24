@@ -18,7 +18,7 @@ export type Lang = "de" | TargetLang;
 
 const DEEPL_LANG: Record<Lang, string> = { de: "DE", en: "EN-GB", vi: "VI" };
 
-export type TranslationSource = "deepl" | "google" | "anthropic" | "groq" | "mymemory" | "none";
+export type TranslationSource = "deepl" | "google" | "anthropic" | "mymemory" | "none";
 
 export interface TranslationResult {
   text: string | null;
@@ -38,8 +38,7 @@ export function hasKeyedProvider(): boolean {
   return Boolean(
     process.env.DEEPL_API_KEY ||
       process.env.GOOGLE_TRANSLATE_API_KEY ||
-      process.env.ANTHROPIC_API_KEY ||
-      process.env.GROQ_API_KEY,
+      process.env.ANTHROPIC_API_KEY,
   );
 }
 
@@ -47,6 +46,7 @@ export async function translate(
   text: string,
   targetLang: Lang,
   sourceLang: Lang = "de",
+  engine: string = "auto",
 ): Promise<TranslationResult> {
   if (!text.trim()) return { text: null, source: "none" };
   if (targetLang === sourceLang) return { text, source: "none" };
@@ -57,15 +57,8 @@ export async function translate(
   const google = await translateWithGoogle(text, targetLang, sourceLang);
   if (google) return { text: google, source: "google" };
 
-  const anthropic = await translateWithAnthropic(text, targetLang, sourceLang);
-  if (anthropic) return { text: anthropic, source: "anthropic" };
-
-  // Groq needs a key too, but it is the one every listener here already has
-  // for "Generate transcript with AI" - reusing it makes translation reliable
-  // out of the box for anyone who already set that up, without a second
-  // signup. Tried before the keyless fallback below for exactly that reason.
-  const groq = await translateWithGroq(text, targetLang, sourceLang);
-  if (groq) return { text: groq, source: "groq" };
+  const llm = await translateWithLLM(text, targetLang, sourceLang, engine);
+  if (llm) return { text: llm, source: "anthropic" };
 
   const free = await translateWithMyMemory(text, targetLang, sourceLang);
   if (free) return { text: free, source: "mymemory" };
@@ -115,9 +108,6 @@ async function translateWithMyMemory(text: string, lang: Lang, sourceLang: Lang)
       const response = await fetch(`https://api.mymemory.translated.net/get?${params}`, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(9000),
-        // Next.js's own fetch extension, not in the standard RequestInit
-        // type the standalone test build compiles against; still honored at
-        // runtime inside Next.js, and harmlessly ignored outside it.
         next: { revalidate: 86_400 },
       } as RequestInit);
       if (!response.ok) return null;
@@ -195,52 +185,41 @@ async function translateWithGoogle(text: string, lang: Lang, sourceLang: Lang): 
 
 const LANG_NAME: Record<Lang, string> = { de: "German", en: "English", vi: "Vietnamese" };
 
-async function translateWithAnthropic(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
-  const result = await askClaude({
+async function translateWithLLM(text: string, lang: Lang, sourceLang: Lang, engine: string): Promise<string | null> {
+  const result = await askLLM({
     system: `You are a translator. Translate the ${LANG_NAME[sourceLang]} input into natural ${LANG_NAME[lang]}. Reply with the translation only, no quotes and no commentary.`,
     user: text,
     maxTokens: 400,
-  });
+  }, engine);
   return result?.trim() ?? null;
 }
 
-/** Fast, free-tier hosted Llama, used the same way as the Anthropic provider
- * above - a plain instruction prompt, since Groq's chat API is otherwise
- * OpenAI-compatible like its transcription endpoint already used here. */
-async function translateWithGroq(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return null;
-  const model = process.env.GROQ_TRANSLATE_MODEL ?? "llama-3.3-70b-versatile";
+export async function translateBatchWithLLM(texts: string[], lang: Lang, sourceLang: Lang, engine: string): Promise<string[] | null> {
+  const inputObj: Record<string, string> = {};
+  texts.forEach((t, i) => { inputObj[String(i)] = t; });
 
+  const result = await askLLM({
+    system: `You are a translator. You will receive a JSON object of text snippets in ${LANG_NAME[sourceLang]}. Translate each snippet into natural ${LANG_NAME[lang]}.
+Return ONLY a JSON object where keys are the same indices and values are the translated strings. Do not combine or drop any snippets.`,
+    user: JSON.stringify(inputObj),
+    maxTokens: 2500,
+    json: true,
+  }, engine);
+  if (!result) return null;
+  
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        max_tokens: 400,
-        messages: [
-          {
-            role: "system",
-            content: `You are a translator. Translate the ${LANG_NAME[sourceLang]} input into natural ${LANG_NAME[lang]}. Reply with the translation only, no quotes and no commentary.`,
-          },
-          { role: "user", content: text },
-        ],
-      }),
-      signal: AbortSignal.timeout(9000),
-    });
-    if (!response.ok) {
-      console.error("[translate] Groq", response.status, await response.text().catch(() => ""));
-      return null;
+    let raw = result.trim();
+    if (raw.startsWith("```json")) raw = raw.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+    if (raw.startsWith("```")) raw = raw.replace(/^```\n?/, "").replace(/\n?```$/, "");
+    
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null) {
+      // Map it back to array based on the original indices
+      return texts.map((_, i) => String(parsed[String(i)] || ""));
     }
-    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    return data.choices?.[0]?.message?.content?.trim() ?? null;
-  } catch (error) {
-    console.error("[translate] Groq request failed:", error);
+    return null;
+  } catch (e) {
+    console.error("[translateBatchWithLLM] failed to parse JSON:", e);
     return null;
   }
 }
@@ -286,6 +265,131 @@ export async function askClaude(request: ClaudeRequest): Promise<string | null> 
     console.error("[claude] request failed:", error);
     return null;
   }
+}
+
+async function askOpenAIFormat(
+  request: ClaudeRequest,
+  url: string,
+  key: string,
+  model: string,
+  authHeader = "Bearer"
+): Promise<string | null> {
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (authHeader === "Bearer") {
+      headers["Authorization"] = `Bearer ${key}`;
+    } else if (authHeader === "api-key") {
+      headers["api-key"] = key;
+    }
+
+    const payload: any = {
+      model,
+      messages: [
+        { role: "system", content: request.system },
+        { role: "user", content: request.user }
+      ],
+      max_tokens: request.maxTokens ?? 512,
+    };
+    
+    if (request.json) {
+      payload.response_format = { type: "json_object" };
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error(`[openai-format ${model}]`, response.status, await response.text());
+      return null;
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content ?? null;
+  } catch (error) {
+    console.error(`[openai-format ${model}] request failed:`, error);
+    return null;
+  }
+}
+
+export async function askLLM(request: ClaudeRequest, engine: string = "auto"): Promise<string | null> {
+  // Determine engine
+  let activeEngine = engine;
+  if (activeEngine === "auto") {
+    if (process.env.GEMINI_API_KEY) activeEngine = "gemini";
+    else if (process.env.GROQ_API_KEY) activeEngine = "groq";
+    else if (process.env.DEEPSEEK_API_KEY) activeEngine = "deepseek";
+    else if (process.env.OPENAI_API_KEY) activeEngine = "openai";
+    else if (process.env.ANTHROPIC_API_KEY) activeEngine = "anthropic";
+    else if (process.env.OPENROUTER_API_KEY) activeEngine = "openrouter";
+  }
+
+  switch (activeEngine) {
+    case "gemini":
+      if (process.env.GEMINI_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+          process.env.GEMINI_API_KEY,
+          "gemini-1.5-flash"
+        );
+      }
+      break;
+    case "groq":
+      if (process.env.GROQ_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://api.groq.com/openai/v1/chat/completions",
+          process.env.GROQ_API_KEY,
+          "llama-3.3-70b-versatile"
+        );
+      }
+      break;
+    case "deepseek":
+      if (process.env.DEEPSEEK_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://api.deepseek.com/chat/completions",
+          process.env.DEEPSEEK_API_KEY,
+          "deepseek-chat"
+        );
+      }
+      break;
+    case "openai":
+      if (process.env.OPENAI_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://api.openai.com/v1/chat/completions",
+          process.env.OPENAI_API_KEY,
+          "gpt-4o"
+        );
+      }
+      break;
+    case "openrouter":
+      if (process.env.OPENROUTER_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://openrouter.ai/api/v1/chat/completions",
+          process.env.OPENROUTER_API_KEY,
+          "anthropic/claude-3.5-sonnet"
+        );
+      }
+      break;
+    case "anthropic":
+      if (process.env.ANTHROPIC_API_KEY) {
+        return askClaude(request);
+      }
+      break;
+  }
+  
+  // Fallback
+  if (process.env.GEMINI_API_KEY) {
+    return askOpenAIFormat(request, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", process.env.GEMINI_API_KEY, "gemini-1.5-flash");
+  }
+  return askClaude(request);
 }
 
 /** Pulls the first JSON object or array out of a model reply. */

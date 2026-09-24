@@ -122,6 +122,11 @@ class LiveCaptionService {
     this.notifyTranscript();
   }
 
+  public appendTranscript(segments: CaptionSegment[]) {
+    this.currentTranscript = [...this.currentTranscript, ...segments];
+    this.notifyTranscript();
+  }
+
   /**
    * Fills in one language's worth of auto-translated lines as they come
    * back, without disturbing anything already loaded - translation happens
@@ -425,15 +430,24 @@ class LiveCaptionService {
     rawText: string,
     explainGrammar = false,
   ): Promise<{ polishedDe: string; translation: string; grammarNotes?: string }> {
-    try {
-      const res = await fetch("/api/caption/polish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: rawText, lang: this.targetLang, explainGrammar }),
-      });
-      if (res.ok) {
-        return (await res.json()) as { polishedDe: string; translation: string; grammarNotes?: string };
-      }
+      let engine = "auto";
+      try {
+        const raw = window.localStorage.getItem("hoerbar.caption.settings.v1");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.translationEngine) engine = parsed.translationEngine;
+        }
+      } catch {}
+
+      try {
+        const res = await fetch("/api/caption/polish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: rawText, lang: this.targetLang, explainGrammar, engine }),
+        });
+        if (res.ok) {
+          return (await res.json()) as { polishedDe: string; translation: string; grammarNotes?: string };
+        }
     } catch (err) {
       console.error("[LiveCaption] polish request failed:", err);
     }

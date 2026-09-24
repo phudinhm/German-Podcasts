@@ -111,10 +111,34 @@ export function FullscreenPlayer() {
   useEffect(() => {
     if (!fullscreenOpen) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setFullscreenOpen(false);
+      if (event.key === "Escape") {
+        if (window.location.hash === "#now-playing") window.history.back();
+        else setFullscreenOpen(false);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreenOpen, setFullscreenOpen]);
+
+  // Push history state to support native iPhone swipe-back gesture
+  useEffect(() => {
+    if (!fullscreenOpen) return;
+    
+    // Add hash to history so swipe back just pops it
+    window.history.pushState(null, "", "#now-playing");
+    
+    const onPopState = () => {
+      if (fullscreenOpen) setFullscreenOpen(false);
+    };
+    
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      // Clean up the hash if we closed it without swiping back
+      if (window.location.hash === "#now-playing") {
+        window.history.back();
+      }
+    };
   }, [fullscreenOpen, setFullscreenOpen]);
 
   if (!track || !fullscreenOpen) return null;
@@ -207,6 +231,8 @@ export function FullscreenPlayer() {
             translationLang={translationLang}
             autoScroll={settings.autoScroll}
             fontSize={settings.fontSize + 2}
+            fontFamily={settings.fontFamily}
+            theme={settings.captionTheme}
           />
         </div>
 

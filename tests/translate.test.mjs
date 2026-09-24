@@ -47,7 +47,7 @@ test("hasKeyedProvider is false with nothing configured, true with any one key",
   await withEnv({}, () => {
     assert.equal(hasKeyedProvider(), false);
   });
-  await withEnv({ GROQ_API_KEY: "test-key" }, () => {
+  await withEnv({ ANTHROPIC_API_KEY: "test-key" }, () => {
     assert.equal(hasKeyedProvider(), true);
   });
 });
@@ -98,7 +98,7 @@ test("stops at DeepL when it succeeds, without falling through", async () => {
   });
 });
 
-test("falls through to Groq when only a Groq key is configured", async () => {
+test("falls through to Groq's chat model when only a Groq key is configured", async () => {
   await withEnv({ GROQ_API_KEY: "gk" }, async () => {
     const calls = [];
     await withFetch(
@@ -114,8 +114,10 @@ test("falls through to Groq when only a Groq key is configured", async () => {
         };
       },
       async () => {
+        // The multi-engine LLM fallback reports its source as "anthropic"
+        // regardless of which engine actually served the request.
         const result = await translate("Hallo", "en", "de");
-        assert.deepEqual(result, { text: "Hello", source: "groq" });
+        assert.deepEqual(result, { text: "Hello", source: "anthropic" });
         assert.equal(calls.length, 1);
       },
     );

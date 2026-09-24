@@ -181,7 +181,7 @@ export function MiniPlayer() {
   };
 
   const mobileTabBar = (
-    <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-[var(--paper-raised)]/90 backdrop-blur-xl border-t border-[var(--rule)] pb-[env(safe-area-inset-bottom,14px)] pt-1.5 flex items-center justify-around shadow-[0_-4px_16px_rgba(0,0,0,0.05)]">
+    <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-[var(--paper-raised)]/75 backdrop-blur-2xl border-t border-[var(--rule)]/50 pb-[env(safe-area-inset-bottom,14px)] pt-1.5 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
       <Link href="/" className={`flex flex-col items-center gap-0.5 w-16 transition-colors ${pathname === "/" ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
         <span className="text-[22px] leading-none">🎧</span>
         <span className="text-[10px] font-medium">{t("nav.listenTab")}</span>
@@ -365,7 +365,7 @@ export function MiniPlayer() {
           {/* COLLAPSED PILL STATE */}
           {!isExpandedDesktop ? (
             <div
-              className="group flex items-center gap-2.5 rounded-full border border-white/20 bg-black/85 dark:bg-black/90 px-3.5 py-1.5 text-white shadow-2xl backdrop-blur-2xl transition-all duration-300 hover:scale-[1.03] cursor-pointer"
+              className="group flex items-center gap-2.5 rounded-full border border-white/25 bg-black/70 dark:bg-black/75 px-3.5 py-1.5 text-white shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-3xl transition-all duration-300 hover:scale-[1.03] cursor-pointer"
               title={t("player.hoverExpand")}
             >
               <Art src={track.artwork} alt="" size={30} seed={track.showTitle || track.title} />
@@ -514,7 +514,7 @@ export function MiniPlayer() {
       {mobileTabBar}
       <div
         data-dock="mobile-iphone"
-        className="fixed inset-x-0 z-[45] sm:hidden bg-black/90 dark:bg-black/95 text-white backdrop-blur-2xl border-t border-white/15 pt-2 pb-2 px-3.5 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] transition-transform"
+        className="fixed inset-x-0 z-[45] sm:hidden bg-black/75 dark:bg-black/80 text-white backdrop-blur-3xl border-t border-white/20 pt-2 pb-2 px-3.5 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] transition-transform"
         style={{ bottom: "calc(50px + env(safe-area-inset-bottom, 14px))" }}
       >
         {/* Module D: Thin progress bar on dock */}

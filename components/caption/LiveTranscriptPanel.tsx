@@ -10,6 +10,7 @@ import {
 import {
   CaptionSettings,
   captionThemeStyle,
+  FONT_FAMILIES,
   type CaptionSettingsState,
 } from "./CaptionSettings";
 import { TextSwapIn } from "./TextSwapIn";
@@ -503,7 +504,7 @@ export function LiveTranscriptPanel({
                   </div>
 
                   {/* German text & Vietnamese translation */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0" style={{ fontFamily: FONT_FAMILIES[settings.fontFamily] }}>
                     <p
                       className="font-medium text-[var(--ink)] select-text"
                       style={{
@@ -530,7 +531,7 @@ export function LiveTranscriptPanel({
                     {/* Its own (mono, italic) type and the accent colour,
                         not just a dimmer copy of the original's own style,
                         so a translation reads as one at a glance. */}
-                    {settings.showTranslation && seg.translations ? (
+                    {settings.showTranslation && (settings.translationVisibility === "all" || isActive) && seg.translations ? (
                       <div className="mt-1 space-y-0.5">
                         {Object.entries(seg.translations).map(([lang, text]) => (
                           <TextSwapIn
@@ -546,12 +547,12 @@ export function LiveTranscriptPanel({
                           </TextSwapIn>
                         ))}
                       </div>
-                    ) : settings.showTranslation && seg.translation ? (
+                    ) : settings.showTranslation && (settings.translationVisibility === "all" || isActive) && seg.translation ? (
                       <TextSwapIn
                         as="p"
                         className="mt-1 block font-mono italic text-[var(--accent)] select-text"
                         style={{
-                          fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.8))}px`,
+                          fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.85))}px`,
                         }}
                       >
                         {seg.translation}

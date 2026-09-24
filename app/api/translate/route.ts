@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { translate, type Lang } from "@/lib/server/translate";
+import { translate, translateBatchWithLLM, type Lang } from "@/lib/server/translate";
 
 export const runtime = "nodejs";
 
@@ -7,32 +7,24 @@ function toLang(value: unknown, fallback: Lang): Lang {
   return value === "de" || value === "en" || value === "vi" ? value : fallback;
 }
 
-/**
- * On-demand translation.
- *
- * Accepts either a single `text` or a batch of `texts`. The batch form exists
- * for episode titles - a feed page shows forty of them at once - and for a
- * published transcript's lines, which can run into the hundreds.
- *
- * `sourceLang` defaults to German: every caller before the published-transcript
- * feature only ever translated German speech, so an English-language show's
- * transcript is the one case that needs to say otherwise.
- */
 export async function POST(request: Request) {
   let text: string;
   let texts: string[] | null = null;
   let lang: Lang;
   let sourceLang: Lang;
+  let engine: string;
   try {
     const body = (await request.json()) as {
       text?: string;
       texts?: string[];
       lang?: string;
       sourceLang?: string;
+      engine?: string;
     };
     text = (body.text ?? "").trim().slice(0, 2000);
     lang = toLang(body.lang, "en");
     sourceLang = toLang(body.sourceLang, "de");
+    engine = body.engine ?? "auto";
     if (Array.isArray(body.texts)) {
       texts = body.texts.slice(0, 60).map((item) => String(item).slice(0, 400));
     }
@@ -44,16 +36,26 @@ export async function POST(request: Request) {
   }
 
   if (texts?.length) {
-    // Sequential rather than parallel: the keyless fallback is rate limited,
-    // and forty simultaneous requests is the fastest way to be cut off.
+    // Try to translate as a batch if LLM is enabled, as sequential fallback is rate limited and slow.
+    if (engine !== "auto" || process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY) {
+      const batchResult = await translateBatchWithLLM(texts, lang, sourceLang, engine);
+      if (batchResult) {
+        return NextResponse.json({
+          texts: batchResult,
+          source: "llm-batch",
+        });
+      }
+    }
+
+    // Sequential fallback
     const results = [];
-    for (const item of texts) results.push(await translate(item, lang, sourceLang));
+    for (const item of texts) results.push(await translate(item, lang, sourceLang, engine));
     return NextResponse.json({
       texts: results.map((result) => result.text),
       source: results[0]?.source ?? "none",
     });
   }
 
-  const result = await translate(text, lang, sourceLang);
+  const result = await translate(text, lang, sourceLang, engine);
   return NextResponse.json(result);
 }
