@@ -72,6 +72,16 @@ export function TranscriptReader({
 
   const activeRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [userScrolledAway, setUserScrolledAway] = useState(false);
+  const userScrollTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const noteUserManualScroll = () => {
+    setUserScrolledAway(true);
+    window.clearTimeout(userScrollTimerRef.current);
+    userScrollTimerRef.current = setTimeout(() => {
+      setUserScrolledAway(false);
+    }, 8000);
+  };
 
   useEffect(() => {
     setSegments(liveCaptionService.getTranscript());
@@ -123,9 +133,16 @@ export function TranscriptReader({
   const activeSegmentId = activeSegment?.id;
 
   useEffect(() => {
-    if (!autoScroll) return;
-    activeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [activeSegmentId, autoScroll]);
+    if (!autoScroll || userScrolledAway) return;
+    const container = scrollContainerRef.current;
+    const item = activeRef.current;
+    if (!container || !item) return;
+    const targetTop = Math.max(
+      0,
+      item.offsetTop - container.clientHeight / 2 + item.clientHeight / 2
+    );
+    container.scrollTo({ top: targetTop, behavior: "smooth" });
+  }, [activeSegmentId, autoScroll, userScrolledAway]);
 
   const handleWordClick = async (
     rawToken: string,
@@ -256,6 +273,8 @@ export function TranscriptReader({
     <div
       ref={scrollContainerRef}
       onScroll={handleReaderScroll}
+      onWheel={noteUserManualScroll}
+      onTouchMove={noteUserManualScroll}
       className={`relative h-full overflow-y-auto px-3 sm:px-8 transition-colors duration-500 rounded-2xl ${
         !isModern ? "bg-[var(--surface)]" : ""
       }`}

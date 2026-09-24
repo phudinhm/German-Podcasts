@@ -157,12 +157,20 @@ export function LiveTranscriptPanel({
     }
   }
 
-  // Smart Auto-scroll: auto scroll to active item unless user deliberately scrolled away
+  // Smart Auto-scroll: scroll ONLY the internal transcript container (never window!),
+  // so mobile users can freely scroll up to the page header/logo without being yanked back down.
   useEffect(() => {
-    if (!autoScroll || userScrolledUp || !activeItemRef.current) return;
-    activeItemRef.current.scrollIntoView({
+    if (!autoScroll || userScrolledUp) return;
+    const container = containerRef.current;
+    const item = activeItemRef.current;
+    if (!container || !item) return;
+    const targetTop = Math.max(
+      0,
+      item.offsetTop - container.clientHeight / 2 + item.clientHeight / 2
+    );
+    container.scrollTo({
+      top: targetTop,
       behavior: "smooth",
-      block: "center", // Apple-style centered focus keeps spoken line right in the middle
     });
   }, [activeSegmentId, autoScroll, userScrolledUp]);
 
@@ -228,10 +236,16 @@ export function LiveTranscriptPanel({
   const resumeAutoScroll = () => {
     setUserScrolledUp(false);
     setAutoScroll(true);
-    if (activeItemRef.current) {
-      activeItemRef.current.scrollIntoView({
+    const container = containerRef.current;
+    const item = activeItemRef.current;
+    if (container && item) {
+      const targetTop = Math.max(
+        0,
+        item.offsetTop - container.clientHeight / 2 + item.clientHeight / 2
+      );
+      container.scrollTo({
+        top: targetTop,
         behavior: "smooth",
-        block: "nearest",
       });
     }
   };
