@@ -895,6 +895,8 @@ export async function* transcribeAudioStream(
   let currentTimeOffset = 0;
   let processedCount = 0;
   let hasYieldedAny = false;
+  let hasYieldedRealAudio = false;
+  let fallbackCoverageEnd = 0;
 
   while (!isDownloadDone || processedCount < rawQueue.length) {
     if (signal?.aborted) break;
@@ -937,6 +939,7 @@ export async function* transcribeAudioStream(
         const step = measuredDuration > 0 ? measuredDuration : maxEndInChunk;
         currentTimeOffset += step;
         hasYieldedAny = true;
+        hasYieldedRealAudio = true;
         yield splitLongTranscriptSegments(finalSegments);
       } else {
         const chunkDur = item.duration > 0 ? item.duration : 45;
@@ -954,6 +957,7 @@ export async function* transcribeAudioStream(
               text: s.text,
             }));
             hasYieldedAny = true;
+            fallbackCoverageEnd = currentTimeOffset + chunkDur;
             yield splitLongTranscriptSegments(openingSegs);
           }
         }
@@ -966,9 +970,18 @@ export async function* transcribeAudioStream(
 
   await downloadTask;
 
-  // Tier 5 & 6 Guarantee: if no segments could be extracted from audio/video bytes,
+  // Tier 5 & 6 Guarantee: if no real audio segments could be extracted,
   // synthesize transcript via AI LLM (Groq LLaMA / Pollinations Free AI) or structured show notes!
-  if (!hasYieldedAny && !signal?.aborted) {
-    yield splitLongTranscriptSegments(await yieldUltimateFallback());
+  if (!hasYieldedRealAudio && !signal?.aborted) {
+    const fullFallback = splitLongTranscriptSegments(await yieldUltimateFallback());
+    const remaining =
+      fallbackCoverageEnd > 0
+        ? fullFallback.filter((s) => s.end > fallbackCoverageEnd + 1)
+        : fullFallback;
+    if (remaining.length > 0) {
+      yield remaining;
+    } else if (!hasYieldedAny && fullFallback.length > 0) {
+      yield fullFallback;
+    }
   }
 }

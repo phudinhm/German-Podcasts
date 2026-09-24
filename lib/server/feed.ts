@@ -88,7 +88,8 @@ export function assertPublicUrl(raw: string): URL {
 export function decodeXmlText(value: string): string {
   return value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<\/(?:p|div|li|h[1-6])>|<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
     .replace(/&#(\d+);/g, (_, dec) => {
       const code = Number(dec);
       return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : _;
@@ -108,6 +109,8 @@ export function decodeXmlText(value: string): string {
     .replace(/&ldquo;|&rdquo;/g, "“")
     .replace(/&hellip;/g, "…")
     .replace(/&amp;/g, "&")
+    .replace(/<\/(?:p|div|li|h[1-6])>|<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
