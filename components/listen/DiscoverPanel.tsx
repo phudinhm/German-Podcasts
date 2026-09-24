@@ -280,23 +280,29 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
           </div>
         </div>
 
-        <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           {sortedCatalog.map((item: Suggestion) => (
             <li key={`${item.label}|${item.lang}`} className="min-w-0">
               <button
                 type="button"
-                className="row-hover h-full w-full p-2.5 text-left"
+                className="group relative flex h-full w-full flex-col justify-between rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-3.5 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/50 hover:shadow-md active:scale-[0.99]"
                 onClick={() => onPick(item.query)}
               >
-                <span className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
-                  <span className="text-[14px] font-medium">{item.label}</span>
-                  <span className="chip text-[10px]">{item.lang === "de" ? "DE" : "EN"}</span>
-                  {item.cefr ? (
-                    <span className="chip chip-level text-[10px]">{item.cefr}</span>
-                  ) : null}
-                </span>
-                <span className="mt-0.5 block truncate text-[12px] text-[var(--ink-soft)]">{item.publisher}</span>
-                <span className="mt-1 block text-[12px] leading-snug text-[var(--ink-faint)]">
+                <div>
+                  <div className="flex flex-wrap items-baseline justify-between gap-1.5">
+                    <span className="text-[14.5px] font-semibold text-[var(--ink)] group-hover:text-[var(--accent)] transition-colors">
+                      {item.label}
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="chip text-[10px] uppercase font-medium">{item.lang === "de" ? "DE" : "EN"}</span>
+                      {item.cefr ? (
+                        <span className="chip chip-level text-[10px] font-semibold">{item.cefr}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <span className="mt-1 block truncate text-[12px] font-medium text-[var(--ink-soft)]">{item.publisher}</span>
+                </div>
+                <span className="mt-2 block text-[12px] leading-relaxed text-[var(--ink-faint)]">
                   {item.why}
                 </span>
               </button>

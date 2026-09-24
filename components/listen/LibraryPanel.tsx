@@ -338,30 +338,50 @@ export function LibraryPanel({
           <h2 className="mb-2 text-[15px] font-semibold text-[var(--ink)]">
             {t("library.continue")}
           </h2>
-          <ul className="grid gap-1.5 sm:grid-cols-2">
-            {unfinished.slice(0, activeTab === "continue" ? undefined : 6).map((entry) => (
-              <li key={entry.id} className="relative min-w-0">
-                <button
-                  type="button"
-                  className="row-hover flex w-full items-start gap-3 p-2.5 pr-10 text-left"
-                  onClick={() => onPlayRecent(entry)}
-                >
-                  <Art src={entry.artwork} alt="" size={56} seed={entry.showTitle || entry.title} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-medium">{entry.title}</span>
-                    <span className="block truncate text-[12px] text-[var(--ink-faint)]">
-                      {entry.showTitle}
-                    </span>
-                    {percent(entry) > 0 ? (
-                      <span className="mt-1.5 block h-1 w-full overflow-hidden rounded-full bg-[var(--rule)]">
-                        <span
-                          className="block h-full rounded-full bg-[var(--accent-ring)]"
-                          style={{ width: `${percent(entry)}%` }}
-                        />
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {unfinished.slice(0, activeTab === "continue" ? undefined : 6).map((entry) => {
+              const pct = percent(entry);
+              const remSec = entry.durationSec ? Math.max(0, entry.durationSec - entry.position) : null;
+              const remMin = remSec ? Math.ceil(remSec / 60) : null;
+
+              return (
+                <li key={entry.id} className="relative min-w-0 group/item">
+                  <button
+                    type="button"
+                    className="flex w-full items-start gap-3 rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-3 pr-10 text-left shadow-xs transition-all duration-200 hover:border-[var(--accent)]/40 hover:shadow-md active:scale-[0.99]"
+                    onClick={() => onPlayRecent(entry)}
+                  >
+                    <div className="relative shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-black/5 dark:ring-white/10">
+                      <Art src={entry.artwork} alt="" size={58} seed={entry.showTitle || entry.title} />
+                      {pct > 0 && (
+                        <div className="absolute inset-x-0 bottom-0 h-1.5 bg-black/50 backdrop-blur-xs">
+                          <div
+                            className="h-full bg-[var(--accent)] rounded-r-full shadow-xs"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14.5px] font-semibold text-[var(--ink)]">{entry.title}</span>
+                      <span className="block truncate text-[12px] text-[var(--ink-faint)] mt-0.5">
+                        {entry.showTitle}
                       </span>
-                    ) : null}
-                  </span>
-                </button>
+                      {pct > 0 ? (
+                        <div className="mt-2 space-y-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
+                            {remMin ? t("feed.remaining", { min: remMin }) : t("library.resumeAt", { percent: pct })}
+                          </span>
+                          <span className="block h-1.5 w-full overflow-hidden rounded-full bg-[var(--rule)]">
+                            <span
+                              className="block h-full rounded-full bg-[var(--accent)]"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </span>
+                        </div>
+                      ) : null}
+                    </span>
+                  </button>
                 <button
                   type="button"
                   aria-label={t("library.forget")}
@@ -372,7 +392,8 @@ export function LibraryPanel({
                   ×
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}

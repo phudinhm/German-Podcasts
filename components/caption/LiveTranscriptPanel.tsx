@@ -101,32 +101,49 @@ export function LiveTranscriptPanel({
   }, []);
 
   // Determine active segment based on current playback time, corrected for
-  // any country-inserted ad break pushing the real audio out of step with
-  // the transcript's own timestamps (see the sync control in CaptionSettings).
+  // any ad breaks pushing real audio out of step.
+  // In Apple Music / Podcasts: During inter-sentence pauses, the currently spoken
+  // sentence remains highlighted until the next one actually begins!
   const contentTime = currentTime - transcriptOffsetSec;
-  const activeSegmentId = segments.find(
-    (s) => contentTime >= s.start - 0.5 && contentTime <= s.end + 0.5,
-  )?.id;
+  let activeSegmentId: string | undefined = undefined;
+
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i];
+    const next = segments[i + 1];
+    if (contentTime >= s.start - 0.3) {
+      if (contentTime <= s.end + 0.4) {
+        activeSegmentId = s.id;
+        break;
+      }
+      // If we are in a pause before the next sentence, keep current sentence active
+      if (next && contentTime < next.start) {
+        activeSegmentId = s.id;
+        break;
+      }
+      if (!next) {
+        activeSegmentId = s.id;
+        break;
+      }
+    }
+  }
 
   // Smart Auto-scroll: auto scroll to active item unless user deliberately scrolled away
   useEffect(() => {
     if (!autoScroll || userScrolledUp || !activeItemRef.current) return;
     activeItemRef.current.scrollIntoView({
       behavior: "smooth",
-      block: "nearest",
+      block: "center", // Apple-style centered focus keeps spoken line right in the middle
     });
   }, [activeSegmentId, autoScroll, userScrolledUp]);
 
-  // A live session appends lines faster than currentTime can catch up to
-  // them, so the "active" segment above can lag behind the newest one by a
-  // few lines. This keeps the newest line in view regardless, which is what
-  // "follow along live" actually means while captioning is running.
+  // When new segments arrive while NOT playing audio (or if user just started), scroll to end
   useEffect(() => {
     if (!autoScroll || userScrolledUp) return;
+    if (currentTime > 0) return; // Do NOT yank scroll if audio is actively playing!
     const container = containerRef.current;
     if (!container) return;
     container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-  }, [segments.length, autoScroll, userScrolledUp]);
+  }, [segments.length, autoScroll, userScrolledUp, currentTime]);
 
   // Handle scroll events to detect user manual scrolling
   const handleScroll = () => {
@@ -476,10 +493,10 @@ export function LiveTranscriptPanel({
               <div
                 key={seg.id}
                 ref={isActive ? activeItemRef : null}
-                className={`group rounded-xl p-3 transition-all duration-150 ${
+                className={`group rounded-xl p-3 transition-all duration-300 ${
                   isActive
-                    ? "bg-[var(--row-active)] border border-[var(--accent)]/40 shadow-xs"
-                    : "hover:bg-[var(--surface)] border border-transparent"
+                    ? "bg-[var(--row-active)] border border-[var(--accent)]/50 shadow-md scale-[1.01] opacity-100 ring-1 ring-[var(--accent)]/20"
+                    : "hover:bg-[var(--surface)] border border-transparent opacity-65 hover:opacity-100"
                 }`}
               >
                 <div className="flex items-start gap-2.5">

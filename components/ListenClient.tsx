@@ -1029,13 +1029,28 @@ export function ListenClient() {
                 nine characters before the two buttons took the rest. */}
             <div className="mb-3">
               <div className="flex items-center gap-3">
-                <Art src={show?.artwork ?? feed.image} alt="" size={56} seed={feed.title} />
+                <div className="shrink-0 overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+                  <Art src={show?.artwork ?? feed.image} alt="" size={60} seed={feed.title} />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-[17px] font-semibold sm:text-[18px]">{feed.title}</h2>
-                  <p className="truncate text-[12.5px] text-[var(--ink-faint)]">
-                    {feed.episodes.length} {t("common.episodes")}
-                    {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
-                  </p>
+                  <h2 className="truncate text-[17px] font-semibold tracking-tight sm:text-[19px] text-[var(--ink)]">{feed.title}</h2>
+                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                    <p className="truncate text-[12.5px] text-[var(--ink-faint)]">
+                      {feed.episodes.length} {t("common.episodes")}
+                      {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
+                    </p>
+                    {(() => {
+                      const listenedCount = episodes.filter((ep) => {
+                        const epId = ep.guid || ep.url;
+                        return recents.some((r) => r.id === epId && (r.position > 15 || r.finished));
+                      }).length;
+                      return listenedCount > 0 ? (
+                        <span className="chip text-[11px] bg-[var(--accent-soft)] text-[var(--accent)] font-medium">
+                          🎧 {t("feed.listenedCount", { count: listenedCount, total: feed.episodes.length })}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1100,65 +1115,103 @@ export function ListenClient() {
               {t("feed.noMatch")}
             </p>
           ) : (
-            <ul>
+            <ul className="space-y-1">
             {episodes.slice(0, visible).map((episode) => {
               const id = episode.guid || episode.url;
               const remembered = recents.find((item) => item.id === id);
+              const duration = episode.durationSec || remembered?.durationSec;
+              const isFinished = Boolean(
+                remembered?.finished || (duration && remembered && remembered.position >= duration - 25),
+              );
               const progress =
-                remembered && episode.durationSec
-                  ? Math.min(100, Math.round((remembered.position / episode.durationSec) * 100))
-                  : 0;
+                remembered && duration
+                  ? Math.min(100, Math.round((remembered.position / duration) * 100))
+                  : remembered && remembered.position > 15
+                    ? 15
+                    : 0;
+              const remainingSec = duration && remembered ? Math.max(0, duration - remembered.position) : null;
+              const remainingMin = remainingSec ? Math.ceil(remainingSec / 60) : null;
               const current = playing?.id === id;
               const isFav = isEpisodeFavorited(id);
+
               return (
                 <li key={id} className="relative min-w-0 group/item">
                   <button
                     type="button"
                     onClick={() => playEpisode(episode)}
-                    className="row-hover flex w-full items-start gap-3 p-2.5 pr-11 text-left"
+                    className={`flex w-full items-start gap-3.5 p-3 pr-11 text-left rounded-2xl transition-all duration-200 ${
+                      current
+                        ? "bg-[var(--row-active)] border border-[var(--accent)]/50 shadow-sm"
+                        : "hover:bg-[var(--surface)]/80 border border-transparent active:scale-[0.995]"
+                    }`}
                     data-active={current}
                     aria-current={current ? "true" : undefined}
                   >
-                    <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={56} seed={feed.title} />
+                    {/* Apple Podcasts Thumbnail with Embedded Progress Bar / Checkmark */}
+                    <div className="relative shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-black/5 dark:ring-white/10">
+                      <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={58} seed={feed.title} />
+                      {isFinished ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-bold text-white shadow-xs">
+                            ✓
+                          </span>
+                        </div>
+                      ) : progress > 0 ? (
+                        <div className="absolute inset-x-0 bottom-0 h-1.5 bg-black/50 backdrop-blur-xs">
+                          <div
+                            className="h-full bg-[var(--accent)] rounded-r-full shadow-xs"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+
                     <span className="min-w-0 flex-1">
                       <span className="flex items-start gap-2">
                         {current ? (
-                          // Aligned to the first line rather than centred: on a
-                          // phone a title runs to three lines and a centred
-                          // marker lands in the middle of a word.
                           <span className="now-playing mt-[5px] shrink-0" aria-hidden>
                             <span />
                             <span />
                             <span />
                           </span>
                         ) : null}
-                        <span className="min-w-0 text-[14.5px] font-medium leading-snug">{episode.title}</span>
+                        <span className="min-w-0 text-[15px] font-semibold tracking-tight leading-snug text-[var(--ink)]">
+                          {episode.title}
+                        </span>
                       </span>
                       {episode.description ? (
-                        <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-relaxed text-[var(--ink-faint)]">
+                        <span className="mt-1 line-clamp-2 block text-[12.5px] leading-relaxed text-[var(--ink-soft)]">
                           {episode.description}
                         </span>
                       ) : null}
-                      <span className="mt-1 flex flex-wrap items-center gap-x-3 text-[11.5px] text-[var(--ink-faint)]">
+                      <span className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-[var(--ink-faint)]">
                         {formatDate(episode.publishedAt, locale) ? (
                           <span>{formatDate(episode.publishedAt, locale)}</span>
                         ) : null}
                         {formatDuration(episode.durationSec, t("common.min")) ? (
-                          <span>{formatDuration(episode.durationSec, t("common.min"))}</span>
+                          <>
+                            <span aria-hidden>·</span>
+                            <span>{formatDuration(episode.durationSec, t("common.min"))}</span>
+                          </>
                         ) : null}
-                        {remembered?.finished ? (
-                          <span className="text-[var(--accent)]">✓ {t("library.finished")}</span>
+                        {isFinished ? (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span className="font-medium text-emerald-600 dark:text-emerald-400">✓ {t("library.finished")}</span>
+                          </>
                         ) : progress > 0 ? (
-                          <span className="text-[var(--accent)]">{t("library.resumeAt", { percent: progress })}</span>
+                          <>
+                            <span aria-hidden>·</span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
+                              {remainingMin ? t("feed.remaining", { min: remainingMin }) : t("library.resumeAt", { percent: progress })}
+                            </span>
+                          </>
                         ) : null}
                       </span>
-                      {/* Part-heard episodes get the bar as well as the wording:
-                          in a list of sixty, "41% in" is something you read, a
-                          bar is something you see. */}
-                      {!remembered?.finished && progress > 0 ? (
-                        <span className="mt-1.5 block h-1 w-full max-w-[220px] overflow-hidden rounded-full bg-[var(--rule)]">
+                      {!isFinished && progress > 0 ? (
+                        <span className="mt-2 block h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-[var(--rule)]">
                           <span
-                            className="block h-full rounded-full bg-[var(--accent-ring)]"
+                            className="block h-full rounded-full bg-[var(--accent)] transition-all duration-300"
                             style={{ width: `${progress}%` }}
                           />
                         </span>

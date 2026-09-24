@@ -176,13 +176,13 @@ export function Transport({
            in, which is the difference between scrubbing and scrolling the page. */
         className="group relative -my-2 flex min-w-0 flex-1 cursor-pointer touch-none items-center py-2"
       >
-        <span className="relative h-1.5 w-full overflow-hidden rounded-full bg-[var(--rule)]">
+        <span className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--rule)]/70 transition-all group-hover:h-2.5">
           <span
             ref={bufferRef}
-            className="absolute inset-y-0 left-0 bg-[var(--ink-faint)] opacity-30"
+            className="absolute inset-y-0 left-0 bg-[var(--ink-faint)]/25 rounded-full"
             style={{ width: 0 }}
           />
-          <span ref={fillRef} className="absolute inset-y-0 left-0 bg-[var(--accent-ring)]" style={{ width: 0 }} />
+          <span ref={fillRef} className="absolute inset-y-0 left-0 bg-[var(--accent)] rounded-full transition-all" style={{ width: 0 }} />
         </span>
       </div>
       <span className="w-[44px] shrink-0 font-mono text-[11px] tabular-nums text-[var(--ink-faint)]">
@@ -192,22 +192,19 @@ export function Transport({
   );
 
   const buttons = (
-    <div className="flex shrink-0 items-center justify-center gap-2">
+    <div className="flex shrink-0 items-center justify-center gap-2.5">
       <button
         type="button"
-        className="btn h-11 w-11 shrink-0 rounded-full p-0 text-[12px] sm:h-9 sm:w-auto sm:px-2.5"
+        className="btn h-10 w-10 shrink-0 rounded-full p-0 text-[12px] sm:h-9 sm:w-9 transition active:scale-95 shadow-xs border border-[var(--rule)]"
         onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
         aria-label={t("player.back10")}
         title={t("player.back10")}
       >
-        <span aria-hidden>−10</span>
-        <span aria-hidden className="hidden sm:inline">
-          s
-        </span>
+        <span aria-hidden>−10s</span>
       </button>
       <button
         type="button"
-        className="btn btn-primary h-12 w-12 shrink-0 rounded-full p-0 text-[15px] sm:h-10 sm:w-10 sm:text-[13px]"
+        className="btn btn-primary h-12 w-12 shrink-0 rounded-full p-0 text-[16px] sm:h-11 sm:w-11 sm:text-[14px] transition active:scale-95 shadow-md shadow-[var(--accent)]/20"
         onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
         aria-label={playing ? t("common.pause") : t("common.play")}
       >
@@ -215,15 +212,12 @@ export function Transport({
       </button>
       <button
         type="button"
-        className="btn h-11 w-11 shrink-0 rounded-full p-0 text-[12px] sm:h-9 sm:w-auto sm:px-2.5"
+        className="btn h-10 w-10 shrink-0 rounded-full p-0 text-[12px] sm:h-9 sm:w-9 transition active:scale-95 shadow-xs border border-[var(--rule)]"
         onClick={() => handle.seekTo(handle.getTime() + 30, true)}
         aria-label={t("player.forward30")}
         title={t("player.forward30")}
       >
-        <span aria-hidden>+30</span>
-        <span aria-hidden className="hidden sm:inline">
-          s
-        </span>
+        <span aria-hidden>+30s</span>
       </button>
     </div>
   );
