@@ -43,10 +43,8 @@ export function GlobalFloatingTranscript() {
     return () => cancelAnimationFrame(frame);
   }, [handle]);
 
-  if (!track || !showTranscript) return null;
-
-  // Always render floating transcript on all pages since we removed the inline one
-  const shouldFloat = true;
+  const shouldFloat = pathname !== "/" || !inlineVisible;
+  if (!track || !showTranscript || !shouldFloat) return null;
 
   const onSeekWithPlay = (seconds: number) => {
     handle.seekTo(seconds, true);

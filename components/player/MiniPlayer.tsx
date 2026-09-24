@@ -124,8 +124,11 @@ export function MiniPlayer() {
     [remember],
   );
 
+  const [playbackTime, setPlaybackTime] = useState(0);
+
   // Listen to live caption and transcript updates
   useEffect(() => {
+    setTranscriptList(liveCaptionService.getTranscript());
     const unsubCap = liveCaptionService.onCaption((seg) => {
       setCurrentCaption(seg);
     });
@@ -142,10 +145,15 @@ export function MiniPlayer() {
   useEffect(() => {
     let frame = 0;
     let last = false;
+    let lastTimeUpdate = 0;
     function tick() {
       frame = requestAnimationFrame(tick);
       const duration = handle.getDuration();
       const time = handle.getTime();
+      if (Math.abs(time - lastTimeUpdate) > 0.25) {
+        lastTimeUpdate = time;
+        setPlaybackTime(time);
+      }
       const percent = duration > 0 ? `${Math.min(100, (time / duration) * 100)}%` : "0%";
       if (fillRef.current) fillRef.current.style.width = percent;
       if (popFillRef.current) popFillRef.current.style.width = percent;
@@ -346,6 +354,26 @@ export function MiniPlayer() {
 
   const isExpandedDesktop = isHovered || pinned;
 
+  const activeDockSeg = (() => {
+    for (let i = 0; i < transcriptList.length; i++) {
+      const s = transcriptList[i];
+      const next = transcriptList[i + 1];
+      if (playbackTime >= s.start - 0.3) {
+        if (playbackTime <= s.end + 0.4 || (next && playbackTime < next.start) || !next) {
+          return s;
+        }
+      }
+    }
+    return currentCaption;
+  })();
+
+  const activeDockTrans =
+    activeDockSeg?.translations?.vi ??
+    activeDockSeg?.translations?.en ??
+    (activeDockSeg?.translations ? Object.values(activeDockSeg.translations)[0] : undefined) ??
+    activeDockSeg?.translation ??
+    null;
+
   return (
     <>
       {/* ========================================================================= */}
@@ -363,12 +391,19 @@ export function MiniPlayer() {
           {/* COLLAPSED PILL STATE */}
           {!isExpandedDesktop ? (
             <div
-              className="group flex items-center gap-2.5 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 text-[var(--ink)] px-3.5 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.14)] backdrop-blur-3xl transition-all duration-300 hover:scale-[1.03] cursor-pointer"
+              className="group flex items-center gap-2.5 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)]/95 text-[var(--ink)] px-3.5 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.14)] backdrop-blur-3xl transition-all duration-300 hover:scale-[1.02] cursor-pointer max-w-[420px]"
               title={t("player.hoverExpand")}
             >
-              <Art src={track.artwork} alt="" size={30} seed={track.showTitle || track.title} />
-              <div className="max-w-[160px] truncate text-[12px] font-medium leading-tight">
-                {track.title}
+              <Art src={track.artwork} alt="" size={32} seed={track.showTitle || track.title} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12px] font-semibold leading-tight">
+                  {activeDockSeg?.text || track.title}
+                </div>
+                {activeDockTrans ? (
+                  <div className="truncate text-[11px] italic text-[var(--accent)] mt-0.5">
+                    {activeDockTrans}
+                  </div>
+                ) : null}
               </div>
               <AudioVisualizer isPlaying={playing} barCount={5} />
               <button
@@ -494,10 +529,15 @@ export function MiniPlayer() {
                 <AudioVisualizer isPlaying={playing} barCount={6} />
               </div>
 
-              {/* Live captions and the running transcript are already reachable
-                  from the toolbar under the player and from the floating panel
-                  that follows you across pages - a third copy here duplicated
-                  both, in a third visual style. */}
+              {activeDockSeg?.text ? (
+                <div className="rounded-xl bg-[var(--surface)]/80 border border-[var(--rule)] px-2.5 py-1.5 text-[11.5px]">
+                  <p className="font-semibold text-[var(--ink)] line-clamp-2">{activeDockSeg.text}</p>
+                  {activeDockTrans ? (
+                    <p className="mt-0.5 italic text-[var(--accent)] line-clamp-2">{activeDockTrans}</p>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="flex items-center pt-1 border-t border-[var(--rule)]">
                 <div className="flex items-center gap-2">{transport}</div>
               </div>
@@ -512,7 +552,7 @@ export function MiniPlayer() {
       {mobileTabBar}
       <div
         data-dock="mobile-iphone"
-        className="fixed inset-x-2.5 z-[45] sm:hidden rounded-2xl bg-[var(--paper-raised)] dark:bg-zinc-900 text-[var(--ink)] dark:text-white border border-[var(--rule)] dark:border-white/15 p-2 shadow-[0_12px_36px_rgba(0,0,0,0.2)] transition-all overflow-hidden"
+        className="fixed inset-x-2.5 z-[45] sm:hidden rounded-2xl bg-[var(--paper-raised)] dark:bg-zinc-900 text-[var(--ink)] dark:text-white border border-[var(--rule)] dark:border-white/15 p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.2)] transition-all overflow-hidden"
         style={{ bottom: "calc(54px + env(safe-area-inset-bottom, 14px))" }}
       >
         {/* Module D: Thin progress bar on dock */}
@@ -530,13 +570,19 @@ export function MiniPlayer() {
               <Art src={track.artwork} alt="" size={40} seed={track.showTitle || track.title} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13.5px] font-semibold leading-tight text-[var(--ink)] dark:text-zinc-50">
-                {track.title}
+              <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)] dark:text-zinc-50">
+                {activeDockSeg?.text || track.title}
               </p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <p className="truncate text-[11.5px] text-[var(--ink-faint)] dark:text-zinc-400">{track.showTitle}</p>
-                <AudioVisualizer isPlaying={playing} barCount={4} />
-              </div>
+              {activeDockTrans ? (
+                <p className="truncate text-[11.5px] italic text-[var(--accent)] mt-0.5">
+                  {activeDockTrans}
+                </p>
+              ) : (
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <p className="truncate text-[11.5px] text-[var(--ink-faint)] dark:text-zinc-400">{track.showTitle}</p>
+                  <AudioVisualizer isPlaying={playing} barCount={4} />
+                </div>
+              )}
             </div>
           </div>
 

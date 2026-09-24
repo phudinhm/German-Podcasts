@@ -311,19 +311,31 @@ export function LiveTranscriptPanel({
 
   if (isCollapsed) {
     const activeSeg = segments.find((s) => s.id === activeSegmentId) ?? segments[segments.length - 1];
+    const activeTranslation =
+      activeSeg?.translations?.[targetTranslateLang] ??
+      (activeSeg?.translations ? Object.values(activeSeg.translations)[0] : undefined) ??
+      activeSeg?.translation;
+
     return (
       <div
-        className={`card flex items-center gap-3 px-3.5 py-2 transition-opacity duration-500 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-xl rounded-full ${
-          dimmed ? "opacity-35 hover:opacity-100" : "opacity-100"
+        className={`card flex items-center gap-3 px-4 py-2.5 transition-opacity duration-500 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-xl rounded-2xl ${
+          dimmed ? "opacity-45 hover:opacity-100" : "opacity-100"
         }`}
         style={captionThemeStyle(settings.captionTheme)}
         onMouseEnter={resetHideTimer}
         onFocus={resetHideTimer}
       >
         <span className="shrink-0 text-[12px] font-semibold text-[var(--accent)]">{formatTime(currentTime)}</span>
-        <p className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--ink)]">
-          {activeSeg?.text || t("caption.waiting")}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
+            {activeSeg?.text || t("caption.waiting")}
+          </p>
+          {settings.showTranslation && activeTranslation ? (
+            <p className="truncate text-[11.5px] italic text-[var(--ink-soft)] mt-0.5">
+              {activeTranslation}
+            </p>
+          ) : null}
+        </div>
         <div className="flex items-center gap-1 shrink-0">
           {onToggleCollapse && (
             <button
@@ -583,7 +595,7 @@ export function LiveTranscriptPanel({
                       })}
                     </p>
 
-                    {settings.showTranslation && (settings.translationVisibility === "all" || isActive) && seg.translations ? (
+                    {settings.showTranslation && seg.translations && Object.keys(seg.translations).length > 0 ? (
                       <div className="mt-2 space-y-1 border-l-2 border-[var(--accent)]/30 pl-2.5">
                         {Object.entries(seg.translations).map(([lang, text]) => (
                           <p
@@ -598,7 +610,7 @@ export function LiveTranscriptPanel({
                           </p>
                         ))}
                       </div>
-                    ) : settings.showTranslation && (settings.translationVisibility === "all" || isActive) && seg.translation ? (
+                    ) : settings.showTranslation && seg.translation ? (
                       <p
                         className="mt-2 border-l-2 border-[var(--accent)]/30 pl-2.5 text-[var(--ink-soft)] italic select-text"
                         style={{
@@ -606,6 +618,10 @@ export function LiveTranscriptPanel({
                         }}
                       >
                         {seg.translation}
+                      </p>
+                    ) : settings.showTranslation ? (
+                      <p className="mt-1.5 border-l-2 border-[var(--rule)] pl-2.5 text-[11.5px] italic text-[var(--ink-faint)] animate-pulse">
+                        {t("caption.translating")}
                       </p>
                     ) : null}
 

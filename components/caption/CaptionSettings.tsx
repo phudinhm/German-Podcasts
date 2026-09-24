@@ -108,7 +108,7 @@ export interface CaptionSettingsState {
   translationEngine: "auto" | "parallel" | "gemini" | "groq" | "deepseek" | "anthropic" | "openai" | "openrouter";
 }
 
-const STORAGE_KEY = "hoerbar.caption.settings.v1";
+const STORAGE_KEY = "hoerbar.caption.settings.v2";
 
 export const DEFAULT_CAPTION_SETTINGS: CaptionSettingsState = {
   fontSize: 18,
@@ -127,7 +127,15 @@ export function loadCaptionSettings(): CaptionSettingsState {
   if (typeof window === "undefined") return DEFAULT_CAPTION_SETTINGS;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_CAPTION_SETTINGS, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        ...DEFAULT_CAPTION_SETTINGS,
+        ...parsed,
+        showTranslation: parsed.showTranslation ?? true,
+        translationVisibility: "all",
+      };
+    }
   } catch {}
   return DEFAULT_CAPTION_SETTINGS;
 }

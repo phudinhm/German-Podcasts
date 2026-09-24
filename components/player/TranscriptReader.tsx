@@ -164,8 +164,11 @@ export function TranscriptReader({
       <div className="mx-auto max-w-xl py-[30vh] space-y-2">
         {segments.map((seg) => {
           const isActive = seg.id === activeSegmentId;
-          const showForSeg = showTranslation && (translationVisibility === "all" || isActive);
-          const translation = showForSeg ? translationFor(seg, translationLang) : null;
+          const showForSeg = showTranslation;
+          const translation = showForSeg
+            ? translationFor(seg, translationLang) ??
+              (seg.translations ? Object.values(seg.translations)[0] ?? null : null)
+            : null;
 
           return (
             <div

@@ -896,6 +896,23 @@ export function ListenClient() {
         </section>
       ) : null}
 
+      {/* Inline Transcript Panel right below the player */}
+      {playing && showTranscript ? (
+        <LiveTranscriptPanel
+          currentTime={currentTime}
+          onSeek={(sec) => {
+            player.handle.seekTo(sec, true);
+            if (!player.handle.isPlaying()) player.handle.play();
+          }}
+          onClose={() => setShowTranscript(false)}
+          settings={captionSettings}
+          onUpdateSettings={(next) => {
+            setCaptionSettings(next);
+            saveCaptionSettings(next);
+          }}
+        />
+      ) : null}
+
       {/* Live caption line, shown only once a source is actually feeding it */}
       {playing && showCaption && !showTranscript && (
         <div
