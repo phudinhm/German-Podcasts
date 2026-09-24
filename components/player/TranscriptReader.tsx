@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useUi } from "@/lib/i18n";
 import { liveCaptionService, type CaptionSegment } from "@/lib/liveCaption";
 import { translateUntranslatedSegments } from "@/lib/transcriptPipeline";
+import {
+  listVocabulary,
+  normalizeVocabWord,
+  saveVocabularyWord,
+  removeVocabularyWord,
+  type SavedWord,
+} from "@/lib/vocabulary";
 import { usePlayer } from "./PlayerProvider";
 
 import { FONT_FAMILIES, type FontFamily, type CaptionTheme, captionThemeStyle } from "../caption/CaptionSettings";
@@ -12,12 +19,7 @@ interface TranscriptReaderProps {
   currentTime: number;
   onSeek: (seconds: number) => void;
   showTranslation: boolean;
-  /** Which single translated language to show beneath the active line - the
-   * reader shows one language at a time (with a picker to switch), not
-   * every translation stacked together. */
   translationLang: "de" | "en" | "vi";
-  /** Off lets someone scroll back through earlier lines - or ahead - without
-   * the view snapping back to the current one on every segment change. */
   autoScroll: boolean;
   fontSize: number;
   fontFamily: FontFamily;
@@ -26,20 +28,16 @@ interface TranscriptReaderProps {
 }
 
 function translationFor(seg: CaptionSegment, lang: "de" | "en" | "vi"): string | null {
-  return seg.translations?.[lang] ?? seg.translation ?? null;
+  return seg.translations?.[lang] ?? null;
 }
 
-/**
- * A continuous, book-like reading view of the transcript - the way Apple
- * Podcasts and Apple Music show one during playback: the current sentence
- * bright, everything else dimmed, the whole thing gliding to keep the
- * current line centred rather than pinned to an edge.
- *
- * Deliberately without the full transcript panel's toolbar - search,
- * export, per-line timestamps, AI grammar notes. Those stay in the regular
- * panel (this page's toolbar, the floating one); this screen is for reading
- * along with the episode, not for reference.
- */
+function formatSegTime(sec: number): string {
+  if (!isFinite(sec) || sec < 0) return "0:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export function TranscriptReader({
   currentTime,
   onSeek,
@@ -49,18 +47,59 @@ export function TranscriptReader({
   fontSize,
   fontFamily,
   theme,
-  translationVisibility,
 }: TranscriptReaderProps) {
   const { t } = useUi();
-  const { track, onGenerateTranscript, generatingTranscript, generateTranscriptError, transcriptOffsetSec } =
-    usePlayer();
+  const {
+    track,
+    duration,
+    onGenerateTranscript,
+    generatingTranscript,
+    generateTranscriptError,
+    transcriptOffsetSec,
+  } = usePlayer();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
+  const [savedWords, setSavedWords] = useState<Record<string, SavedWord>>({});
+  const [selectedWord, setSelectedWord] = useState<{
+    word: string;
+    cleanWord: string;
+    meaning: string;
+    loading: boolean;
+    segId: string;
+    sentence: string;
+    sentenceTranslation?: string;
+    timestamp: number;
+  } | null>(null);
+
   const activeRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [userScrolledAway, setUserScrolledAway] = useState(false);
+  const userScrollTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const noteUserManualScroll = () => {
+    setUserScrolledAway(true);
+    window.clearTimeout(userScrollTimerRef.current);
+    userScrollTimerRef.current = setTimeout(() => {
+      setUserScrolledAway(false);
+    }, 8000);
+  };
 
   useEffect(() => {
     setSegments(liveCaptionService.getTranscript());
     return liveCaptionService.onTranscript(setSegments);
+  }, []);
+
+  useEffect(() => {
+    const syncVocab = () => {
+      const list = listVocabulary();
+      const map: Record<string, SavedWord> = {};
+      for (const item of list) {
+        map[item.normalizedWord] = item;
+      }
+      setSavedWords(map);
+    };
+    syncVocab();
+    window.addEventListener("hoerbar:vocab-changed", syncVocab);
+    return () => window.removeEventListener("hoerbar:vocab-changed", syncVocab);
   }, []);
 
   useEffect(() => {
@@ -88,113 +127,330 @@ export function TranscriptReader({
 
   const contentTime = currentTime - transcriptOffsetSec;
 
-  const activeSegmentId = segments.find(
-    (s) => contentTime >= s.start - 0.5 && contentTime <= s.end + 0.5,
-  )?.id;
+  const activeSegment =
+    segments.find((s) => contentTime >= s.start - 0.15 && contentTime <= s.end + 0.25) ??
+    segments.find((s) => contentTime >= s.start - 0.6 && contentTime <= s.end + 0.6);
+  const activeSegmentId = activeSegment?.id;
 
   useEffect(() => {
-    if (!autoScroll) return;
-    activeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [activeSegmentId, autoScroll]);
+    if (!autoScroll || userScrolledAway) return;
+    const container = scrollContainerRef.current;
+    const item = activeRef.current;
+    if (!container || !item) return;
+    const targetTop = Math.max(
+      0,
+      item.offsetTop - container.clientHeight / 2 + item.clientHeight / 2
+    );
+    container.scrollTo({ top: targetTop, behavior: "smooth" });
+  }, [activeSegmentId, autoScroll, userScrolledAway]);
 
-  // Determine colors based on theme using the CSS variables from captionThemeStyle
-  // By default (modern), TranscriptReader is inside a dark FullscreenPlayer.
-  // When a theme is selected, the CSS variables like --ink and --ink-soft will be redefined.
-  
-  // For the default "modern" theme, we want white text on the dark player background.
-  // For other themes, we use the theme's defined --ink.
+  const handleWordClick = async (
+    rawToken: string,
+    seg: CaptionSegment,
+    sentenceTranslation?: string | null
+  ) => {
+    const clean = rawToken
+      .trim()
+      .replace(/^[.,!?;:"'„“”‚‘’()\[\]{}«»—–-]+|[.,!?;:"'„“”‚‘’()\[\]{}«»—–-]+$/g, "");
+    if (!clean) return;
+
+    const norm = normalizeVocabWord(clean);
+    const existing = savedWords[norm];
+
+    if (selectedWord && selectedWord.cleanWord.toLowerCase() === clean.toLowerCase() && selectedWord.segId === seg.id) {
+      setSelectedWord(null);
+      return;
+    }
+
+    setSelectedWord({
+      word: rawToken,
+      cleanWord: clean,
+      meaning: existing?.meaning || "...",
+      loading: !existing?.meaning,
+      segId: seg.id,
+      sentence: seg.text,
+      sentenceTranslation: sentenceTranslation || undefined,
+      timestamp: Math.max(0, seg.start + transcriptOffsetSec),
+    });
+
+    if (existing?.meaning) return;
+
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: clean,
+          sourceLang: "de",
+          targetLang: translationLang === "de" ? "vi" : translationLang,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const translated = (data.translation || clean).trim();
+        setSelectedWord((prev) =>
+          prev && prev.cleanWord === clean
+            ? { ...prev, meaning: translated, loading: false }
+            : prev
+        );
+      } else {
+        setSelectedWord((prev) =>
+          prev && prev.cleanWord === clean ? { ...prev, loading: false } : prev
+        );
+      }
+    } catch {
+      setSelectedWord((prev) =>
+        prev && prev.cleanWord === clean ? { ...prev, loading: false } : prev
+      );
+    }
+  };
+
+  const speakGermanWord = (text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "de-DE";
+      utter.rate = 0.9;
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // ignore
+    }
+  };
+
   const isModern = theme === "modern";
-  
-  const inactiveColor = isModern ? "text-white/40" : "text-[var(--ink-faint)]";
+  const inactiveColor = isModern ? "text-white/45" : "text-[var(--ink-faint)]";
   const activeColor = isModern ? "text-white" : "text-[var(--ink)]";
-  const hoverColor = isModern ? "hover:text-white/70" : "hover:text-[var(--ink-soft)]";
-  const translationColor = isModern ? "text-white/60" : "text-[var(--ink-soft)]";
-  const borderColor = isModern ? "border-white/20" : "border-[var(--rule)]";
   const generatingText = isModern ? "text-white" : "text-[var(--ink)]";
   const generatingHint = isModern ? "text-white/50" : "text-[var(--ink-soft)]";
   const errorText = isModern ? "text-rose-300" : "text-rose-600";
-  const btnClasses = isModern 
-    ? "bg-white text-black" 
+  const btnClasses = isModern
+    ? "bg-white text-black"
     : "bg-[var(--ink)] text-[var(--surface)]";
 
   if (segments.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center rounded-xl" style={captionThemeStyle(theme)}>
-        {generatingTranscript ? (
-          <>
-            <p className={`text-[15px] font-medium ${generatingText}`}>{t("caption.generating")}</p>
-            <p className={`max-w-xs text-[12.5px] ${generatingHint}`}>{t("caption.generatingHint")}</p>
-          </>
-        ) : (
-          <>
-            <p className={`text-[14px] ${generatingHint}`}>{t("caption.noTranscript")}</p>
-            {generateTranscriptError ? (
-              <p className={`max-w-xs text-[12px] ${errorText}`}>
-                {generateTranscriptError === "too-large"
-                  ? t("caption.generateTooLarge")
-                  : generateTranscriptError === "no-key"
-                    ? t("caption.generateNoProvider")
-                    : t("caption.generateFailed")}
-              </p>
-            ) : null}
-            {track?.url ? (
-              <button
-                type="button"
-                onClick={onGenerateTranscript}
-                className={`rounded-full px-4 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${btnClasses}`}
-              >
-                {t("caption.generateTranscript")}
-              </button>
-            ) : null}
-          </>
-        )}
+      <div
+        className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center rounded-xl"
+        style={captionThemeStyle(theme)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+          <p className={`text-[15px] font-medium ${generatingText}`}>
+            {generatingTranscript ? t("caption.generating") : "Đang chuẩn bị transcript AI..."}
+          </p>
+        </div>
+        <p className={`max-w-xs text-[12.5px] ${generatingHint}`}>
+          {t("caption.generatingHint")}
+        </p>
+        {track?.url ? (
+          <button
+            type="button"
+            onClick={onGenerateTranscript}
+            className={`rounded-full px-4 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${btnClasses}`}
+          >
+            ⚡ {t("caption.generateTranscript")}
+          </button>
+        ) : null}
       </div>
     );
   }
 
-  return (
-    <div
-      ref={scrollContainerRef}
-      onScroll={handleReaderScroll}
-      className={`h-full overflow-y-auto px-4 sm:px-8 transition-colors duration-500 rounded-2xl ${
-        !isModern ? "bg-[var(--surface)]" : ""
-      }`}
-      style={{ ...captionThemeStyle(theme), scrollbarWidth: "none" }}
-    >
-      <div className="mx-auto max-w-xl py-[30vh] space-y-2">
-        {segments.map((seg) => {
-          const isActive = seg.id === activeSegmentId;
-          const showForSeg = showTranslation;
-          const translation = showForSeg
-            ? translationFor(seg, translationLang) ??
-              (seg.translations ? Object.values(seg.translations)[0] ?? null : null)
-            : null;
+  const episodeDuration = duration > 0 ? duration : (track?.durationSec ?? 0);
+  const episodePct =
+    episodeDuration > 0
+      ? Math.max(0, Math.min(100, (currentTime / episodeDuration) * 100))
+      : 0;
 
-          return (
-            <div
-              key={seg.id}
-              ref={isActive ? activeRef : null}
-              onClick={() => onSeek(Math.max(0, seg.start - 0.25 + transcriptOffsetSec))}
-              className={`group cursor-pointer rounded-2xl px-4 py-3 transition-all duration-300 text-center ${
-                isActive
-                  ? isModern
-                    ? "bg-white/12 shadow-lg ring-1 ring-white/20 backdrop-blur-md scale-[1.02]"
-                    : "bg-[var(--paper-raised)] shadow-md ring-1 ring-[var(--accent)]/30 scale-[1.02]"
-                  : "opacity-45 hover:opacity-85 hover:bg-white/5 active:scale-[0.99]"
-              }`}
-            >
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10">
+      {/* Top colored line representing overall podcast listening progress */}
+      <div className="pointer-events-none relative z-30 h-[3px] w-full shrink-0 bg-white/10 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 transition-all duration-300"
+          style={{ width: `${episodePct}%` }}
+        />
+      </div>
+
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleReaderScroll}
+        onWheel={noteUserManualScroll}
+        onTouchMove={noteUserManualScroll}
+        className={`relative flex-1 overflow-y-auto px-3 sm:px-8 transition-colors duration-500 ${
+          !isModern ? "bg-[var(--surface)]" : ""
+        }`}
+        style={{ ...captionThemeStyle(theme), scrollbarWidth: "none" }}
+      >
+        {/* Subtle sticky top header with overall podcast time & percentage */}
+        <div className="sticky top-0 z-20 mx-auto max-w-xl pt-1.5 pb-1.5 pointer-events-none">
+          <div className="flex items-center justify-between gap-2 rounded-full bg-black/35 px-3 py-1 backdrop-blur-md border border-white/10 text-[10.5px] text-white/65">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span>Bấm vào từ bất kỳ để dịch & lưu từ vựng</span>
+            </span>
+            <span className="font-mono tabular-nums text-amber-300/95">
+              {formatSegTime(currentTime)}
+              {episodeDuration > 0
+                ? ` / ${formatSegTime(episodeDuration)} (${Math.round(episodePct)}%)`
+                : ""}
+            </span>
+          </div>
+        </div>
+
+        <div className="mx-auto max-w-xl py-[16vh] space-y-2.5">
+          {segments.map((seg, idx) => {
+            const isActive = seg.id === activeSegmentId;
+            const showForSeg = showTranslation;
+            const translation = showForSeg ? translationFor(seg, translationLang) : null;
+
+            const isWordPopoverOpenHere = selectedWord?.segId === seg.id;
+
+            return (
+              <div
+                key={seg.id}
+                ref={isActive ? activeRef : null}
+                onClick={() => onSeek(Math.max(0, seg.start - 0.2 + transcriptOffsetSec))}
+                className={`group relative overflow-visible cursor-pointer rounded-2xl px-4 py-3.5 transition-all duration-300 text-center ${
+                  isActive
+                    ? isModern
+                      ? "bg-white/[0.13] shadow-xl ring-1 ring-amber-300/35 backdrop-blur-md scale-[1.015]"
+                      : "bg-[var(--paper-raised)] shadow-md ring-1 ring-[var(--accent)]/40 scale-[1.015]"
+                    : "opacity-50 hover:opacity-90 hover:bg-white/[0.06]"
+                }`}
+              >
+                {/* Timestamp & index badge inside the active card (or on hover) */}
+                <div
+                  className={`mb-1.5 flex items-center justify-between text-[10.5px] font-mono transition-opacity ${
+                    isActive ? "opacity-90" : "opacity-0 group-hover:opacity-65"
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-amber-200">
+                    <span>{isActive ? "●" : "▶"}</span>
+                    <span>
+                      {formatSegTime(Math.max(0, seg.start + transcriptOffsetSec))} –{" "}
+                      {formatSegTime(Math.max(0, seg.end + transcriptOffsetSec))}
+                    </span>
+                  </span>
+                  <span className="text-white/55">
+                    {isActive ? `#${idx + 1}/${segments.length}` : `#${idx + 1}`}
+                  </span>
+                </div>
+
+              {/* Tokenized German words so each word can be clicked to translate & save */}
               <p
-                className={`font-semibold leading-relaxed transition-colors duration-300 select-text ${
+                className={`relative z-10 font-semibold leading-relaxed transition-colors duration-300 select-text ${
                   isActive ? activeColor : inactiveColor
                 }`}
                 style={{ fontSize: `${fontSize}px`, fontFamily: FONT_FAMILIES[fontFamily] }}
               >
-                {seg.text}
+                {seg.text.split(/(\s+)/).map((token, tokenIdx) => {
+                  if (/^\s+$/.test(token)) {
+                    return <span key={tokenIdx}>{token}</span>;
+                  }
+                  const norm = normalizeVocabWord(token);
+                  const savedEntry = norm ? savedWords[norm] : undefined;
+                  const isSelected =
+                    isWordPopoverOpenHere &&
+                    norm &&
+                    normalizeVocabWord(selectedWord?.cleanWord || "") === norm;
+
+                  return (
+                    <span
+                      key={tokenIdx}
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleWordClick(token, seg, translation);
+                      }}
+                      title={
+                        savedEntry
+                          ? `⭐ ${savedEntry.word}: ${savedEntry.meaning}`
+                          : "Bấm để dịch & lưu từ này"
+                      }
+                      className={`inline-block rounded-md px-0.5 transition-all ${
+                        isSelected
+                          ? "bg-amber-400 text-zinc-950 font-bold shadow-sm scale-105"
+                          : savedEntry
+                            ? "bg-amber-500/20 text-amber-200 underline decoration-amber-400 decoration-2 underline-offset-4"
+                            : "hover:bg-white/15 hover:text-amber-200"
+                      }`}
+                    >
+                      {token}
+                    </span>
+                  );
+                })}
               </p>
+
+              {/* Inline Word Lookup & Save Popover */}
+              {isWordPopoverOpenHere && selectedWord && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative z-20 mx-auto mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400/40 bg-zinc-950/95 px-3.5 py-2 text-left text-xs text-white shadow-xl backdrop-blur-md"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => speakGermanWord(selectedWord.cleanWord)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 font-bold text-amber-300 hover:bg-white/20"
+                      title="Nghe phát âm"
+                    >
+                      🔊 {selectedWord.cleanWord}
+                    </button>
+                    <span className="text-white/40">→</span>
+                    <span className="font-semibold text-emerald-300">
+                      {selectedWord.loading ? "Đang dịch..." : selectedWord.meaning}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {(() => {
+                      const norm = normalizeVocabWord(selectedWord.cleanWord);
+                      const isSaved = Boolean(norm && savedWords[norm]);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSaved) {
+                              removeVocabularyWord(selectedWord.cleanWord);
+                            } else {
+                              saveVocabularyWord({
+                                word: selectedWord.cleanWord,
+                                meaning: selectedWord.meaning,
+                                contextSentence: selectedWord.sentence,
+                                contextTranslation: selectedWord.sentenceTranslation,
+                                showTitle: track?.showTitle,
+                                episodeTitle: track?.title,
+                                timestamp: selectedWord.timestamp,
+                              });
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
+                            isSaved
+                              ? "bg-emerald-500/25 text-emerald-200 border border-emerald-400/40"
+                              : "bg-amber-400 text-zinc-950 hover:bg-amber-300"
+                          }`}
+                        >
+                          {isSaved ? "✓ Đã lưu (Bỏ lưu)" : "⭐ Lưu từ vựng"}
+                        </button>
+                      );
+                    })()}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWord(null)}
+                      className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"
+                      aria-label="Đóng"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {translation ? (
                 <p
-                  className={`mt-2 font-normal leading-relaxed italic select-text transition-all ${
+                  className={`relative z-10 mt-2 whitespace-pre-wrap break-words font-normal leading-relaxed italic select-text transition-all ${
                     isModern ? "text-amber-200/90 font-medium" : "text-[var(--accent)] font-medium"
                   }`}
                   style={{
@@ -207,6 +463,15 @@ export function TranscriptReader({
             </div>
           );
         })}
+        </div>
+      </div>
+
+      {/* Bottom colored line representing overall podcast listening progress */}
+      <div className="pointer-events-none relative z-30 h-[3px] w-full shrink-0 bg-white/10 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 transition-all duration-300"
+          style={{ width: `${episodePct}%` }}
+        />
       </div>
     </div>
   );

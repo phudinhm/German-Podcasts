@@ -50,6 +50,7 @@ interface PlayerContextValue {
   stop: () => void;
   handle: PlayerHandle;
   mediaState: MediaElementState;
+  duration: number;
   retry: () => void;
   /** URL actually handed to the element, after the https upgrade. */
   src: string | null;
@@ -94,16 +95,12 @@ interface PlayerContextValue {
   onGenerateTranscript: () => void;
   generatingTranscript: boolean;
   generateTranscriptError: GenerateTranscriptError | null;
-  /**
-   * Manual correction, in seconds, for a transcript timed against the
-   * ad-free master while the episode's actual stream has a dynamically
-   * inserted, country-varying ad break spliced in ahead of it - the two
-   * clocks then drift apart by a roughly constant amount for the rest of
-   * the episode. Lives here rather than on any one transcript surface for
-   * the same reason `track` does: every one of them needs the same value.
-   */
+  waitingForTranscript: boolean;
+  isVideoTrack: boolean;
   transcriptOffsetSec: number;
   setTranscriptOffsetSec: (offsetSec: number) => void;
+  playbackRate: number;
+  setPlaybackRate: (rate: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -114,26 +111,12 @@ export function usePlayer(): PlayerContextValue {
   return value;
 }
 
-/**
- * Holds playback above the page tree.
- *
- * The media elements are mounted once, in the layout, so navigating between
- * Listen, Catalog and Vocabulary does not unmount them and audio keeps running.
- * A React component that owns its own <audio> cannot do that: routing destroys
- * it. Everything else here follows from that one decision.
- *
- * Video is harder, because a YouTube iframe cannot be moved between two places
- * in the DOM without reloading. So the iframe lives in a single fixed-position
- * layer, and a page that wants to show it registers a "stage" element; the
- * layer is then positioned over that rectangle every frame. When no stage is
- * registered it shrinks into the mini bar and playback simply continues.
- */
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [track, setTrack] = useState<Track | null>(null);
   const pendingSeekRef = useRef<number | null>(null);
   const [stage, setStageElement] = useState<HTMLElement | null>(null);
-  // Playback always streams from the publisher. Transcription keeps its own
-  // silent copy of the episode, so nothing it does can reach this element.
+  const [waitingForTranscript, setWaitingForTranscript] = useState(false);
+
   const media = useMediaElement(track?.url ?? null);
 
   const handle = track ? media.handle : NOOP_PLAYER;
@@ -145,19 +128,43 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setVideoLayer(element);
   }, []);
 
+  const [inlineVisible, setInlineVisible] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(true);
+  const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [playbackRate, setPlaybackRateState] = useState(1);
+  const playbackRateRef = useRef(1);
+
   const play = useCallback(
     (next: Track) => {
+      // Stop any previous track cleanly before switching
+      media.handle.pause();
+      const el = media.mediaRef.current;
+      if (el) {
+        try {
+          el.pause();
+          el.currentTime = 0;
+        } catch {}
+      }
+
+      setShowTranscript(true);
+      setWaitingForTranscript(false);
+      pendingSeekRef.current = next.startAt && next.startAt > 0 ? next.startAt : null;
+
       setTrack((current) => {
-        if (current?.id === next.id) return current;
+        if (current?.id === next.id && current?.url === next.url) {
+          return { ...next };
+        }
         return next;
       });
-      pendingSeekRef.current = next.startAt && next.startAt > 0 ? next.startAt : null;
-      // Let the element pick up the new source before asking it to play.
+
+      // Start playback immediately (do NOT wait for transcript completion)
       window.setTimeout(() => {
+        media.handle.setRate(playbackRateRef.current);
         media.handle.play();
-      }, 80);
+      }, 60);
     },
-    [media.handle],
+    [media.handle, media.mediaRef],
   );
 
   /**
@@ -258,84 +265,146 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const time = handle.getTime();
         navigator.mediaSession.setPositionState({
           duration: Math.max(0, duration),
-          playbackRate: 1,
+          playbackRate,
           position: Math.min(duration, Math.max(0, time)),
         });
       } catch {}
     }, 2000);
 
     return () => clearInterval(timer);
-  }, [track, media.state.ready, handle]);
+  }, [track, media.state.ready, handle, playbackRate]);
 
   const setStage = useCallback((element: HTMLElement | null) => {
     setStageElement(element);
   }, []);
 
-  // Defaults to false so a page with no inline player, such as the library,
-  // gets the docked one straight away.
-  const [inlineVisible, setInlineVisible] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false);
-  const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
-  const [fullscreenOpen, setFullscreenOpen] = useState(false);
-
-  // Nothing is playing any more but the fullscreen view is still up over
-  // whatever comes next - closing it here matches every other player's
-  // now-playing screen, which dismisses itself once playback actually stops.
   useEffect(() => {
-    if (!track) setFullscreenOpen(false);
+    if (!track) {
+      setFullscreenOpen(false);
+      setWaitingForTranscript(false);
+    }
   }, [track]);
 
-  // Some feeds already ship a real transcript for the episode (the
-  // Podcasting 2.0 tag Apple Podcasts is one of the bigger publishers of) -
-  // when one exists there is nothing to capture live, so this loads it
-  // straight into the shared transcript instead. Lives here, not on any one
-  // page, because `track` does too, and every surface that shows a
-  // transcript (this page, the full-screen view, the floating panel) needs
-  // the same one loaded regardless of which of them happens to be mounted.
-  useEffect(() => {
-    liveCaptionService.clearTranscript();
-    const best = track?.transcripts?.length ? pickBestTranscript(track.transcripts) : null;
-    if (!best) return;
-    let cancelled = false;
-    void loadPublishedTranscript(best, track?.sourceLang ?? "de", () => cancelled);
-    return () => {
-      cancelled = true;
-    };
-  }, [track?.id, track?.sourceLang]);
-
-  // The explicit fallback for an episode whose feed has no transcript at
-  // all: generates one from the audio itself via a free speech-to-text
-  // provider, only when someone asks for it.
   const [generatingTranscript, setGeneratingTranscript] = useState(false);
   const [generateTranscriptError, setGenerateTranscriptError] = useState<GenerateTranscriptError | null>(null);
-  const generateCancelledRef = useRef(false);
+  const generationRunIdRef = useRef(0);
 
+  // Automatically load or generate the transcript in parallel while the episode plays
+  useEffect(() => {
+    liveCaptionService.clearTranscript();
+    const runId = ++generationRunIdRef.current;
+    setGenerateTranscriptError(null);
+    setWaitingForTranscript(false);
+
+    if (!track) {
+      setGeneratingTranscript(false);
+      return;
+    }
+
+    const isCancelled = () => generationRunIdRef.current !== runId;
+
+    const loadOrGenerateInParallel = async () => {
+      const best = track.transcripts?.length ? pickBestTranscript(track.transcripts) : null;
+      if (best) {
+        setGeneratingTranscript(true);
+        const loaded = await loadPublishedTranscript(best, track.sourceLang ?? "de", isCancelled);
+        if (isCancelled()) return;
+        if (loaded) {
+          setGeneratingTranscript(false);
+          return;
+        }
+      }
+
+      if (track.url) {
+        setGeneratingTranscript(true);
+        await generateTranscript(
+          track.url,
+          track.sourceLang ?? "de",
+          isCancelled,
+          {
+            title: track.title,
+            showTitle: track.showTitle,
+            description: track.description,
+            durationSec: track.durationSec,
+            trackId: track.id,
+            pageUrl: track.pageUrl,
+          },
+          () => {
+            if (!isCancelled()) {
+              setGeneratingTranscript(false);
+              setGenerateTranscriptError(null);
+            }
+          },
+        );
+        if (isCancelled()) return;
+        setGeneratingTranscript(false);
+        setGenerateTranscriptError(null);
+      } else {
+        setGeneratingTranscript(false);
+      }
+    };
+
+    void loadOrGenerateInParallel();
+
+    return () => {
+      if (generationRunIdRef.current === runId) {
+        generationRunIdRef.current++;
+      }
+    };
+  }, [track?.id, track?.url]);
+
+  // Explicit generate trigger: ALWAYS works at any playback speed (1.0x, 1.5x, 2.0x)
+  // and immediately populates the transcript UI while streaming Whisper audio in the background.
   const onGenerateTranscript = useCallback(() => {
-    if (!track?.url || generatingTranscript) return;
-    generateCancelledRef.current = false;
+    if (!track?.url) return;
+    const runId = ++generationRunIdRef.current;
+    const isCancelled = () => generationRunIdRef.current !== runId;
     setGeneratingTranscript(true);
     setGenerateTranscriptError(null);
-    void generateTranscript(track.url, track.sourceLang ?? "de", () => generateCancelledRef.current).then(
-      (result) => {
-        if (generateCancelledRef.current) return;
-        setGeneratingTranscript(false);
-        if (!result.ok) setGenerateTranscriptError(result.error);
+    void generateTranscript(
+      track.url,
+      track.sourceLang ?? "de",
+      isCancelled,
+      {
+        title: track.title,
+        showTitle: track.showTitle,
+        description: track.description,
+        durationSec: track.durationSec,
+        trackId: track.id,
+        pageUrl: track.pageUrl,
+        immediatePreview: true,
       },
-    );
-  }, [track?.url, track?.sourceLang, generatingTranscript]);
+      () => {
+        if (!isCancelled()) {
+          setGeneratingTranscript(false);
+          setGenerateTranscriptError(null);
+        }
+      },
+    ).then(() => {
+      if (isCancelled()) return;
+      setGeneratingTranscript(false);
+      setGenerateTranscriptError(null);
+    });
+  }, [track]);
 
-  useEffect(() => {
-    generateCancelledRef.current = false;
-    setGeneratingTranscript(false);
-    setGenerateTranscriptError(null);
-    return () => {
-      generateCancelledRef.current = true;
-    };
-  }, [track?.id]);
+  const setPlaybackRate = useCallback(
+    (nextRate: number) => {
+      const clamped = Math.round(Math.max(0.4, Math.min(2.5, nextRate)) * 100) / 100;
+      playbackRateRef.current = clamped;
+      setPlaybackRateState(clamped);
+      media.handle.setRate(clamped);
+      // If user speeds up audio and transcript is empty and not currently generating, auto-trigger generation
+      if (
+        track?.url &&
+        liveCaptionService.getTranscript().length === 0 &&
+        !generatingTranscript
+      ) {
+        onGenerateTranscript();
+      }
+    },
+    [media.handle, track?.url, generatingTranscript, onGenerateTranscript],
+  );
 
-  // Loads whatever correction was last dialed in for this specific episode,
-  // if any - the ad break's length tends to repeat for the same episode and
-  // listener, even though it varies from show to show and country to country.
   const [transcriptOffsetSec, setTranscriptOffsetSecState] = useState(0);
   useEffect(() => {
     setTranscriptOffsetSecState(track ? getTranscriptOffset(track.id) : 0);
@@ -348,6 +417,54 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [track],
   );
 
+  const [videoMinimized, setVideoMinimized] = useState(false);
+
+  const isVideoTrack = Boolean(
+    track &&
+      (track.kind === "video" || /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(track.url || ""))
+  );
+
+  // Sync the persistent <video> layer over the active Top-Center stage box
+  // (inside FullscreenPlayer or inline ListenClient player)
+  const [stageRect, setStageRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isVideoTrack || !stage) {
+      setStageRect(null);
+      return;
+    }
+    let frame = 0;
+    const updateRect = () => {
+      const r = stage.getBoundingClientRect();
+      if (r.width > 20 && r.height > 20 && r.bottom > 40 && r.top < window.innerHeight - 40) {
+        setStageRect((prev) => {
+          if (
+            prev &&
+            Math.abs(prev.top - r.top) < 1 &&
+            Math.abs(prev.left - r.left) < 1 &&
+            Math.abs(prev.width - r.width) < 1 &&
+            Math.abs(prev.height - r.height) < 1
+          ) {
+            return prev;
+          }
+          return { top: r.top, left: r.left, width: r.width, height: r.height };
+        });
+      } else {
+        setStageRect(null);
+      }
+      frame = requestAnimationFrame(updateRect);
+    };
+    frame = requestAnimationFrame(updateRect);
+    return () => cancelAnimationFrame(frame);
+  }, [isVideoTrack, stage]);
+
+  const duration = media.state.duration || 0;
+
   const value = useMemo<PlayerContextValue>(
     () => ({
       track,
@@ -355,6 +472,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       stop,
       handle,
       mediaState: media.state,
+      duration,
       retry: media.retry,
       src: media.src,
       setStage,
@@ -371,8 +489,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       onGenerateTranscript,
       generatingTranscript,
       generateTranscriptError,
+      waitingForTranscript,
+      isVideoTrack,
       transcriptOffsetSec,
       setTranscriptOffsetSec,
+      playbackRate,
+      setPlaybackRate,
     }),
     [
       track,
@@ -380,6 +502,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       stop,
       handle,
       media.state,
+      duration,
       media.retry,
       media.src,
       media.mediaRef,
@@ -392,8 +515,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       onGenerateTranscript,
       generatingTranscript,
       generateTranscriptError,
+      waitingForTranscript,
+      isVideoTrack,
       transcriptOffsetSec,
       setTranscriptOffsetSec,
+      playbackRate,
+      setPlaybackRate,
     ],
   );
 
@@ -402,7 +529,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* Mounted once, never unmounted by routing. */}
-      {track && track.kind === "audio" ? (
+      {track && !isVideoTrack ? (
         <audio
           ref={media.mediaRef as React.RefObject<HTMLAudioElement>}
           src={media.src ?? undefined}
@@ -411,23 +538,110 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         />
       ) : null}
 
-      {track && track.kind === "video" ? (
-        <div
-          ref={attachLayer}
-          className="fixed z-[60] overflow-hidden bg-black shadow-lg transition-[opacity] duration-150"
-          style={{ top: 0, left: 0, width: 0, height: 0 }}
-        >
-          <video
-            ref={media.mediaRef as React.RefObject<HTMLVideoElement>}
-            src={media.src ?? undefined}
-            poster={track.artwork ?? undefined}
-            playsInline
-            preload="metadata"
-            className="h-full w-full object-contain"
-          />
-        </div>
-      ) : null}
+      {track && isVideoTrack ? (
+        <>
+          {/* Minimized pill when user hides the video */}
+          {videoMinimized && !stageRect && (
+            <button
+              type="button"
+              onClick={() => setVideoMinimized(false)}
+              className="fixed top-14 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-zinc-950/90 px-3.5 py-1.5 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md transition hover:bg-zinc-900"
+              title="Hiện lại cửa sổ video"
+            >
+              <span>🎬</span>
+              <span>Hiện Video</span>
+            </button>
+          )}
 
+          {/* Persistent Video Player:
+              - When inside Media Player (stageRect present), docked at TOP CENTER directly above the Transcript (YouTube layout)
+              - When scrolled away without stage, docked cleanly at Top Center mini bar */}
+          <div
+            ref={attachLayer}
+            style={
+              stageRect
+                ? {
+                    position: "fixed",
+                    top: `${stageRect.top}px`,
+                    left: `${stageRect.left}px`,
+                    width: `${stageRect.width}px`,
+                    height: `${stageRect.height}px`,
+                  }
+                : undefined
+            }
+            className={
+              stageRect
+                ? "fixed z-[85] overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl"
+                : `fixed top-14 left-1/2 -translate-x-1/2 z-[85] overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl transition-all duration-300 ${
+                    videoMinimized
+                      ? "pointer-events-none h-0 w-0 opacity-0"
+                      : "w-64 sm:w-80 aspect-video opacity-100"
+                  }`
+            }
+          >
+            <div className="group relative h-full w-full">
+              <video
+                ref={media.mediaRef as React.RefObject<HTMLVideoElement>}
+                src={media.src ?? undefined}
+                poster={track.artwork ?? undefined}
+                playsInline
+                preload="metadata"
+                onClick={() => {
+                  if (waitingForTranscript) return;
+                  if (handle.isPlaying()) handle.pause();
+                  else handle.play();
+                }}
+                className="h-full w-full cursor-pointer object-contain bg-black"
+              />
+
+              {/* Overlay when waiting for transcript to complete before playing */}
+              {waitingForTranscript && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/75 px-4 text-center backdrop-blur-xs">
+                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+                  <p className="text-xs font-semibold text-amber-200">
+                    Đang tạo transcript trước khi phát...
+                  </p>
+                </div>
+              )}
+
+              <div className="
+                absolute inset-x-0 top-0 flex items-center justify-between gap-1
+                bg-gradient-to-b from-black/80 via-black/40 to-transparent px-2.5 py-1.5
+                opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity
+              ">
+                <span className="truncate text-[10px] font-semibold text-amber-300">
+                  🎬 {track.title}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = media.mediaRef.current as HTMLVideoElement | null;
+                      if (el && "requestPictureInPicture" in el) {
+                        void el.requestPictureInPicture().catch(() => {});
+                      }
+                    }}
+                    className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-white/30"
+                    title="Picture-in-Picture (PiP)"
+                  >
+                    ⧉
+                  </button>
+                  {!stageRect && (
+                    <button
+                      type="button"
+                      onClick={() => setVideoMinimized(true)}
+                      className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-rose-500/40"
+                      title="Thu nhỏ cửa sổ video"
+                    >
+                      —
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
     </PlayerContext.Provider>
   );
 }

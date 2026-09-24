@@ -88,13 +88,29 @@ export function assertPublicUrl(raw: string): URL {
 export function decodeXmlText(value: string): string {
   return value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<\/(?:p|div|li|h[1-6])>|<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#(\d+);/g, (_, dec) => {
+      const code = Number(dec);
+      return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : _;
+    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+      const code = parseInt(hex, 16);
+      return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : _;
+    })
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;|&apos;/g, "'")
     .replace(/&nbsp;/g, " ")
+    .replace(/&ndash;/g, "–")
+    .replace(/&mdash;/g, "—")
+    .replace(/&bdquo;/g, "„")
+    .replace(/&ldquo;|&rdquo;/g, "“")
+    .replace(/&hellip;/g, "…")
     .replace(/&amp;/g, "&")
+    .replace(/<\/(?:p|div|li|h[1-6])>|<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -190,17 +206,48 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
     } catch {
       continue;
     }
+    const itemGuid = tag(item, "guid") ?? safeUrl;
+    const itemPageUrl = tag(item, "link") ?? undefined;
+    const itemTranscripts = extractTranscripts(item);
+
+    // Automatically attach official DW LearnGerman / Nicos Weg transcript reference
+    if (
+      itemTranscripts.length === 0 &&
+      (/dw\.com|akamaihd\.net|nicosweg/i.test(safeUrl) ||
+        (itemPageUrl && /learngerman\.dw\.com/i.test(itemPageUrl)))
+    ) {
+      const dwMatch =
+        itemPageUrl?.match(/\/l-(\d{6,9})(?:[/?#]|$)/i) ??
+        (/^\d{6,9}$/.test(itemGuid.trim()) ? [null, itemGuid.trim()] : null);
+      if (dwMatch?.[1]) {
+        itemTranscripts.push({
+          url: `https://learngerman.dw.com/de/dw-transcript/l-${dwMatch[1]}`,
+          type: "text/vtt",
+          language: "de",
+        });
+      }
+    }
+
+    const rawContentEncoded = tag(item, "content:encoded") ?? "";
+    const rawDescription = tag(item, "description") ?? tag(item, "itunes:summary") ?? "";
+    const bestRawText =
+      rawContentEncoded.length > rawDescription.length ? rawContentEncoded : rawDescription;
+    // Strip leading sponsor block (e.g. Slow German 'WERBUNG ... Und jetzt zur Folge:') so the transcript starts at the real episode content
+    const cleanedDescription = bestRawText
+      .replace(/^[\s\S]{0,1800}?(?:Und jetzt zur Folge\s*:|Now to the episode\s*:)\s*/i, "")
+      .slice(0, 16000);
+
     episodes.push({
-      guid: tag(item, "guid") ?? safeUrl,
-      pageUrl: tag(item, "link") ?? undefined,
+      guid: itemGuid,
+      pageUrl: itemPageUrl,
       title: tag(item, "title") ?? "Ohne Titel",
-      description: (tag(item, "description") ?? tag(item, "itunes:summary") ?? "").slice(0, 600),
+      description: cleanedDescription,
       url: safeUrl,
       type: attr(item, "enclosure", "type") ?? "audio/mpeg",
       durationSec: parseDuration(tag(item, "itunes:duration")),
       publishedAt: tag(item, "pubDate"),
       image: attr(item, "itunes:image", "href"),
-      transcripts: extractTranscripts(item),
+      transcripts: itemTranscripts,
     });
   }
 
