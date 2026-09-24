@@ -315,6 +315,39 @@ async function askOpenAIFormat(
   }
 }
 
+async function askGemini(request: ClaudeRequest, key: string, model: string): Promise<string | null> {
+  try {
+    const payload: any = {
+      system_instruction: { parts: { text: request.system } },
+      contents: [
+        { role: "user", parts: [{ text: request.user }] }
+      ],
+      generationConfig: {
+        maxOutputTokens: request.maxTokens ?? 512,
+      }
+    };
+    if (request.json) {
+      payload.generationConfig.responseMimeType = "application/json";
+    }
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error(`[gemini ${model}]`, response.status, await response.text());
+      return null;
+    }
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+  } catch (error) {
+    console.error(`[gemini ${model}] request failed:`, error);
+    return null;
+  }
+}
+
 export async function askLLM(request: ClaudeRequest, engine: string = "auto"): Promise<string | null> {
   // Determine engine
   let activeEngine = engine;
@@ -330,9 +363,8 @@ export async function askLLM(request: ClaudeRequest, engine: string = "auto"): P
   switch (activeEngine) {
     case "gemini":
       if (process.env.GEMINI_API_KEY) {
-        return askOpenAIFormat(
+        return askGemini(
           request,
-          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
           process.env.GEMINI_API_KEY,
           "gemini-1.5-flash"
         );
@@ -387,7 +419,7 @@ export async function askLLM(request: ClaudeRequest, engine: string = "auto"): P
   
   // Fallback
   if (process.env.GEMINI_API_KEY) {
-    return askOpenAIFormat(request, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", process.env.GEMINI_API_KEY, "gemini-1.5-flash");
+    return askGemini(request, process.env.GEMINI_API_KEY, "gemini-1.5-flash");
   }
   return askClaude(request);
 }

@@ -21,6 +21,7 @@ interface TranscriptReaderProps {
   fontSize: number;
   fontFamily: FontFamily;
   theme: CaptionTheme;
+  translationVisibility: "all" | "active";
 }
 
 function translationFor(seg: CaptionSegment, lang: "de" | "en" | "vi"): string | null {
@@ -47,6 +48,7 @@ export function TranscriptReader({
   fontSize,
   fontFamily,
   theme,
+  translationVisibility,
 }: TranscriptReaderProps) {
   const { t } = useUi();
   const { track, onGenerateTranscript, generatingTranscript, generateTranscriptError, transcriptOffsetSec } =
@@ -134,7 +136,8 @@ export function TranscriptReader({
         >
           {segments.map((seg) => {
             const isActive = seg.id === activeSegmentId;
-            const translation = isActive && showTranslation ? translationFor(seg, translationLang) : null;
+            const showForSeg = showTranslation && (translationVisibility === "all" || isActive);
+            const translation = showForSeg ? translationFor(seg, translationLang) : null;
             return (
               <span key={seg.id}>
                 <span

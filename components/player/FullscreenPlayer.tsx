@@ -233,6 +233,7 @@ export function FullscreenPlayer() {
             fontSize={settings.fontSize + 2}
             fontFamily={settings.fontFamily}
             theme={settings.captionTheme}
+            translationVisibility={settings.translationVisibility}
           />
         </div>
 
