@@ -56,18 +56,96 @@ test("refuses to transcribe with no key configured", async () => {
   }
 });
 
-test("declines an episode whose declared size is over the cap", async () => {
+test("declines an episode whose declared size is over the combined cap", async () => {
   await withGroqKey("test-key", async () => {
     await withFetch(
       async (url, init) => {
         if (init?.method === "HEAD") {
-          return { headers: new Map([["content-length", String(30 * 1024 * 1024)]]) };
+          // Bigger than MAX_CHUNKS (4) * MAX_CHUNK_BYTES (24MB) - too large
+          // even for the chunked path.
+          return { headers: new Map([["content-length", String(100 * 1024 * 1024)]]) };
         }
         throw new Error("should not fetch the body when HEAD already says it's too large");
       },
       async () => {
         const result = await transcribeAudio(AUDIO_URL);
         assert.deepEqual(result, { ok: false, reason: "too-large" });
+      },
+    );
+  });
+});
+
+test("splits a declared size over one chunk into ranged requests and stitches the results", async () => {
+  await withGroqKey("test-key", async () => {
+    const rangesRequested = [];
+    await withFetch(
+      async (url, init) => {
+        if (init?.method === "HEAD") {
+          // 30MB: bigger than one 24MB chunk, small enough for two.
+          return { headers: new Map([["content-length", String(30 * 1024 * 1024)]]) };
+        }
+        if (String(url).includes("groq.com")) {
+          // Each chunk's Groq call is distinguished by its own audio blob's
+          // size, set below per range - order-independent since both
+          // chunks' fetch-then-transcribe pipelines run in parallel.
+          const audioBlob = init.body.get("file");
+          if (audioBlob.size === 111) {
+            return {
+              ok: true,
+              json: async () => ({ duration: 600, segments: [{ start: 0, end: 3, text: "Erster Teil." }] }),
+            };
+          }
+          return {
+            ok: true,
+            json: async () => ({ duration: 300, segments: [{ start: 0, end: 4, text: "Zweiter Teil." }] }),
+          };
+        }
+        const range = init?.headers?.Range;
+        rangesRequested.push(range);
+        const size = range === "bytes=0-25165823" ? 111 : 222;
+        return {
+          ok: true,
+          headers: new Map([["content-type", "audio/mpeg"]]),
+          arrayBuffer: async () => new ArrayBuffer(size),
+        };
+      },
+      async () => {
+        const result = await transcribeAudio(AUDIO_URL);
+        assert.equal(result.ok, true);
+        // Two chunks: [0, 24MB-1] and [24MB, 30MB-1].
+        assert.deepEqual(rangesRequested.sort(), ["bytes=0-25165823", "bytes=25165824-31457279"].sort());
+        assert.equal(result.segments.length, 2);
+        const byText = Object.fromEntries(result.segments.map((s) => [s.text, s]));
+        assert.equal(byText["Erster Teil."].start, 0);
+        // Second chunk's segments are offset by the first chunk's own
+        // 600s duration, not by an estimate from its byte size.
+        assert.equal(byText["Zweiter Teil."].start, 600);
+      },
+    );
+  });
+});
+
+test("reports transcription-failed when any chunk fails, rather than a silent gap", async () => {
+  await withGroqKey("test-key", async () => {
+    await withFetch(
+      async (url, init) => {
+        if (init?.method === "HEAD") {
+          return { headers: new Map([["content-length", String(30 * 1024 * 1024)]]) };
+        }
+        const range = init?.headers?.Range;
+        if (range === "bytes=0-25165823") {
+          return {
+            ok: true,
+            headers: new Map([["content-type", "audio/mpeg"]]),
+            arrayBuffer: async () => new ArrayBuffer(1000),
+          };
+        }
+        // The second chunk's audio fetch itself fails.
+        return { ok: false, status: 500 };
+      },
+      async () => {
+        const result = await transcribeAudio(AUDIO_URL);
+        assert.deepEqual(result, { ok: false, reason: "transcription-failed" });
       },
     );
   });

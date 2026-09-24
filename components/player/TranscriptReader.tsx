@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUi } from "@/lib/i18n";
 import { liveCaptionService, type CaptionSegment } from "@/lib/liveCaption";
+import { TextSwapIn } from "@/components/caption/TextSwapIn";
 import { usePlayer } from "./PlayerProvider";
 
 interface TranscriptReaderProps {
@@ -124,12 +125,17 @@ export function TranscriptReader({
                   {seg.text}
                 </span>
                 {translation ? (
-                  <span
-                    className="mx-1 block py-1 text-white/45"
+                  // A visibly different line, not just a dimmer copy of the
+                  // original: its own (mono, italic) type and a warm accent
+                  // colour so it reads as "the translation" at a glance
+                  // rather than needing to be parsed out of the same style.
+                  <TextSwapIn
+                    as="span"
+                    className="mx-1 block py-1 font-mono italic text-[#e0c065]"
                     style={{ fontSize: `${Math.max(13, Math.round(fontSize * 0.68))}px`, lineHeight: 1.5 }}
                   >
                     {translation}
-                  </span>
+                  </TextSwapIn>
                 ) : null}
                 {" "}
               </span>

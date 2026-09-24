@@ -18,7 +18,7 @@ export type Lang = "de" | TargetLang;
 
 const DEEPL_LANG: Record<Lang, string> = { de: "DE", en: "EN-GB", vi: "VI" };
 
-export type TranslationSource = "deepl" | "google" | "anthropic" | "mymemory" | "none";
+export type TranslationSource = "deepl" | "google" | "anthropic" | "groq" | "mymemory" | "none";
 
 export interface TranslationResult {
   text: string | null;
@@ -38,7 +38,8 @@ export function hasKeyedProvider(): boolean {
   return Boolean(
     process.env.DEEPL_API_KEY ||
       process.env.GOOGLE_TRANSLATE_API_KEY ||
-      process.env.ANTHROPIC_API_KEY,
+      process.env.ANTHROPIC_API_KEY ||
+      process.env.GROQ_API_KEY,
   );
 }
 
@@ -58,6 +59,13 @@ export async function translate(
 
   const anthropic = await translateWithAnthropic(text, targetLang, sourceLang);
   if (anthropic) return { text: anthropic, source: "anthropic" };
+
+  // Groq needs a key too, but it is the one every listener here already has
+  // for "Generate transcript with AI" - reusing it makes translation reliable
+  // out of the box for anyone who already set that up, without a second
+  // signup. Tried before the keyless fallback below for exactly that reason.
+  const groq = await translateWithGroq(text, targetLang, sourceLang);
+  if (groq) return { text: groq, source: "groq" };
 
   const free = await translateWithMyMemory(text, targetLang, sourceLang);
   if (free) return { text: free, source: "mymemory" };
@@ -107,8 +115,11 @@ async function translateWithMyMemory(text: string, lang: Lang, sourceLang: Lang)
       const response = await fetch(`https://api.mymemory.translated.net/get?${params}`, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(9000),
+        // Next.js's own fetch extension, not in the standard RequestInit
+        // type the standalone test build compiles against; still honored at
+        // runtime inside Next.js, and harmlessly ignored outside it.
         next: { revalidate: 86_400 },
-      });
+      } as RequestInit);
       if (!response.ok) return null;
       const data = (await response.json()) as {
         responseStatus?: number | string;
@@ -191,6 +202,47 @@ async function translateWithAnthropic(text: string, lang: Lang, sourceLang: Lang
     maxTokens: 400,
   });
   return result?.trim() ?? null;
+}
+
+/** Fast, free-tier hosted Llama, used the same way as the Anthropic provider
+ * above - a plain instruction prompt, since Groq's chat API is otherwise
+ * OpenAI-compatible like its transcription endpoint already used here. */
+async function translateWithGroq(text: string, lang: Lang, sourceLang: Lang): Promise<string | null> {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
+  const model = process.env.GROQ_TRANSLATE_MODEL ?? "llama-3.3-70b-versatile";
+
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 400,
+        messages: [
+          {
+            role: "system",
+            content: `You are a translator. Translate the ${LANG_NAME[sourceLang]} input into natural ${LANG_NAME[lang]}. Reply with the translation only, no quotes and no commentary.`,
+          },
+          { role: "user", content: text },
+        ],
+      }),
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!response.ok) {
+      console.error("[translate] Groq", response.status, await response.text().catch(() => ""));
+      return null;
+    }
+    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    return data.choices?.[0]?.message?.content?.trim() ?? null;
+  } catch (error) {
+    console.error("[translate] Groq request failed:", error);
+    return null;
+  }
 }
 
 export interface ClaudeRequest {

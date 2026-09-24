@@ -12,6 +12,7 @@ import {
   captionThemeStyle,
   type CaptionSettingsState,
 } from "./CaptionSettings";
+import { TextSwapIn } from "./TextSwapIn";
 
 // How long the collapsed floating bar stays fully visible after the last
 // caption update or interaction before fading, when auto-hide is on.
@@ -25,7 +26,11 @@ interface LiveTranscriptPanelProps {
   onUpdateSettings: (settings: CaptionSettingsState) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
-  isFloating?: boolean;
+  /** True when a resizable parent (the floating panel) should dictate the
+   * panel's height, so the transcript list grows/shrinks to fill it instead
+   * of stopping at a fixed max-height. Left off for the embedded panel on
+   * the listen page, whose parent has no bounded height of its own. */
+  fillHeight?: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -43,7 +48,7 @@ export function LiveTranscriptPanel({
   onUpdateSettings,
   isCollapsed = false,
   onToggleCollapse,
-  isFloating = false,
+  fillHeight = false,
 }: LiveTranscriptPanelProps) {
   const { t, lang } = useUi();
   const {
@@ -266,7 +271,7 @@ export function LiveTranscriptPanel({
       <div
         className={`card flex items-center gap-3 px-3.5 py-2 transition-opacity duration-500 ${
           dimmed ? "opacity-35 hover:opacity-100" : "opacity-100"
-        } ${isFloating ? "backdrop-blur-2xl bg-[var(--paper-raised)]/90 dark:bg-[var(--paper-raised)]/80 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-[var(--rule)]/50" : ""}`}
+        }`}
         style={captionThemeStyle(settings.captionTheme)}
         onMouseEnter={resetHideTimer}
         onFocus={resetHideTimer}
@@ -300,11 +305,11 @@ export function LiveTranscriptPanel({
   }
 
   return (
-    <section 
-      className={`card mt-4 flex flex-col overflow-hidden ${isFloating ? "backdrop-blur-2xl bg-[var(--paper-raised)]/90 dark:bg-[var(--paper-raised)]/80 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-[var(--rule)]/50" : ""}`} 
+    <section
+      className={`card mt-4 flex flex-col overflow-hidden ${fillHeight ? "h-full" : ""}`}
       style={captionThemeStyle(settings.captionTheme)}
     >
-      <div className={`border-b border-[var(--rule)] p-3.5 ${isFloating ? "bg-[var(--surface)]/60" : "bg-[var(--surface)]"}`}>
+      <div className="border-b border-[var(--rule)] bg-[var(--surface)] p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <h3 className="text-[15px] font-semibold text-[var(--ink)]">
@@ -419,7 +424,9 @@ export function LiveTranscriptPanel({
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="relative max-h-[420px] min-h-[160px] overflow-y-auto p-4 space-y-3 scroll-smooth"
+        className={`relative overflow-y-auto p-4 space-y-3 scroll-smooth ${
+          fillHeight ? "flex-1 min-h-0" : "max-h-[420px] min-h-[160px]"
+        }`}
       >
         {filteredSegments.length === 0 ? (
           <div className="py-12 text-center text-[13px] text-[var(--ink-faint)]">
@@ -520,30 +527,35 @@ export function LiveTranscriptPanel({
                       })}
                     </p>
 
+                    {/* Its own (mono, italic) type and the accent colour,
+                        not just a dimmer copy of the original's own style,
+                        so a translation reads as one at a glance. */}
                     {settings.showTranslation && seg.translations ? (
                       <div className="mt-1 space-y-0.5">
                         {Object.entries(seg.translations).map(([lang, text]) => (
-                          <p
+                          <TextSwapIn
                             key={lang}
-                            className="text-[var(--ink-soft)] select-text"
+                            as="p"
+                            className="block font-mono italic text-[var(--accent)] select-text"
                             style={{ fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.8))}px` }}
                           >
-                            <span className="mr-1.5 font-mono text-[10px] uppercase text-[var(--ink-faint)]">
+                            <span className="mr-1.5 not-italic font-sans text-[10px] uppercase text-[var(--ink-faint)]">
                               {lang}
                             </span>
                             {text}
-                          </p>
+                          </TextSwapIn>
                         ))}
                       </div>
                     ) : settings.showTranslation && seg.translation ? (
-                      <p
-                        className="mt-1 text-[var(--ink-soft)] select-text"
+                      <TextSwapIn
+                        as="p"
+                        className="mt-1 block font-mono italic text-[var(--accent)] select-text"
                         style={{
                           fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.8))}px`,
                         }}
                       >
                         {seg.translation}
-                      </p>
+                      </TextSwapIn>
                     ) : null}
 
                     {/* AI Grammar explanation if loaded */}

@@ -69,3 +69,28 @@ test("unplayed with no history is just newest first", () => {
 test("an unknown key falls back to newest rather than throwing", () => {
   assert.deepEqual(ids(sortEpisodes(feed, "nonsense")), ["d", "c", "b", "a"]);
 });
+
+test("titleAsc sorts alphabetically rather than by feed order", () => {
+  const named = [ep("1", null, null), ep("2", null, null), ep("3", null, null)];
+  named[0].title = "Zebra";
+  named[1].title = "Apfel";
+  named[2].title = "Birne";
+  assert.deepEqual(ids(sortEpisodes(named, "titleAsc")), ["2", "3", "1"]);
+});
+
+test("titleAsc is case-insensitive", () => {
+  const named = [ep("1", null, null), ep("2", null, null), ep("3", null, null)];
+  named[0].title = "Zebra";
+  named[1].title = "apfel";
+  named[2].title = "Birne";
+  assert.deepEqual(ids(sortEpisodes(named, "titleAsc")), ["2", "3", "1"]);
+});
+
+test("titleAsc orders numbered titles numerically, not lexically", () => {
+  const named = [ep("a", null, null), ep("b", null, null), ep("c", null, null)];
+  named[0].title = "Folge 10";
+  named[1].title = "Folge 2";
+  named[2].title = "Folge 1";
+  // Lexical order would put "Folge 10" before "Folge 2"; listeners expect episode order instead.
+  assert.deepEqual(ids(sortEpisodes(named, "titleAsc")), ["c", "b", "a"]);
+});

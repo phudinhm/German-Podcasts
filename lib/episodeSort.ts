@@ -1,9 +1,9 @@
 import type { FeedEpisode } from "./server/feed";
 import type { RecentEpisode } from "./library";
 
-export type SortKey = "newest" | "oldest" | "longest" | "shortest" | "unplayed";
+export type SortKey = "newest" | "oldest" | "longest" | "shortest" | "unplayed" | "titleAsc";
 
-export const SORT_KEYS: SortKey[] = ["newest", "oldest", "longest", "shortest", "unplayed"];
+export const SORT_KEYS: SortKey[] = ["newest", "oldest", "longest", "shortest", "unplayed", "titleAsc"];
 
 function published(episode: FeedEpisode): number {
   if (!episode.publishedAt) return 0;
@@ -46,6 +46,13 @@ export function sortEpisodes(
         const right = b.episode.durationSec ?? Number.POSITIVE_INFINITY;
         return left - right || stable(a, b);
       }
+      case "titleAsc":
+        // Locale-aware so umlauts sort where a German speaker expects them,
+        // and numeric so "Folge 2" lands before "Folge 10" instead of after.
+        return (
+          a.episode.title.localeCompare(b.episode.title, "de", { sensitivity: "base", numeric: true }) ||
+          stable(a, b)
+        );
       case "unplayed": {
         const rank = (episode: FeedEpisode) => {
           const entry = heard.get(episode.guid || episode.url);
