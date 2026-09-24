@@ -189,41 +189,44 @@ export async function generateTranscript(
 
   liveCaptionService.clearTranscript();
 
-  while (true) {
-    if (isCancelled()) {
-      reader.cancel();
-      return { ok: false, error: "transcription-failed" };
-    }
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      if (isCancelled()) {
+        reader.cancel();
+        return totalSegments > 0 ? { ok: true } : { ok: false, error: "transcription-failed" };
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const data = JSON.parse(line) as { segments?: FetchedSegment[], error?: string, reason?: string };
-        if (data.error) {
-          const known: GenerateTranscriptError[] = ["no-key", "too-large", "fetch-failed", "transcription-failed"];
-          return { ok: false, error: known.find((r) => r === data.reason) ?? "unknown" };
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const data = JSON.parse(line) as { segments?: FetchedSegment[]; error?: string; reason?: string };
+          if (data.error) {
+            if (totalSegments > 0) return { ok: true };
+            const known: GenerateTranscriptError[] = ["no-key", "too-large", "fetch-failed", "transcription-failed"];
+            return { ok: false, error: known.find((r) => r === data.reason) ?? "unknown" };
+          }
+          if (data.segments && data.segments.length > 0) {
+            totalSegments += data.segments.length;
+            liveCaptionService.appendTranscript(data.segments.map((s) => ({ ...s, isFinal: true })));
+            void autoTranslateSegments(data.segments, sourceLang, isCancelled);
+          }
+        } catch {
+          // Parse error, ignore and continue
         }
-        if (data.segments && data.segments.length > 0) {
-          totalSegments += data.segments.length;
-          liveCaptionService.appendTranscript(data.segments.map((s) => ({ ...s, isFinal: true })));
-          void autoTranslateSegments(data.segments, sourceLang, isCancelled);
-        }
-      } catch (err) {
-        // Parse error, ignore and continue
       }
     }
-  }
 
-  if (buffer.trim()) {
+    if (buffer.trim()) {
       try {
-        const data = JSON.parse(buffer) as { segments?: FetchedSegment[], error?: string, reason?: string };
+        const data = JSON.parse(buffer) as { segments?: FetchedSegment[]; error?: string; reason?: string };
         if (data.error) {
+          if (totalSegments > 0) return { ok: true };
           const known: GenerateTranscriptError[] = ["no-key", "too-large", "fetch-failed", "transcription-failed"];
           return { ok: false, error: known.find((r) => r === data.reason) ?? "unknown" };
         }
@@ -232,9 +235,12 @@ export async function generateTranscript(
           liveCaptionService.appendTranscript(data.segments.map((s) => ({ ...s, isFinal: true })));
           void autoTranslateSegments(data.segments, sourceLang, isCancelled);
         }
-      } catch (err) {
+      } catch {
         // Parse error
       }
+    }
+  } catch {
+    if (totalSegments > 0) return { ok: true };
   }
 
   if (isCancelled() || totalSegments === 0) return { ok: false, error: "transcription-failed" };
