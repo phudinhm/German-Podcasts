@@ -520,7 +520,7 @@ export function LiveTranscriptPanel({
                       })}
                     </p>
 
-                    {settings.showTranslation && seg.translations ? (
+                    {settings.showTranslation && (settings.translationVisibility === "all" || isActive) && seg.translations ? (
                       <div className="mt-1 space-y-0.5">
                         {Object.entries(seg.translations).map(([lang, text]) => (
                           <p
@@ -535,7 +535,7 @@ export function LiveTranscriptPanel({
                           </p>
                         ))}
                       </div>
-                    ) : settings.showTranslation && seg.translation ? (
+                    ) : settings.showTranslation && (settings.translationVisibility === "all" || isActive) && seg.translation ? (
                       <p
                         className="mt-1 text-[var(--ink-soft)] select-text"
                         style={{

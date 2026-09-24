@@ -87,6 +87,8 @@ export interface CaptionSettingsState {
    * `showTranslation` is on. "auto" takes whichever `translationTargetsFor`
    * lists first for the episode's own spoken language. */
   translationLang: TranslationLangPreference;
+  translationVisibility: "all" | "active";
+  translationEngine: "auto" | "gemini" | "groq" | "deepseek" | "anthropic" | "openai" | "openrouter";
 }
 
 const STORAGE_KEY = "hoerbar.caption.settings.v1";
@@ -99,6 +101,8 @@ export const DEFAULT_CAPTION_SETTINGS: CaptionSettingsState = {
   captionTheme: "modern",
   autoHide: true,
   translationLang: "auto",
+  translationVisibility: "all",
+  translationEngine: "auto",
 };
 
 export function loadCaptionSettings(): CaptionSettingsState {
@@ -234,6 +238,34 @@ export function CaptionSettings({
           })}
         </div>
       ) : null}
+
+      {/* Translation visibility & Engine */}
+      {settings.showTranslation && (
+        <div className="flex items-center gap-2">
+          <select
+            value={settings.translationVisibility}
+            onChange={(e) => update({ translationVisibility: e.target.value as "all" | "active" })}
+            className="rounded border border-[var(--rule)] bg-[var(--surface)] px-1.5 py-1 text-[11px] text-[var(--ink)] outline-none cursor-pointer"
+            title="Translation visibility"
+          >
+            <option value="all">Dịch tất cả (All)</option>
+            <option value="active">Chỉ dịch dòng hiện tại (Active)</option>
+          </select>
+          <select
+            value={settings.translationEngine}
+            onChange={(e) => update({ translationEngine: e.target.value as any })}
+            className="rounded border border-[var(--rule)] bg-[var(--surface)] px-1.5 py-1 text-[11px] text-[var(--ink)] outline-none cursor-pointer"
+            title="AI Translation Engine"
+          >
+            <option value="auto">Auto Engine</option>
+            <option value="gemini">Gemini</option>
+            <option value="groq">Groq</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="anthropic">Claude</option>
+            <option value="openai">GPT-4o</option>
+          </select>
+        </div>
+      )}
 
       {/* Auto-scroll toggle - off lets someone read back through past lines
           (or ahead) without the view snapping back to the current one on

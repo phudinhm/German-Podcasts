@@ -41,17 +41,9 @@ export async function transcribeAudio(audioUrl: URL, sourceLang?: SpokenLang): P
   const key = process.env.GROQ_API_KEY;
   if (!key) return { ok: false, reason: "no-key" };
 
-  let audio: Blob;
+  let buffer: ArrayBuffer;
+  let contentType: string;
   try {
-    const head = await fetch(audioUrl, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    }).catch(() => null);
-    const declaredLength = Number(head?.headers.get("content-length") ?? NaN);
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_AUDIO_BYTES) {
-      return { ok: false, reason: "too-large" };
-    }
-
     const response = await fetch(audioUrl, {
       headers: { "User-Agent": "Hoerbar/0.1 (transcription)" },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -59,47 +51,76 @@ export async function transcribeAudio(audioUrl: URL, sourceLang?: SpokenLang): P
     });
     if (!response.ok) return { ok: false, reason: "fetch-failed" };
 
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength > MAX_AUDIO_BYTES) return { ok: false, reason: "too-large" };
-    audio = new Blob([buffer], { type: response.headers.get("content-type") ?? "audio/mpeg" });
+    buffer = await response.arrayBuffer();
+    contentType = response.headers.get("content-type") ?? "audio/mpeg";
   } catch {
     return { ok: false, reason: "fetch-failed" };
   }
 
   try {
-    const form = new FormData();
-    form.set("file", audio, "episode.mp3");
-    form.set("model", GROQ_MODEL);
-    form.set("response_format", "verbose_json");
-    if (sourceLang) form.set("language", WHISPER_LANG[sourceLang]);
-
-    const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}` },
-      body: form,
-      signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
-    });
-    if (!response.ok) {
-      console.error("[transcribe] Groq", response.status, await response.text().catch(() => ""));
-      return { ok: false, reason: "transcription-failed" };
+    const chunks: Blob[] = [];
+    for (let i = 0; i < buffer.byteLength; i += MAX_AUDIO_BYTES) {
+      chunks.push(new Blob([buffer.slice(i, i + MAX_AUDIO_BYTES)], { type: contentType }));
     }
 
-    const data = (await response.json()) as {
-      segments?: Array<{ start: number; end: number; text: string }>;
-      text?: string;
+    const transcribeChunk = async (chunk: Blob, index: number) => {
+      const form = new FormData();
+      form.set("file", chunk, `episode_part_${index}.mp3`);
+      form.set("model", GROQ_MODEL);
+      form.set("response_format", "verbose_json");
+      if (sourceLang) form.set("language", WHISPER_LANG[sourceLang]);
+
+      const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+        signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        console.error(`[transcribe] Groq chunk ${index}`, response.status, await response.text().catch(() => ""));
+        throw new Error("transcription-failed");
+      }
+
+      const data = (await response.json()) as {
+        segments?: Array<{ start: number; end: number; text: string }>;
+        text?: string;
+      };
+
+      const segments = (data.segments ?? [])
+        .map((seg) => ({ start: seg.start, end: seg.end, text: seg.text.trim() }))
+        .filter((seg) => seg.text.length > 0);
+
+      if (segments.length === 0 && data.text?.trim()) {
+        segments.push({ start: 0, end: Number.MAX_SAFE_INTEGER, text: data.text.trim() });
+      }
+      return segments;
     };
 
-    const segments: TranscriptSegment[] = (data.segments ?? [])
-      .map((seg) => ({ start: seg.start, end: seg.end, text: seg.text.trim() }))
-      .filter((seg) => seg.text.length > 0);
+    const chunkResults = await Promise.all(chunks.map((c, i) => transcribeChunk(c, i)));
 
-    if (segments.length === 0 && data.text?.trim()) {
-      segments.push({ start: 0, end: Number.MAX_SAFE_INTEGER, text: data.text.trim() });
+    const finalSegments: TranscriptSegment[] = [];
+    let currentTimeOffset = 0;
+
+    for (const chunkSegments of chunkResults) {
+      if (chunkSegments.length === 0) continue;
+      
+      let maxEndInChunk = 0;
+      for (const seg of chunkSegments) {
+        if (seg.end !== Number.MAX_SAFE_INTEGER) {
+          maxEndInChunk = Math.max(maxEndInChunk, seg.end);
+        }
+        finalSegments.push({
+          start: seg.start + currentTimeOffset,
+          end: seg.end === Number.MAX_SAFE_INTEGER ? Number.MAX_SAFE_INTEGER : seg.end + currentTimeOffset,
+          text: seg.text
+        });
+      }
+      currentTimeOffset += maxEndInChunk;
     }
 
-    return { ok: true, segments };
+    return { ok: true, segments: finalSegments };
   } catch (error) {
-    console.error("[transcribe] Groq request failed:", error);
+    console.error("[transcribe] Failed:", error);
     return { ok: false, reason: "transcription-failed" };
   }
 }

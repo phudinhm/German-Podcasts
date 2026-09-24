@@ -236,6 +236,131 @@ export async function askClaude(request: ClaudeRequest): Promise<string | null> 
   }
 }
 
+async function askOpenAIFormat(
+  request: ClaudeRequest,
+  url: string,
+  key: string,
+  model: string,
+  authHeader = "Bearer"
+): Promise<string | null> {
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (authHeader === "Bearer") {
+      headers["Authorization"] = `Bearer ${key}`;
+    } else if (authHeader === "api-key") {
+      headers["api-key"] = key;
+    }
+
+    const payload: any = {
+      model,
+      messages: [
+        { role: "system", content: request.system },
+        { role: "user", content: request.user }
+      ],
+      max_tokens: request.maxTokens ?? 512,
+    };
+    
+    if (request.json) {
+      payload.response_format = { type: "json_object" };
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error(`[openai-format ${model}]`, response.status, await response.text());
+      return null;
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content ?? null;
+  } catch (error) {
+    console.error(`[openai-format ${model}] request failed:`, error);
+    return null;
+  }
+}
+
+export async function askLLM(request: ClaudeRequest, engine: string = "auto"): Promise<string | null> {
+  // Determine engine
+  let activeEngine = engine;
+  if (activeEngine === "auto") {
+    if (process.env.GEMINI_API_KEY) activeEngine = "gemini";
+    else if (process.env.GROQ_API_KEY) activeEngine = "groq";
+    else if (process.env.DEEPSEEK_API_KEY) activeEngine = "deepseek";
+    else if (process.env.OPENAI_API_KEY) activeEngine = "openai";
+    else if (process.env.ANTHROPIC_API_KEY) activeEngine = "anthropic";
+    else if (process.env.OPENROUTER_API_KEY) activeEngine = "openrouter";
+  }
+
+  switch (activeEngine) {
+    case "gemini":
+      if (process.env.GEMINI_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+          process.env.GEMINI_API_KEY,
+          "gemini-1.5-flash"
+        );
+      }
+      break;
+    case "groq":
+      if (process.env.GROQ_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://api.groq.com/openai/v1/chat/completions",
+          process.env.GROQ_API_KEY,
+          "llama-3.3-70b-versatile"
+        );
+      }
+      break;
+    case "deepseek":
+      if (process.env.DEEPSEEK_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://api.deepseek.com/chat/completions",
+          process.env.DEEPSEEK_API_KEY,
+          "deepseek-chat"
+        );
+      }
+      break;
+    case "openai":
+      if (process.env.OPENAI_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://api.openai.com/v1/chat/completions",
+          process.env.OPENAI_API_KEY,
+          "gpt-4o"
+        );
+      }
+      break;
+    case "openrouter":
+      if (process.env.OPENROUTER_API_KEY) {
+        return askOpenAIFormat(
+          request,
+          "https://openrouter.ai/api/v1/chat/completions",
+          process.env.OPENROUTER_API_KEY,
+          "anthropic/claude-3.5-sonnet"
+        );
+      }
+      break;
+    case "anthropic":
+      if (process.env.ANTHROPIC_API_KEY) {
+        return askClaude(request);
+      }
+      break;
+  }
+  
+  // Fallback
+  if (process.env.GEMINI_API_KEY) {
+    return askOpenAIFormat(request, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", process.env.GEMINI_API_KEY, "gemini-1.5-flash");
+  }
+  return askClaude(request);
+}
+
 /** Pulls the first JSON object or array out of a model reply. */
 export function extractJson<T>(raw: string | null): T | null {
   if (!raw) return null;

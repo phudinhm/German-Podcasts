@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { askClaude, translate } from "@/lib/server/translate";
+import { askLLM, translate } from "@/lib/server/translate";
 import type { TargetLang } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -8,6 +8,7 @@ interface PolishRequestBody {
   text: string;
   lang?: TargetLang;
   explainGrammar?: boolean;
+  engine?: string;
 }
 
 interface PolishResponse {
@@ -78,8 +79,15 @@ export async function POST(request: Request) {
   const targetLang: TargetLang = body.lang === "vi" ? "vi" : "en";
   const targetName = targetLang === "vi" ? "Vietnamese" : "English";
 
-  // 1. Try LLM if Anthropic or Gemini key is configured
-  if (process.env.ANTHROPIC_API_KEY) {
+  // 1. Try LLM if any key is configured
+  if (
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    process.env.GROQ_API_KEY ||
+    process.env.DEEPSEEK_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    process.env.OPENROUTER_API_KEY
+  ) {
     const systemPrompt = `You are an expert German language tutor and transcription polisher.
 Given a raw speech-to-text German segment:
 1. Polish the German text: Correct capitalization (ALL German nouns must be capitalized), fix punctuation, fix any obvious speech recognition typos or run-on words.
@@ -92,12 +100,12 @@ Reply ONLY with a JSON object in this exact format:
   "grammarNotes": ${body.explainGrammar ? '"grammar explanation in ' + targetName + '"' : "null"}
 }`;
 
-    const llmResult = await askClaude({
+    const llmResult = await askLLM({
       system: systemPrompt,
       user: rawText,
       maxTokens: 500,
       json: true,
-    });
+    }, body.engine ?? "auto");
 
     if (llmResult) {
       try {

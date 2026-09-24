@@ -912,11 +912,11 @@ export function ListenClient() {
 
       {/* ---------------- results ---------------- */}
       {results && results.length > 0 && !feed ? (
-        <section className="mt-6">
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <section className="mt-6 relative">
+          <div className="sticky top-[env(safe-area-inset-top,0)] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--bg)]/90 px-2 py-3 backdrop-blur-xl">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--accent)] hover:underline"
+              className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2 py-1 rounded bg-[var(--surface)] shadow-xs"
               onClick={browse}
             >
               <span aria-hidden>←</span>
@@ -976,11 +976,11 @@ export function ListenClient() {
 
       {/* ---------------- episodes ---------------- */}
       {feed ? (
-        <section className="mt-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
+        <section className="mt-4 relative">
+          <div className="sticky top-[env(safe-area-inset-top,0)] z-20 -mx-2 mb-2 flex items-center justify-between gap-2 bg-[var(--bg)]/90 px-2 py-3 backdrop-blur-xl">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-[var(--accent)] hover:underline"
+              className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2 py-1 rounded bg-[var(--surface)] shadow-xs"
               onClick={backToResultsOrBrowse}
             >
               <span aria-hidden>←</span>
