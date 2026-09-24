@@ -709,14 +709,6 @@ export function ListenClient() {
               </div>
             )}
 
-            {/* Status Banner when waiting for transcript completion before playing */}
-            {player.waitingForTranscript && (
-              <div className="mb-3 flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-xs font-semibold text-amber-600 dark:text-amber-300">
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
-                <span>Đang tạo transcript — Sẽ tự động phát ngay khi hoàn thành...</span>
-              </div>
-            )}
-
             <div className="flex items-start gap-3">
               {!player.isVideoTrack && (
                 <>

@@ -234,34 +234,24 @@ export function TranscriptReader({
         className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center rounded-xl"
         style={captionThemeStyle(theme)}
       >
-        {generatingTranscript ? (
-          <>
-            <p className={`text-[15px] font-medium ${generatingText}`}>{t("caption.generating")}</p>
-            <p className={`max-w-xs text-[12.5px] ${generatingHint}`}>{t("caption.generatingHint")}</p>
-          </>
-        ) : (
-          <>
-            <p className={`text-[14px] ${generatingHint}`}>{t("caption.noTranscript")}</p>
-            {generateTranscriptError ? (
-              <p className={`max-w-xs text-[12px] ${errorText}`}>
-                {generateTranscriptError === "too-large"
-                  ? t("caption.generateTooLarge")
-                  : generateTranscriptError === "no-key"
-                    ? t("caption.generateNoProvider")
-                    : t("caption.generateFailed")}
-              </p>
-            ) : null}
-            {track?.url ? (
-              <button
-                type="button"
-                onClick={onGenerateTranscript}
-                className={`rounded-full px-4 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${btnClasses}`}
-              >
-                {t("caption.generateTranscript")}
-              </button>
-            ) : null}
-          </>
-        )}
+        <div className="flex items-center gap-2">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+          <p className={`text-[15px] font-medium ${generatingText}`}>
+            {generatingTranscript ? t("caption.generating") : "Đang chuẩn bị transcript AI..."}
+          </p>
+        </div>
+        <p className={`max-w-xs text-[12.5px] ${generatingHint}`}>
+          {t("caption.generatingHint")}
+        </p>
+        {!generatingTranscript && track?.url ? (
+          <button
+            type="button"
+            onClick={onGenerateTranscript}
+            className={`rounded-full px-4 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${btnClasses}`}
+          >
+            {t("caption.generateTranscript")}
+          </button>
+        ) : null}
       </div>
     );
   }

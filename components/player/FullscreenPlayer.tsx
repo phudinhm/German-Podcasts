@@ -509,14 +509,6 @@ export function FullscreenPlayer() {
           </div>
         ) : null}
 
-        {/* Status Banner while waiting for transcript to complete before playing */}
-        {waitingForTranscript && (
-          <div className="mb-1.5 flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-400/35 bg-amber-400/15 px-3 py-1.5 text-xs font-semibold text-amber-200">
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" />
-            <span>Đang tạo transcript — Sẽ tự động phát ngay khi hoàn thành...</span>
-          </div>
-        )}
-
         {/* Main Transcript Reader (Directly below Top-Center Video, just like YouTube) */}
         <div className="mt-1 min-h-0 flex-1">
           <TranscriptReader

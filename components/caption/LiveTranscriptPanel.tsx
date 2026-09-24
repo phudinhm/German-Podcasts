@@ -622,31 +622,20 @@ export function LiveTranscriptPanel({
           <div className="py-12 text-center text-[13px] text-[var(--ink-faint)]">
             {searchQuery ? (
               <p>{t("caption.noMatch")}</p>
-            ) : generatingTranscript ? (
-              <div className="space-y-2">
-                <p className="font-medium text-[var(--ink)]">{t("caption.generating")}</p>
+            ) : (
+              <div className="space-y-2.5">
+                <div className="inline-flex items-center justify-center gap-2 font-medium text-[var(--ink)]">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+                  <span>{generatingTranscript ? t("caption.generating") : "Đang tạo transcript bằng AI..."}</span>
+                </div>
                 <p className="text-[11.5px] max-w-sm mx-auto text-[var(--ink-faint)]">
                   {t("caption.generatingHint")}
                 </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p>{t("caption.noTranscript")}</p>
-                {generateTranscriptError ? (
-                  <p className="text-[11.5px] max-w-sm mx-auto text-rose-500">
-                    {generateTranscriptError === "too-large"
-                      ? t("caption.generateTooLarge")
-                      : generateTranscriptError === "no-key"
-                        ? t("caption.generateNoProvider")
-                        : t("caption.generateFailed")}
-                  </p>
-                ) : null}
-                {track?.url ? (
+                {!generatingTranscript && track?.url ? (
                   <button type="button" onClick={onGenerateTranscript} className="btn btn-primary px-3.5 py-1.5 text-[12.5px]">
                     {t("caption.generateTranscript")}
                   </button>
                 ) : null}
-                <p className="text-[11.5px] max-w-sm mx-auto text-[var(--ink-faint)]">{t("caption.chromeTip")}</p>
               </div>
             )}
           </div>

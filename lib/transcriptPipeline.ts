@@ -167,7 +167,7 @@ export async function generateTranscript(
   audioUrl: string,
   sourceLang: SpokenLang,
   isCancelled: () => boolean,
-  meta?: { title?: string; description?: string; durationSec?: number | null },
+  meta?: { title?: string; showTitle?: string; description?: string; durationSec?: number | null },
   onReady?: () => void,
 ): Promise<{ ok: true } | { ok: false; error: GenerateTranscriptError }> {
   let notifiedReady = false;
@@ -211,6 +211,7 @@ export async function generateTranscript(
       audioUrl,
       sourceLang,
       title: meta?.title,
+      showTitle: meta?.showTitle,
       description: meta?.description,
       durationSec: meta?.durationSec,
     }),

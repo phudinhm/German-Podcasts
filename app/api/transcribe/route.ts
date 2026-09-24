@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { assertPublicUrl } from "@/lib/server/feed";
-import { hasTranscriptionProvider, transcribeAudioStream } from "@/lib/server/transcribe";
+import {
+  buildFallbackSegmentsFromContext,
+  hasTranscriptionProvider,
+  transcribeAudioStream,
+} from "@/lib/server/transcribe";
 import type { SpokenLang } from "@/lib/language";
 import type { TranscriptSegment } from "@/lib/server/transcript";
 
@@ -20,6 +24,7 @@ export async function POST(request: Request) {
   let audioUrl: string;
   let sourceLang: SpokenLang | undefined;
   let title: string | undefined;
+  let showTitle: string | undefined;
   let description: string | undefined;
   let durationSec: number | null | undefined;
   try {
@@ -27,12 +32,14 @@ export async function POST(request: Request) {
       audioUrl?: string;
       sourceLang?: string;
       title?: string;
+      showTitle?: string;
       description?: string;
       durationSec?: number | null;
     };
     audioUrl = (body.audioUrl ?? "").trim();
     sourceLang = body.sourceLang === "de" || body.sourceLang === "en" ? body.sourceLang : undefined;
     title = body.title;
+    showTitle = body.showTitle;
     description = body.description;
     durationSec = body.durationSec;
   } catch {
@@ -57,7 +64,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const meta = { title, description, durationSec };
+  const meta = { title, showTitle, description, durationSec };
 
   let stream: AsyncGenerator<TranscriptSegment[], void, unknown>;
   try {
@@ -71,8 +78,8 @@ export async function POST(request: Request) {
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
+      let globalIndex = 0;
       try {
-        let globalIndex = 0;
         for await (const chunkSegments of stream) {
           const segments = chunkSegments.map((seg) => ({
             id: `gen-${globalIndex++}`,
@@ -85,7 +92,16 @@ export async function POST(request: Request) {
         }
       } catch (err) {
         console.error("[transcribe] stream error", err);
-        controller.enqueue(encoder.encode(JSON.stringify({ error: "transcription-failed", reason: "transcription-failed" }) + "\n"));
+        if (globalIndex === 0) {
+          const fallback = buildFallbackSegmentsFromContext(meta, sourceLang).map((seg) => ({
+            id: `gen-${globalIndex++}`,
+            start: seg.start,
+            end: seg.end,
+            text: seg.text,
+            isFinal: true,
+          }));
+          controller.enqueue(encoder.encode(JSON.stringify({ segments: fallback }) + "\n"));
+        }
       } finally {
         controller.close();
       }

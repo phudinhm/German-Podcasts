@@ -133,34 +133,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const play = useCallback(
     (next: Track) => {
-      // Immediately stop any previous audio/video so another podcast never bleeds through
+      // Stop any previous track cleanly before switching
       media.handle.pause();
       const el = media.mediaRef.current;
       if (el) {
         try {
           el.pause();
           el.currentTime = 0;
-          // Unlock mobile browser autoplay gesture while keeping audio silent & paused
-          el.muted = true;
-          const p = el.play();
-          if (p && typeof p.then === "function") {
-            p.then(() => {
-              el.pause();
-              el.currentTime = 0;
-              el.muted = false;
-            }).catch(() => {
-              el.muted = false;
-            });
-          } else {
-            el.muted = false;
-          }
-        } catch {
-          el.muted = false;
-        }
+        } catch {}
       }
 
       setShowTranscript(true);
-      setWaitingForTranscript(true);
+      setWaitingForTranscript(false);
       pendingSeekRef.current = next.startAt && next.startAt > 0 ? next.startAt : null;
 
       setTrack((current) => {
@@ -169,6 +153,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
         return next;
       });
+
+      // Start playback immediately (do NOT wait for transcript completion)
+      window.setTimeout(() => {
+        media.handle.play();
+      }, 60);
     },
     [media.handle, media.mediaRef],
   );
@@ -295,27 +284,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [generateTranscriptError, setGenerateTranscriptError] = useState<GenerateTranscriptError | null>(null);
   const generateCancelledRef = useRef(false);
 
-  // Automatically load or generate the transcript whenever a track is chosen,
-  // and ONLY start playback (media.handle.play()) after the transcript completes!
+  // Automatically load or generate the transcript in parallel while the episode plays
   useEffect(() => {
     liveCaptionService.clearTranscript();
     generateCancelledRef.current = false;
     setGenerateTranscriptError(null);
+    setWaitingForTranscript(false);
 
     if (!track) {
       setGeneratingTranscript(false);
-      setWaitingForTranscript(false);
       return;
     }
 
     let cancelled = false;
     const isCancelled = () => cancelled || generateCancelledRef.current;
 
-    // Ensure media stays paused while transcript is being prepared
-    media.handle.pause();
-    setWaitingForTranscript(true);
-
-    const prepareAndPlay = async () => {
+    const loadOrGenerateInParallel = async () => {
       const best = track.transcripts?.length ? pickBestTranscript(track.transcripts) : null;
       if (best) {
         setGeneratingTranscript(true);
@@ -323,40 +307,32 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (isCancelled()) return;
         if (loaded) {
           setGeneratingTranscript(false);
-          setWaitingForTranscript(false);
-          media.handle.play();
           return;
         }
       }
 
       if (track.url) {
         setGeneratingTranscript(true);
-        const result = await generateTranscript(
+        await generateTranscript(
           track.url,
           track.sourceLang ?? "de",
           isCancelled,
           {
             title: track.title,
+            showTitle: track.showTitle,
             description: track.description,
             durationSec: track.durationSec,
           },
         );
         if (isCancelled()) return;
         setGeneratingTranscript(false);
-        setWaitingForTranscript(false);
-        if (!result.ok) {
-          setGenerateTranscriptError(result.error);
-        }
-        // Start playing now that transcript has completed!
-        media.handle.play();
+        setGenerateTranscriptError(null);
       } else {
         setGeneratingTranscript(false);
-        setWaitingForTranscript(false);
-        media.handle.play();
       }
     };
 
-    void prepareAndPlay();
+    void loadOrGenerateInParallel();
 
     return () => {
       cancelled = true;
@@ -375,17 +351,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       () => generateCancelledRef.current,
       {
         title: track.title,
+        showTitle: track.showTitle,
         description: track.description,
         durationSec: track.durationSec,
       },
-    ).then((result) => {
+    ).then(() => {
       if (generateCancelledRef.current) return;
       setGeneratingTranscript(false);
-      setWaitingForTranscript(false);
-      if (!result.ok) setGenerateTranscriptError(result.error);
-      else if (!media.handle.isPlaying()) media.handle.play();
+      setGenerateTranscriptError(null);
     });
-  }, [track, generatingTranscript, media.handle]);
+  }, [track, generatingTranscript]);
 
   const [transcriptOffsetSec, setTranscriptOffsetSecState] = useState(0);
   useEffect(() => {
