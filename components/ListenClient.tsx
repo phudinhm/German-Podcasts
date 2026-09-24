@@ -673,7 +673,7 @@ export function ListenClient() {
           ref={playerRef}
           className={`card mt-6 overflow-hidden transition-all duration-300 ${
             freezePane
-              ? "sticky top-3 z-30 glass-panel border-[var(--accent)]/40 ring-1 ring-[var(--accent)]/20"
+              ? "sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[52px] z-30 bg-[var(--paper-raised)] shadow-2xl border-[var(--accent)]/60 ring-1 ring-[var(--accent)]/30"
               : ""
           }`}
         >
@@ -898,25 +898,32 @@ export function ListenClient() {
 
       {/* Live caption line, shown only once a source is actually feeding it */}
       {playing && showCaption && !showTranscript && (
-        <div className="fixed bottom-[var(--player-h)] left-0 right-0 z-40 mx-auto w-full max-w-2xl px-2 pb-2">
-          <LiveCaptionOverlay
-            isPlaying={player.handle.isPlaying()}
-            mode={captureMode}
-            onOpenTranscript={() => setShowTranscript(true)}
-            onClose={stopLiveCaption}
-            settings={captionSettings}
-            onUpdateSettings={setCaptionSettings}
-          />
+        <div
+          className="fixed left-0 right-0 z-40 mx-auto w-full max-w-2xl px-3 pointer-events-none transition-all duration-300 sm:!bottom-8"
+          style={{
+            bottom: "calc(120px + env(safe-area-inset-bottom, 14px))",
+          }}
+        >
+          <div className="pointer-events-auto">
+            <LiveCaptionOverlay
+              isPlaying={player.handle.isPlaying()}
+              mode={captureMode}
+              onOpenTranscript={() => setShowTranscript(true)}
+              onClose={stopLiveCaption}
+              settings={captionSettings}
+              onUpdateSettings={setCaptionSettings}
+            />
+          </div>
         </div>
       )}
 
       {/* ---------------- results ---------------- */}
       {results && results.length > 0 && !feed ? (
         <section className="mt-6 relative">
-          <div className="sticky top-[env(safe-area-inset-top,0)] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--paper)]/75 px-3 py-3 backdrop-blur-2xl border-b border-[var(--rule)]/40 shadow-sm">
+          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2 py-1 rounded bg-[var(--surface)]/80 backdrop-blur-md shadow-sm border border-[var(--rule)]/50"
+              className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2.5 py-1 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60"
               onClick={browse}
             >
               <span aria-hidden>←</span>
@@ -1007,10 +1014,10 @@ export function ListenClient() {
       {/* ---------------- episodes ---------------- */}
       {feed ? (
         <section className="mt-4 relative">
-          <div className="sticky top-[env(safe-area-inset-top,0)] z-20 -mx-2 mb-3 flex items-center justify-between gap-2 bg-[var(--paper)]/75 px-3 py-3 backdrop-blur-2xl border-b border-[var(--rule)]/40 shadow-sm">
+          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 flex items-center justify-between gap-2 bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2 py-1 rounded bg-[var(--surface)]/80 backdrop-blur-md shadow-sm border border-[var(--rule)]/50"
+              className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2.5 py-1 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60"
               onClick={backToResultsOrBrowse}
             >
               <span aria-hidden>←</span>
@@ -1274,11 +1281,11 @@ export function ListenClient() {
       {(scrolledDown || feed || (results && results.length > 0)) && (
         <aside
           aria-label="Quick navigation"
-          className="fixed left-3 z-40 flex items-center justify-center rounded-full border border-[var(--rule)]/50 bg-[var(--paper-raised)]/75 p-0 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl transition-all duration-300 sm:left-6 sm:gap-1.5 sm:px-2 sm:py-1"
+          className="fixed right-4 z-40 flex items-center justify-center rounded-full border border-[var(--rule)] bg-[var(--paper-raised)] p-0.5 shadow-[0_8px_32px_rgba(0,0,0,0.16)] backdrop-blur-2xl transition-all duration-300 sm:left-6 sm:right-auto sm:gap-1.5 sm:px-2 sm:py-1 sm:!bottom-6"
           style={{
             bottom: playing
-              ? "calc(76px + env(safe-area-inset-bottom, 14px))"
-              : "calc(16px + env(safe-area-inset-bottom, 0px))",
+              ? "calc(124px + env(safe-area-inset-bottom, 14px))"
+              : "calc(68px + env(safe-area-inset-bottom, 14px))",
           }}
         >
           <span className="hidden sm:inline-flex">

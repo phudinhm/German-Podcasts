@@ -181,7 +181,7 @@ export function MiniPlayer() {
   };
 
   const mobileTabBar = (
-    <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-[var(--paper-raised)]/75 backdrop-blur-2xl border-t border-[var(--rule)]/50 pb-[env(safe-area-inset-bottom,14px)] pt-1.5 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
+    <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-[var(--paper-raised)]/95 backdrop-blur-2xl border-t border-[var(--rule)] pb-[env(safe-area-inset-bottom,14px)] pt-1.5 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
       <Link href="/" className={`flex flex-col items-center gap-0.5 w-16 transition-colors ${pathname === "/" ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
         <span className="text-[22px] leading-none">🎧</span>
         <span className="text-[10px] font-medium">{t("nav.listenTab")}</span>
@@ -363,7 +363,7 @@ export function MiniPlayer() {
           {/* COLLAPSED PILL STATE */}
           {!isExpandedDesktop ? (
             <div
-              className="group flex items-center gap-2.5 rounded-full border border-white/25 bg-black/70 dark:bg-black/75 px-3.5 py-1.5 text-white shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-3xl transition-all duration-300 hover:scale-[1.03] cursor-pointer"
+              className="group flex items-center gap-2.5 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 text-[var(--ink)] px-3.5 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.14)] backdrop-blur-3xl transition-all duration-300 hover:scale-[1.03] cursor-pointer"
               title={t("player.hoverExpand")}
             >
               <Art src={track.artwork} alt="" size={30} seed={track.showTitle || track.title} />
@@ -512,29 +512,29 @@ export function MiniPlayer() {
       {mobileTabBar}
       <div
         data-dock="mobile-iphone"
-        className="fixed inset-x-0 z-[45] sm:hidden bg-black/75 dark:bg-black/80 text-white backdrop-blur-3xl border-t border-white/20 pt-2 pb-2 px-3.5 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] transition-transform"
-        style={{ bottom: "calc(50px + env(safe-area-inset-bottom, 14px))" }}
+        className="fixed inset-x-2.5 z-[45] sm:hidden rounded-2xl bg-[var(--paper-raised)] dark:bg-zinc-900 text-[var(--ink)] dark:text-white border border-[var(--rule)] dark:border-white/15 p-2 shadow-[0_12px_36px_rgba(0,0,0,0.2)] transition-all overflow-hidden"
+        style={{ bottom: "calc(54px + env(safe-area-inset-bottom, 14px))" }}
       >
         {/* Module D: Thin progress bar on dock */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/10">
-          <div ref={mobileFillRef} className="h-full bg-[var(--accent-ring)]" style={{ width: 0 }} />
+        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-[var(--rule)]/60 dark:bg-white/10">
+          <div ref={mobileFillRef} className="h-full bg-[var(--accent)]" style={{ width: 0 }} />
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          {/* Tapping track info opens the full "now playing" screen - the
-              one place with the reading-mode transcript, translation picker,
-              sync offset and auto-hide, rather than a second, thinner copy. */}
+          {/* Tapping track info opens the full "now playing" screen */}
           <div
             onClick={() => setFullscreenOpen(true)}
             className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
           >
-            <Art src={track.artwork} alt="" size={40} seed={track.showTitle || track.title} />
+            <div className="shrink-0 overflow-hidden rounded-xl">
+              <Art src={track.artwork} alt="" size={40} seed={track.showTitle || track.title} />
+            </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13.5px] font-semibold leading-tight text-zinc-50">
+              <p className="truncate text-[13.5px] font-semibold leading-tight text-[var(--ink)] dark:text-zinc-50">
                 {track.title}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <p className="truncate text-[11.5px] text-zinc-400">{track.showTitle}</p>
+                <p className="truncate text-[11.5px] text-[var(--ink-faint)] dark:text-zinc-400">{track.showTitle}</p>
                 <AudioVisualizer isPlaying={playing} barCount={4} />
               </div>
             </div>
@@ -544,7 +544,7 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
-              className="btn btn-primary h-11 w-11 rounded-full p-0 text-[15px] shadow-md"
+              className="btn btn-primary h-10 w-10 rounded-full p-0 text-[14px] shadow-md"
               aria-label={playing ? t("common.pause") : t("common.play")}
             >
               {playing ? "❚❚" : "▶"}

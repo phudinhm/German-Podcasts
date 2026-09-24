@@ -59,10 +59,10 @@ export function LibraryClient() {
 
   return (
     <div>
-      <div className="sticky top-[env(safe-area-inset-top,0)] z-20 -mx-2 mb-3 bg-[var(--paper)]/75 px-3 py-3 backdrop-blur-2xl border-b border-[var(--rule)]/40 shadow-sm">
+      <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2 py-1 rounded bg-[var(--surface)]/80 backdrop-blur-md shadow-sm border border-[var(--rule)]/50"
+          className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2.5 py-1 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60"
         >
           <span>←</span>
           <span>{t("common.back")} ({t("nav.listen")})</span>

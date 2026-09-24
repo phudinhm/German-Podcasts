@@ -73,7 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-7 sm:px-5">{children}</main>
 
-          <footer className="mt-16 border-t border-[var(--rule)] pb-24">
+          <footer className="mt-16 border-t border-[var(--rule)] pb-[calc(130px+env(safe-area-inset-bottom,14px))] sm:pb-20">
             <Footer />
           </footer>
 

@@ -60,10 +60,8 @@ export function GlobalFloatingTranscript() {
       aria-label="Floating Transcript"
       className="hidden sm:block fixed z-40 max-w-xl transition-all duration-300 pointer-events-auto sm:left-6 sm:w-[480px] max-sm:inset-x-3 drop-shadow-[0_12px_40px_rgba(0,0,0,0.15)]"
       style={{
-        // Enough clearance for the mini player's tallest state (an open card,
-        // not the tucked button) plus the safe area, so a phone where both
-        // are visible stacks them instead of layering one over the other.
-        bottom: "calc(96px + env(safe-area-inset-bottom, 14px))",
+        // Stacks neatly above the quick navigation pill on the left
+        bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
       }}
     >
       <LiveTranscriptPanel

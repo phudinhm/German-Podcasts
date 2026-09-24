@@ -91,7 +91,7 @@ export function SettingsMenu() {
       </button>
 
       {open ? (
-        <div role="menu" className="card absolute right-0 z-50 mt-1.5 w-[186px] overflow-hidden p-1.5">
+        <div role="menu" className="card absolute right-0 z-50 mt-2 w-[210px] overflow-hidden p-2 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-2xl">
           <p className="px-2 pb-1 pt-1 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">
             {t("theme.title")}
           </p>
