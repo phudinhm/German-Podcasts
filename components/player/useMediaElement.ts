@@ -47,11 +47,27 @@ export function useMediaElement(rawSrc: string | null): {
     const media = mediaRef.current;
     readyRef.current = false;
     if (!media || !src) {
+      if (media) {
+        try {
+          media.pause();
+          media.removeAttribute("src");
+          media.load();
+        } catch {}
+      }
       setState({ ready: false, duration: 0, buffered: 0, loading: false, error: null });
       return;
     }
 
-    setState((prev) => ({ ...prev, ready: false, loading: true, error: null }));
+    try {
+      media.pause();
+      media.currentTime = 0;
+      if (media.src !== src) {
+        media.src = src;
+      }
+      media.load();
+    } catch {}
+
+    setState({ ready: false, duration: 0, buffered: 0, loading: true, error: null });
     media.preservesPitch = true;
 
     function onLoadedMetadata() {

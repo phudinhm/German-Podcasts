@@ -19,10 +19,22 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   let audioUrl: string;
   let sourceLang: SpokenLang | undefined;
+  let title: string | undefined;
+  let description: string | undefined;
+  let durationSec: number | null | undefined;
   try {
-    const body = (await request.json()) as { audioUrl?: string; sourceLang?: string };
+    const body = (await request.json()) as {
+      audioUrl?: string;
+      sourceLang?: string;
+      title?: string;
+      description?: string;
+      durationSec?: number | null;
+    };
     audioUrl = (body.audioUrl ?? "").trim();
     sourceLang = body.sourceLang === "de" || body.sourceLang === "en" ? body.sourceLang : undefined;
+    title = body.title;
+    description = body.description;
+    durationSec = body.durationSec;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -45,9 +57,11 @@ export async function POST(request: Request) {
     );
   }
 
+  const meta = { title, description, durationSec };
+
   let stream: AsyncGenerator<TranscriptSegment[], void, unknown>;
   try {
-    stream = transcribeAudioStream(parsed, sourceLang, request.signal);
+    stream = transcribeAudioStream(parsed, sourceLang, request.signal, meta);
   } catch (err) {
     const error = err as Error;
     const status = error.message === "too-large" ? 413 : 502;

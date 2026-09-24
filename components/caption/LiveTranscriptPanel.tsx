@@ -58,6 +58,7 @@ export function LiveTranscriptPanel({
   const { t, lang } = useUi();
   const {
     track,
+    duration,
     onGenerateTranscript,
     generatingTranscript,
     generateTranscriptError,
@@ -422,11 +423,25 @@ export function LiveTranscriptPanel({
     );
   }
 
+  const episodeDuration = duration > 0 ? duration : (track?.durationSec ?? 0);
+  const episodePct =
+    episodeDuration > 0
+      ? Math.max(0, Math.min(100, (currentTime / episodeDuration) * 100))
+      : 0;
+
   return (
     <section 
       className={`card mt-4 flex flex-col overflow-hidden bg-[var(--paper-raised)] border border-[var(--rule)] shadow-2xl rounded-2xl`} 
       style={captionThemeStyle(settings.captionTheme)}
     >
+      {/* Top colored line representing overall podcast listening progress */}
+      <div className="pointer-events-none relative z-20 h-[3px] w-full shrink-0 bg-[var(--rule)]/50 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 transition-all duration-300"
+          style={{ width: `${episodePct}%` }}
+        />
+      </div>
+
       <div className="border-b border-[var(--rule)] p-3.5 bg-[var(--surface)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -774,6 +789,14 @@ export function LiveTranscriptPanel({
           </button>
         </div>
       )}
+
+      {/* Bottom colored line representing overall podcast listening progress */}
+      <div className="pointer-events-none relative z-20 h-[3px] w-full shrink-0 bg-[var(--rule)]/50 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 transition-all duration-300"
+          style={{ width: `${episodePct}%` }}
+        />
+      </div>
 
       <VocabularyModal
         open={vocabModalOpen}

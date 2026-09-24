@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { useUi } from "@/lib/i18n";
 import { resolveTranslationLang } from "@/lib/language";
 import { listVocabulary } from "@/lib/vocabulary";
-import { usePlayer } from "./PlayerProvider";
+import { usePlayer, useVideoStage } from "./PlayerProvider";
 import { Art } from "../listen/Art";
 import { TranscriptReader } from "./TranscriptReader";
 import { VocabularyModal } from "../caption/VocabularyModal";
@@ -183,7 +183,10 @@ export function FullscreenPlayer() {
     setFullscreenOpen,
     transcriptOffsetSec,
     setTranscriptOffsetSec,
+    isVideoTrack,
+    waitingForTranscript,
   } = usePlayer();
+  const videoStageRef = useVideoStage(Boolean(fullscreenOpen && isVideoTrack));
   const { t } = useUi();
   const [currentTime, setCurrentTime] = useState(0);
   const [settings, setSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
@@ -473,8 +476,18 @@ export function FullscreenPlayer() {
           </div>
         ) : null}
 
-        {/* Optional expanded header artwork when not docked */}
-        {!docked ? (
+        {/* YouTube-style Top Center Video Player when playing a video podcast */}
+        {isVideoTrack ? (
+          <div className="mt-1 mb-2 flex flex-col items-center shrink-0">
+            <div
+              ref={videoStageRef}
+              className="mx-auto w-full max-w-xl aspect-video max-h-[28vh] sm:max-h-[34vh] rounded-2xl overflow-hidden bg-black border border-white/20 shadow-2xl"
+            />
+            <p className="mt-1.5 max-w-xl truncate text-center text-xs font-semibold text-[var(--ink-soft)]">
+              {track.title}
+            </p>
+          </div>
+        ) : !docked ? (
           <div className="mt-1 mb-1 flex shrink-0 items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 backdrop-blur-md">
             <Art src={track.artwork} alt="" size={52} seed={track.showTitle || track.title} />
             <div className="min-w-0 flex-1">
@@ -496,7 +509,15 @@ export function FullscreenPlayer() {
           </div>
         ) : null}
 
-        {/* Main Transcript Reader */}
+        {/* Status Banner while waiting for transcript to complete before playing */}
+        {waitingForTranscript && (
+          <div className="mb-1.5 flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-400/35 bg-amber-400/15 px-3 py-1.5 text-xs font-semibold text-amber-200">
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" />
+            <span>Đang tạo transcript — Sẽ tự động phát ngay khi hoàn thành...</span>
+          </div>
+        )}
+
+        {/* Main Transcript Reader (Directly below Top-Center Video, just like YouTube) */}
         <div className="mt-1 min-h-0 flex-1">
           <TranscriptReader
             currentTime={currentTime}

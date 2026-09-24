@@ -286,7 +286,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
               <button
                 type="button"
                 className="group relative flex h-full w-full flex-col justify-between rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-3.5 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/50 hover:shadow-md active:scale-[0.99]"
-                onClick={() => onPick(item.query)}
+                onClick={() => onPick(item.feedUrl ?? item.query)}
               >
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-1.5">

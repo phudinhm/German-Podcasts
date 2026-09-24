@@ -25,7 +25,7 @@ import {
   type RecentSource,
   type FavoriteEpisode,
 } from "@/lib/library";
-import { usePlayer, type Track } from "./player/PlayerProvider";
+import { usePlayer, useVideoStage, type Track } from "./player/PlayerProvider";
 import { Transport } from "./player/Transport";
 import { StreamControls } from "./StreamControls";
 import { DiscoverPanel } from "./listen/DiscoverPanel";
@@ -379,7 +379,22 @@ export function ListenClient() {
           return next;
         });
 
-        if (found.length === 1 && found[0].feedUrl) openShow(found[0]);
+        if (found.length === 1 && found[0].feedUrl) {
+          openShow(found[0]);
+        } else if (found.length > 1) {
+          const normTerm = term.trim().toLowerCase();
+          const exactMatch =
+            found.find((r) => r.feedUrl && r.title.trim().toLowerCase() === normTerm) ??
+            found.find(
+              (r) =>
+                r.feedUrl &&
+                normTerm.includes(r.title.trim().toLowerCase()) &&
+                r.title.trim().length >= 4
+            );
+          if (exactMatch) {
+            openShow(exactMatch);
+          }
+        }
       } catch {
         setError(t("listen.searchFailed"));
       } finally {
@@ -391,16 +406,24 @@ export function ListenClient() {
 
   // ---- playing -----------------------------------------------------------
 
+  const inlineVideoStageRef = useVideoStage(
+    Boolean(playing && player.isVideoTrack && !player.fullscreenOpen)
+  );
+
   const playEpisode = useCallback(
     (episode: FeedEpisode, from?: number) => {
-      const id = episode.guid || episode.url;
+      const showPrefix = show?.feedUrl || feed?.title || show?.title || "show";
+      const id = `${showPrefix}::${episode.guid || episode.url}::${episode.url}`;
+      const isVideoUrl =
+        episode.type.startsWith("video/") ||
+        /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(episode.url || "");
       const track: Track = {
         id,
         title: episode.title,
         showTitle: feed?.title ?? show?.title ?? "",
         artwork: episode.image ?? show?.artwork ?? feed?.image ?? null,
         description: episode.description,
-        kind: episode.type.startsWith("video/") ? "video" : "audio",
+        kind: isVideoUrl ? "video" : "audio",
         url: episode.url || undefined,
         pageUrl: episode.pageUrl,
         durationSec: episode.durationSec,
@@ -409,6 +432,7 @@ export function ListenClient() {
         transcripts: episode.transcripts,
         sourceLang: detectSpokenLang(feed?.language, `${episode.title} ${episode.description}`),
       };
+      setShowTranscript(true);
       player.play(track);
       noteplayed({
         id,
@@ -678,13 +702,32 @@ export function ListenClient() {
           }`}
         >
           <div className="p-4">
+            {/* YouTube-style Top Center Video Stage when playing a video podcast */}
+            {player.isVideoTrack && (
+              <div className="mx-auto mb-4 w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--rule)] bg-black shadow-2xl aspect-video">
+                <div ref={inlineVideoStageRef} className="h-full w-full" />
+              </div>
+            )}
+
+            {/* Status Banner when waiting for transcript completion before playing */}
+            {player.waitingForTranscript && (
+              <div className="mb-3 flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-xs font-semibold text-amber-600 dark:text-amber-300">
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                <span>Đang tạo transcript — Sẽ tự động phát ngay khi hoàn thành...</span>
+              </div>
+            )}
+
             <div className="flex items-start gap-3">
-              <span className="hidden sm:block">
-                <Art src={playing.artwork} alt="" size={88} seed={playing.showTitle || playing.title} />
-              </span>
-              <span className="sm:hidden">
-                <Art src={playing.artwork} alt="" size={56} seed={playing.showTitle || playing.title} />
-              </span>
+              {!player.isVideoTrack && (
+                <>
+                  <span className="hidden sm:block">
+                    <Art src={playing.artwork} alt="" size={88} seed={playing.showTitle || playing.title} />
+                  </span>
+                  <span className="sm:hidden">
+                    <Art src={playing.artwork} alt="" size={56} seed={playing.showTitle || playing.title} />
+                  </span>
+                </>
+              )}
               <div className="min-w-0 flex-1">
                 <h2 className="line-clamp-3 text-[16px] font-semibold leading-snug">{playing.title}</h2>
                 <p className="mt-0.5 truncate text-[12.5px] text-[var(--ink-faint)]">

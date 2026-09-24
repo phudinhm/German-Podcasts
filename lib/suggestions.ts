@@ -27,11 +27,14 @@ export interface Suggestion {
   topics: string[];
   /** Watchable rather than only listenable, so the video filter can find it. */
   video?: boolean;
+  /** Verified direct RSS feed URL so clicking the card opens the exact show without search ambiguity. */
+  feedUrl?: string;
 }
 
 export const SUGGESTIONS: Suggestion[] = [
   {
-    query: "Easy German Learn German with native speakers",
+    query: "https://feeds.transistor.fm/easy-german-podcast",
+    feedUrl: "https://feeds.transistor.fm/easy-german-podcast",
     label: "Easy German",
     publisher: "Easy Languages",
     lang: "de",
@@ -40,7 +43,8 @@ export const SUGGESTIONS: Suggestion[] = [
     topics: ["Easy German", "German Learning", "Society"],
   },
   {
-    query: "Slow German Annik Rubens",
+    query: "https://slowgerman.com/feed/podcast/",
+    feedUrl: "https://slowgerman.com/feed/podcast/",
     label: "Slow German",
     publisher: "Annik Rubens",
     lang: "de",
@@ -58,7 +62,8 @@ export const SUGGESTIONS: Suggestion[] = [
     topics: ["Easy German", "German Learning"],
   },
   {
-    query: "Top-Thema mit Vokabeln Deutsche Welle",
+    query: "https://rss.dw.com/xml/DKpodcast_topthema_de",
+    feedUrl: "https://rss.dw.com/xml/DKpodcast_topthema_de",
     label: "Top-Thema mit Vokabeln (DW)",
     publisher: "Deutsche Welle",
     lang: "de",
@@ -67,7 +72,8 @@ export const SUGGESTIONS: Suggestion[] = [
     topics: ["Easy German", "German Learning", "News"],
   },
   {
-    query: "Nicos Weg Deutschkurs A1 DW",
+    query: "https://rss.dw.com/xml/rss_de_nicos-weg-video-a1",
+    feedUrl: "https://rss.dw.com/xml/rss_de_nicos-weg-video-a1",
     label: "DW Nicos Weg (A1)",
     publisher: "Deutsche Welle",
     lang: "de",
@@ -77,7 +83,8 @@ export const SUGGESTIONS: Suggestion[] = [
     video: true,
   },
   {
-    query: "Nicos Weg Deutschkurs A2 DW",
+    query: "https://rss.dw.com/xml/rss_de_nicos-weg-video-a2",
+    feedUrl: "https://rss.dw.com/xml/rss_de_nicos-weg-video-a2",
     label: "DW Nicos Weg (A2)",
     publisher: "Deutsche Welle",
     lang: "de",
@@ -87,7 +94,8 @@ export const SUGGESTIONS: Suggestion[] = [
     video: true,
   },
   {
-    query: "Nicos Weg Deutschkurs B1 DW",
+    query: "https://rss.dw.com/xml/rss_de_nicos-weg-video-b1",
+    feedUrl: "https://rss.dw.com/xml/rss_de_nicos-weg-video-b1",
     label: "DW Nicos Weg (B1)",
     publisher: "Deutsche Welle",
     lang: "de",
@@ -97,7 +105,8 @@ export const SUGGESTIONS: Suggestion[] = [
     video: true,
   },
   {
-    query: "Coffee Break German",
+    query: "https://feeds.acast.com/public/shows/coffee-break-german",
+    feedUrl: "https://feeds.acast.com/public/shows/coffee-break-german",
     label: "Coffee Break German",
     publisher: "Coffee Break Languages",
     lang: "de",

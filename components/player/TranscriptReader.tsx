@@ -266,97 +266,86 @@ export function TranscriptReader({
     );
   }
 
+  const episodeDuration = duration > 0 ? duration : (track?.durationSec ?? 0);
   const episodePct =
-    duration > 0 ? Math.max(0, Math.min(100, Math.round((currentTime / duration) * 100))) : 0;
+    episodeDuration > 0
+      ? Math.max(0, Math.min(100, (currentTime / episodeDuration) * 100))
+      : 0;
 
   return (
-    <div
-      ref={scrollContainerRef}
-      onScroll={handleReaderScroll}
-      onWheel={noteUserManualScroll}
-      onTouchMove={noteUserManualScroll}
-      className={`relative h-full overflow-y-auto px-3 sm:px-8 transition-colors duration-500 rounded-2xl ${
-        !isModern ? "bg-[var(--surface)]" : ""
-      }`}
-      style={{ ...captionThemeStyle(theme), scrollbarWidth: "none" }}
-    >
-      {/* Subtle sticky top progress strip for the whole reader */}
-      <div className="sticky top-0 z-20 mx-auto max-w-xl pt-1 pb-1.5 pointer-events-none">
-        <div className="flex items-center justify-between gap-2 rounded-full bg-black/30 px-3 py-1 backdrop-blur-md border border-white/10 text-[10.5px] text-white/60">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-            <span>Bấm vào từ bất kỳ để dịch & lưu từ vựng</span>
-          </span>
-          <span className="font-mono tabular-nums text-amber-300/90">
-            {formatSegTime(currentTime)}
-            {duration > 0 ? ` / ${formatSegTime(duration)} (${episodePct}%)` : ""}
-          </span>
-        </div>
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10">
+      {/* Top colored line representing overall podcast listening progress */}
+      <div className="pointer-events-none relative z-30 h-[3px] w-full shrink-0 bg-white/10 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 transition-all duration-300"
+          style={{ width: `${episodePct}%` }}
+        />
       </div>
 
-      <div className="mx-auto max-w-xl py-[22vh] space-y-2.5">
-        {segments.map((seg, idx) => {
-          const isActive = seg.id === activeSegmentId;
-          const showForSeg = showTranslation;
-          const translation = showForSeg ? translationFor(seg, translationLang) : null;
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleReaderScroll}
+        onWheel={noteUserManualScroll}
+        onTouchMove={noteUserManualScroll}
+        className={`relative flex-1 overflow-y-auto px-3 sm:px-8 transition-colors duration-500 ${
+          !isModern ? "bg-[var(--surface)]" : ""
+        }`}
+        style={{ ...captionThemeStyle(theme), scrollbarWidth: "none" }}
+      >
+        {/* Subtle sticky top header with overall podcast time & percentage */}
+        <div className="sticky top-0 z-20 mx-auto max-w-xl pt-1.5 pb-1.5 pointer-events-none">
+          <div className="flex items-center justify-between gap-2 rounded-full bg-black/35 px-3 py-1 backdrop-blur-md border border-white/10 text-[10.5px] text-white/65">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span>Bấm vào từ bất kỳ để dịch & lưu từ vựng</span>
+            </span>
+            <span className="font-mono tabular-nums text-amber-300/95">
+              {formatSegTime(currentTime)}
+              {episodeDuration > 0
+                ? ` / ${formatSegTime(episodeDuration)} (${Math.round(episodePct)}%)`
+                : ""}
+            </span>
+          </div>
+        </div>
 
-          const segDuration = Math.max(0.6, seg.end - seg.start);
-          const segProgress = isActive
-            ? Math.max(0, Math.min(100, ((contentTime - seg.start) / segDuration) * 100))
-            : contentTime > seg.end
-              ? 100
-              : 0;
+        <div className="mx-auto max-w-xl py-[16vh] space-y-2.5">
+          {segments.map((seg, idx) => {
+            const isActive = seg.id === activeSegmentId;
+            const showForSeg = showTranslation;
+            const translation = showForSeg ? translationFor(seg, translationLang) : null;
 
-          const isWordPopoverOpenHere = selectedWord?.segId === seg.id;
+            const isWordPopoverOpenHere = selectedWord?.segId === seg.id;
 
-          return (
-            <div
-              key={seg.id}
-              ref={isActive ? activeRef : null}
-              onClick={() => onSeek(Math.max(0, seg.start - 0.2 + transcriptOffsetSec))}
-              className={`group relative overflow-hidden cursor-pointer rounded-2xl px-4 py-3.5 transition-all duration-300 text-center ${
-                isActive
-                  ? isModern
-                    ? "bg-white/[0.13] shadow-xl ring-1 ring-amber-300/35 backdrop-blur-md scale-[1.015]"
-                    : "bg-[var(--paper-raised)] shadow-md ring-1 ring-[var(--accent)]/40 scale-[1.015]"
-                  : "opacity-50 hover:opacity-90 hover:bg-white/[0.06]"
-              }`}
-            >
-              {/* Subtle ambient horizontal progress fill inside the active sentence card */}
-              {isActive && (
-                <>
-                  <div
-                    className="pointer-events-none absolute inset-y-0 left-0 bg-gradient-to-r from-amber-400/[0.14] via-amber-300/[0.07] to-transparent transition-all duration-150"
-                    style={{ width: `${segProgress}%` }}
-                  />
-                  <div className="pointer-events-none absolute inset-x-3 bottom-0 h-[2.5px] overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-300 to-amber-200 transition-all duration-150"
-                      style={{ width: `${segProgress}%` }}
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Subtle timestamp & progress badge inside the active card (or on hover) */}
+            return (
               <div
-                className={`mb-1.5 flex items-center justify-between text-[10.5px] font-mono transition-opacity ${
-                  isActive ? "opacity-90" : "opacity-0 group-hover:opacity-65"
+                key={seg.id}
+                ref={isActive ? activeRef : null}
+                onClick={() => onSeek(Math.max(0, seg.start - 0.2 + transcriptOffsetSec))}
+                className={`group relative overflow-hidden cursor-pointer rounded-2xl px-4 py-3.5 transition-all duration-300 text-center ${
+                  isActive
+                    ? isModern
+                      ? "bg-white/[0.13] shadow-xl ring-1 ring-amber-300/35 backdrop-blur-md scale-[1.015]"
+                      : "bg-[var(--paper-raised)] shadow-md ring-1 ring-[var(--accent)]/40 scale-[1.015]"
+                    : "opacity-50 hover:opacity-90 hover:bg-white/[0.06]"
                 }`}
               >
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-amber-200">
-                  <span>{isActive ? "●" : "▶"}</span>
-                  <span>
-                    {formatSegTime(Math.max(0, seg.start + transcriptOffsetSec))} –{" "}
-                    {formatSegTime(Math.max(0, seg.end + transcriptOffsetSec))}
+                {/* Timestamp & index badge inside the active card (or on hover) */}
+                <div
+                  className={`mb-1.5 flex items-center justify-between text-[10.5px] font-mono transition-opacity ${
+                    isActive ? "opacity-90" : "opacity-0 group-hover:opacity-65"
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-amber-200">
+                    <span>{isActive ? "●" : "▶"}</span>
+                    <span>
+                      {formatSegTime(Math.max(0, seg.start + transcriptOffsetSec))} –{" "}
+                      {formatSegTime(Math.max(0, seg.end + transcriptOffsetSec))}
+                    </span>
                   </span>
-                </span>
-                <span className="text-white/55">
-                  {isActive
-                    ? `${Math.round(segProgress)}% câu · #${idx + 1}/${segments.length}`
-                    : `#${idx + 1}`}
-                </span>
-              </div>
+                  <span className="text-white/55">
+                    {isActive ? `#${idx + 1}/${segments.length}` : `#${idx + 1}`}
+                  </span>
+                </div>
 
               {/* Tokenized German words so each word can be clicked to translate & save */}
               <p
@@ -484,6 +473,15 @@ export function TranscriptReader({
             </div>
           );
         })}
+        </div>
+      </div>
+
+      {/* Bottom colored line representing overall podcast listening progress */}
+      <div className="pointer-events-none relative z-30 h-[3px] w-full shrink-0 bg-white/10 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 transition-all duration-300"
+          style={{ width: `${episodePct}%` }}
+        />
       </div>
     </div>
   );

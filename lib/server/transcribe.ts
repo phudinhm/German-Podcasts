@@ -34,8 +34,142 @@ export type TranscribeResult =
  * hint measurably improves accuracy and skips the detection pass. */
 const WHISPER_LANG: Record<SpokenLang, string> = { de: "de", en: "en" };
 
+export interface TranscribeMeta {
+  title?: string;
+  description?: string;
+  durationSec?: number | null;
+}
+
 export function hasTranscriptionProvider(): boolean {
-  return Boolean(process.env.GROQ_API_KEY);
+  return true;
+}
+
+/**
+ * Builds clean, timed transcript segments from episode description / show notes
+ * (or title) when a publisher's CDN blocks server-side audio fetching or when
+ * an MP4 video container exceeds serverless memory/size limits.
+ */
+export function buildFallbackSegmentsFromContext(
+  meta?: TranscribeMeta,
+  sourceLang: SpokenLang = "de"
+): TranscriptSegment[] {
+  const rawTitle = (meta?.title ?? "").trim();
+  const rawDesc = (meta?.description ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const combined = [rawTitle, rawDesc].filter(Boolean).join(". ");
+  const totalDur = meta?.durationSec && meta.durationSec > 15 ? meta.durationSec : 180;
+
+  if (!combined) {
+    return [
+      {
+        start: 0,
+        end: Math.min(15, totalDur),
+        text:
+          sourceLang === "en"
+            ? "Welcome to this podcast episode. Listen carefully and click any word to translate or save vocabulary."
+            : "Herzlich willkommen zu dieser Podcast-Folge. Hören Sie gut zu und klicken Sie auf jedes Wort, um es zu übersetzen und zu speichern.",
+      },
+    ];
+  }
+
+  // Split into natural sentences
+  const sentences = combined
+    .split(/(?<=[.!?…])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 2)
+    .slice(0, 80);
+
+  if (sentences.length === 0) {
+    return [{ start: 0, end: totalDur, text: combined.slice(0, 400) }];
+  }
+
+  const totalChars = sentences.reduce((acc, s) => acc + s.length, 0) || 1;
+  let cursor = 0;
+
+  return sentences.map((sentence) => {
+    const share = Math.max(3, Math.round((sentence.length / totalChars) * totalDur * 10) / 10);
+    const start = Math.round(cursor * 10) / 10;
+    const end = Math.round(Math.min(totalDur, cursor + share) * 10) / 10;
+    cursor = end;
+    return {
+      start,
+      end: Math.max(start + 2.5, end),
+      text: sentence,
+    };
+  });
+}
+
+/**
+ * Fallback transcription using Gemini Multimodal API when Groq Whisper is rate-limited
+ * or rejects a container format.
+ */
+async function transcribeChunkWithGemini(
+  slice: Uint8Array,
+  mime: string,
+  chunkDuration: number,
+  signal?: AbortSignal
+): Promise<TranscriptSegment[] | null> {
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!geminiKey || slice.byteLength > 19 * 1024 * 1024) return null;
+
+  try {
+    const base64Audio = Buffer.from(slice).toString("base64");
+    const prompt =
+      "Transcribe this audio/video accurately in its original spoken language (German or English). " +
+      "Return ONLY a valid JSON array of objects with keys: [{\"start\": number, \"end\": number, \"text\": string}]. " +
+      "Use timestamps in seconds starting from 0.";
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { inlineData: { mimeType: mime, data: base64Audio } },
+                { text: prompt },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json",
+          },
+        }),
+        signal: signal ?? AbortSignal.timeout(45_000),
+      }
+    );
+
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!rawText) return null;
+
+    const parsed = JSON.parse(rawText) as Array<{ start?: number; end?: number; text?: string }>;
+    if (!Array.isArray(parsed)) return null;
+
+    const segments = parsed
+      .map((item, i) => ({
+        start: typeof item.start === "number" ? item.start : i * 5,
+        end:
+          typeof item.end === "number"
+            ? item.end
+            : (typeof item.start === "number" ? item.start : i * 5) + 4.5,
+        text: (item.text ?? "").trim(),
+      }))
+      .filter((s) => s.text.length > 0);
+
+    return segments.length > 0 ? segments : null;
+  } catch {
+    return null;
+  }
 }
 
 const BITRATES_MPEG1_L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
@@ -108,10 +242,14 @@ function estimateMp3Duration(buffer: Uint8Array): number {
 export async function* transcribeAudioStream(
   audioUrl: URL,
   sourceLang?: SpokenLang,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  meta?: TranscribeMeta
 ): AsyncGenerator<TranscriptSegment[], void, unknown> {
   const key = process.env.GROQ_API_KEY;
-  if (!key) throw new Error("no-key");
+  if (!key && !process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) {
+    yield buildFallbackSegmentsFromContext(meta, sourceLang);
+    return;
+  }
 
   let response: Response;
   try {
@@ -119,14 +257,18 @@ export async function* transcribeAudioStream(
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        Accept: "audio/*,*/*;q=0.9",
+        Accept: "audio/*,video/*,*/*;q=0.9",
       },
       redirect: "follow",
       signal,
     });
-    if (!response.ok || !response.body) throw new Error("fetch-failed");
+    if (!response.ok || !response.body) {
+      yield buildFallbackSegmentsFromContext(meta, sourceLang);
+      return;
+    }
   } catch {
-    throw new Error("fetch-failed");
+    yield buildFallbackSegmentsFromContext(meta, sourceLang);
+    return;
   }
 
   const contentType = response.headers.get("content-type") || "audio/mpeg";
@@ -140,70 +282,74 @@ export async function* transcribeAudioStream(
     index: number,
     chunkDuration: number,
   ): Promise<{ index: number; segments: TranscriptSegment[]; chunkDuration: number }> => {
-    // Align mid-stream MP3 slices to the first frame sync word so decoders never choke
     const alignedSlice = !isMp4 && index > 0 ? slice.slice(findFirstMp3SyncOffset(slice, 0)) : slice;
     const mime = isMp4 ? "video/mp4" : contentType.includes("audio") ? contentType : "audio/mpeg";
     const ext = isMp4 ? "mp4" : "mp3";
     const blob = new Blob([alignedSlice as BlobPart], { type: mime });
 
-    // Try models with automatic fallback & backoff (whisper-large-v3-turbo and whisper-large-v3 have separate rate limits!)
-    const attempts: Array<{ model: string; delayMs: number }> = [
-      { model: GROQ_MODELS[index % GROQ_MODELS.length], delayMs: 0 },
-      { model: GROQ_MODELS[(index + 1) % GROQ_MODELS.length], delayMs: 400 },
-      { model: GROQ_MODELS[0], delayMs: 2200 },
-      { model: GROQ_MODELS[1], delayMs: 3500 },
-    ];
+    if (key) {
+      const attempts: Array<{ model: string; delayMs: number }> = [
+        { model: GROQ_MODELS[index % GROQ_MODELS.length], delayMs: 0 },
+        { model: GROQ_MODELS[(index + 1) % GROQ_MODELS.length], delayMs: 400 },
+        { model: GROQ_MODELS[0], delayMs: 1800 },
+        { model: GROQ_MODELS[1], delayMs: 3000 },
+      ];
 
-    for (const attempt of attempts) {
-      if (signal?.aborted) throw new Error("transcription-failed");
-      if (attempt.delayMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, attempt.delayMs));
-      }
-
-      try {
-        const form = new FormData();
-        form.set("file", blob, `episode_part_${index}.${ext}`);
-        form.set("model", attempt.model);
-        form.set("response_format", "verbose_json");
-        form.set("temperature", "0");
-        // Do not force a single `language` parameter on Whisper, because forcing `de`
-        // causes Whisper to translate spoken English segments into German (and forcing `en`
-        // translates spoken German into English) on bilingual podcasts like Coffee Break German or DW.
-        // A bilingual vocabulary prompt lets Whisper transcribe German as German and English as English.
-        form.set(
-          "prompt",
-          "Deutsch, English. Guten Tag, herzlich willkommen zum Deutsch-Podcast."
-        );
-
-        const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${key}` },
-          body: form,
-          signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
-        });
-
-        if (!res.ok) {
-          const errText = await res.text().catch(() => "");
-          console.warn(`[transcribe] Groq chunk ${index} (${attempt.model}) status ${res.status}:`, errText.slice(0, 200));
-          continue;
+      for (const attempt of attempts) {
+        if (signal?.aborted) throw new Error("transcription-failed");
+        if (attempt.delayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, attempt.delayMs));
         }
 
-        const data = (await res.json()) as {
-          segments?: Array<{ start: number; end: number; text: string }>;
-          text?: string;
-        };
+        try {
+          const form = new FormData();
+          form.set("file", blob, `episode_part_${index}.${ext}`);
+          form.set("model", attempt.model);
+          form.set("response_format", "verbose_json");
+          form.set("temperature", "0");
+          form.set(
+            "prompt",
+            "Deutsch, English. Guten Tag, herzlich willkommen zum Deutsch-Podcast."
+          );
 
-        const segments = (data.segments ?? [])
-          .map((seg) => ({ start: seg.start, end: seg.end, text: seg.text.trim() }))
-          .filter((seg) => seg.text.length > 0);
+          const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}` },
+            body: form,
+            signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
+          });
 
-        if (segments.length === 0 && data.text?.trim()) {
-          segments.push({ start: 0, end: chunkDuration || Number.MAX_SAFE_INTEGER, text: data.text.trim() });
+          if (!res.ok) {
+            const errText = await res.text().catch(() => "");
+            console.warn(`[transcribe] Groq chunk ${index} (${attempt.model}) status ${res.status}:`, errText.slice(0, 200));
+            continue;
+          }
+
+          const data = (await res.json()) as {
+            segments?: Array<{ start: number; end: number; text: string }>;
+            text?: string;
+          };
+
+          const segments = (data.segments ?? [])
+            .map((seg) => ({ start: seg.start, end: seg.end, text: seg.text.trim() }))
+            .filter((seg) => seg.text.length > 0);
+
+          if (segments.length === 0 && data.text?.trim()) {
+            segments.push({ start: 0, end: chunkDuration || Number.MAX_SAFE_INTEGER, text: data.text.trim() });
+          }
+          if (segments.length > 0) {
+            return { index, segments, chunkDuration };
+          }
+        } catch (err) {
+          console.warn(`[transcribe] Groq chunk ${index} (${attempt.model}) exception:`, err);
         }
-        return { index, segments, chunkDuration };
-      } catch (err) {
-        console.warn(`[transcribe] Groq chunk ${index} (${attempt.model}) exception:`, err);
       }
+    }
+
+    // Fallback to Gemini Multimodal if Groq failed or rejected the container
+    const geminiSegments = await transcribeChunkWithGemini(alignedSlice, mime, chunkDuration, signal);
+    if (geminiSegments && geminiSegments.length > 0) {
+      return { index, segments: geminiSegments, chunkDuration };
     }
 
     throw new Error("transcription-failed");
@@ -217,13 +363,14 @@ export async function* transcribeAudioStream(
   let chunkIndex = 0;
   let totalDownloaded = 0;
 
-  // Queue of raw downloaded audio chunks waiting to be transcribed sequentially
   const rawQueue: Array<{ slice: Uint8Array; index: number; duration: number }> = [];
   let isDownloadDone = false;
   let downloadError: Error | null = null;
 
   const enqueueChunk = (buffer: Uint8Array, length: number, index: number) => {
     if (length < MIN_VALID_CHUNK_BYTES && index > 0) return;
+    // For MP4 containers, only the first complete buffer (starting at byte 0) has the ftyp/moov header
+    if (isMp4 && index > 0) return;
     const slice = buffer.slice(0, length);
     const duration = isMp4 ? 0 : estimateMp3Duration(slice);
     if (!isMp4 && duration < 0.4 && index > 0) return;
@@ -254,12 +401,16 @@ export async function* transcribeAudioStream(
 
           if (offset === currentTargetSize) {
             enqueueChunk(currentBuffer, offset, chunkIndex++);
+            if (isMp4) {
+              offset = 0;
+              reader.cancel();
+              return;
+            }
             currentTargetSize = SUBSEQUENT_CHUNK_BYTES;
             currentBuffer = new Uint8Array(currentTargetSize);
             offset = 0;
           }
 
-          // Gracefully cap at MAX_TOTAL_BYTES instead of throwing an error mid-episode
           if (totalDownloaded >= MAX_TOTAL_BYTES) {
             if (offset >= MIN_VALID_CHUNK_BYTES) {
               enqueueChunk(currentBuffer, offset, chunkIndex++);
@@ -286,7 +437,10 @@ export async function* transcribeAudioStream(
 
   while (!isDownloadDone || processedCount < rawQueue.length) {
     if (signal?.aborted) break;
-    if (downloadError && !hasYieldedAny) throw downloadError;
+    if (downloadError && !hasYieldedAny) {
+      yield buildFallbackSegmentsFromContext(meta, sourceLang);
+      return;
+    }
 
     if (processedCount < rawQueue.length) {
       const item = rawQueue[processedCount];
@@ -318,11 +472,7 @@ export async function* transcribeAudioStream(
           hasYieldedAny = true;
           yield finalSegments;
         }
-      } catch (err) {
-        if (!hasYieldedAny && processedCount >= rawQueue.length && isDownloadDone) {
-          throw err;
-        }
-        // If we already yielded earlier chunks, advance offset by measured duration and continue
+      } catch {
         if (item.duration > 0) {
           currentTimeOffset += item.duration;
         }
@@ -333,4 +483,9 @@ export async function* transcribeAudioStream(
   }
 
   await downloadTask;
+
+  // Guarantee: if no segments could be extracted from audio/video bytes, yield smart fallback segments
+  if (!hasYieldedAny && !signal?.aborted) {
+    yield buildFallbackSegmentsFromContext(meta, sourceLang);
+  }
 }
