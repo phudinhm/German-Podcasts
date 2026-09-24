@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useUi } from "@/lib/i18n";
 import {
   ALL_SUGGESTIONS,
@@ -32,6 +32,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
   const [lang, setLang] = useState<SourceLang | "">("");
   const [topic, setTopic] = useState("");
   const [level, setLevel] = useState<Cefr | "">("");
+  const [catalogSort, setCatalogSort] = useState<"popular" | "az" | "level">("popular");
   const [allTopics, setAllTopics] = useState(false);
   const [charts, setCharts] = useState<ChartEntry[] | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
@@ -63,6 +64,23 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
   // German shows are in view at all.
   const levelsApply = lang !== "en" && pool.some((item) => item.cefr);
   const filtered = byLevel(byTopic(pool, topic), levelsApply ? level : "");
+
+  const sortedCatalog = useMemo(() => {
+    const list = [...filtered];
+    if (catalogSort === "az") {
+      return list.sort((a, b) => a.label.localeCompare(b.label, "de", { sensitivity: "base" }));
+    }
+    if (catalogSort === "level") {
+      const CEFR_ORDER: Record<string, number> = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
+      return list.sort((a, b) => {
+        const orderA = a.cefr ? (CEFR_ORDER[a.cefr] ?? 99) : 99;
+        const orderB = b.cefr ? (CEFR_ORDER[b.cefr] ?? 99) : 99;
+        return orderA - orderB || a.label.localeCompare(b.label, "de");
+      });
+    }
+    // "popular" (default: most listened): keeps natural curated popularity ranking
+    return list;
+  }, [filtered, catalogSort]);
 
   return (
     <div className="mt-7 space-y-7">
@@ -119,25 +137,69 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
             <span className="text-[12px] text-[var(--ink-faint)]">
               {filtered.length} {filtered.length === 1 ? "show" : "shows"}
             </span>
-            <div className="flex overflow-hidden rounded-full border border-[var(--rule)] sm:ml-auto">
-              {([" ", "de", "en"] as const).map((option) => {
-                const value = option.trim() as SourceLang | "";
-                return (
+            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+              <div className="flex overflow-hidden rounded-full border border-[var(--rule)]">
+                {([" ", "de", "en"] as const).map((option) => {
+                  const value = option.trim() as SourceLang | "";
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      data-active={lang === value}
+                      onClick={() => {
+                        setLang(value);
+                        setTopic("");
+                        if (value === "en") setLevel("");
+                      }}
+                      className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-1 text-[12px] last:border-r-0"
+                    >
+                      {value === "" ? t("common.all") : value === "de" ? "Deutsch" : "English"}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Sort pills: Most listened (default) vs A-Z */}
+              <div className="flex overflow-hidden rounded-full border border-[var(--rule)] bg-[var(--surface)] p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setCatalogSort("popular")}
+                  className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
+                    catalogSort === "popular"
+                      ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
+                      : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                  }`}
+                  title={t("sort.mostListened")}
+                >
+                  🔥 {t("sort.mostListened")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCatalogSort("az")}
+                  className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
+                    catalogSort === "az"
+                      ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
+                      : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                  }`}
+                  title={t("sort.az")}
+                >
+                  🔤 {t("sort.az")}
+                </button>
+                {levelsApply && (
                   <button
-                    key={option}
                     type="button"
-                    data-active={lang === value}
-                    onClick={() => {
-                      setLang(value);
-                      setTopic("");
-                      if (value === "en") setLevel("");
-                    }}
-                    className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-1 text-[12px] last:border-r-0"
+                    onClick={() => setCatalogSort("level")}
+                    className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
+                      catalogSort === "level"
+                        ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
+                        : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                    }`}
+                    title={t("sort.level")}
                   >
-                    {value === "" ? t("common.all") : value === "de" ? "Deutsch" : "English"}
+                    📊 {t("sort.level")}
                   </button>
-                );
-              })}
+                )}
+              </div>
             </div>
           </div>
 
@@ -219,7 +281,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
         </div>
 
         <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((item: Suggestion) => (
+          {sortedCatalog.map((item: Suggestion) => (
             <li key={`${item.label}|${item.lang}`} className="min-w-0">
               <button
                 type="button"

@@ -1,9 +1,9 @@
 import type { FeedEpisode } from "./server/feed";
 import type { RecentEpisode } from "./library";
 
-export type SortKey = "newest" | "oldest" | "longest" | "shortest" | "unplayed";
+export type SortKey = "newest" | "oldest" | "longest" | "shortest" | "unplayed" | "titleAsc";
 
-export const SORT_KEYS: SortKey[] = ["newest", "oldest", "longest", "shortest", "unplayed"];
+export const SORT_KEYS: SortKey[] = ["newest", "oldest", "longest", "shortest", "unplayed", "titleAsc"];
 
 function published(episode: FeedEpisode): number {
   if (!episode.publishedAt) return 0;
@@ -34,6 +34,8 @@ export function sortEpisodes(
 
   list.sort((a, b) => {
     switch (key) {
+      case "titleAsc":
+        return a.episode.title.localeCompare(b.episode.title, undefined, { sensitivity: "base" }) || stable(a, b);
       case "oldest":
         return published(a.episode) - published(b.episode) || stable(a, b);
       case "longest":

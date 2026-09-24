@@ -114,6 +114,15 @@ export function ListenClient() {
   const [currentTime, setCurrentTime] = useState(0);
   const [freezePane, setFreezePane] = useState(false);
   const [scrolledDown, setScrolledDown] = useState(false);
+  const [resultsSort, setResultsSort] = useState<"popular" | "az">("popular");
+
+  const sortedResults = useMemo(() => {
+    if (!results) return null;
+    if (resultsSort === "az") {
+      return [...results].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+    }
+    return results; // Default: most listened / relevant
+  }, [results, resultsSort]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -913,12 +922,42 @@ export function ListenClient() {
               <span aria-hidden>←</span>
               <span>{t("listen.backToBrowse")}</span>
             </button>
-            <h2 className="text-[13px] font-medium text-[var(--ink-soft)]">
-              {t("listen.results", { count: results.length })}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-[13px] font-medium text-[var(--ink-soft)]">
+                {t("listen.results", { count: results.length })}
+              </h2>
+              {results.length > 1 && (
+                <div className="flex overflow-hidden rounded-full border border-[var(--rule)] bg-[var(--surface)] p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setResultsSort("popular")}
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${
+                      resultsSort === "popular"
+                        ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
+                        : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                    }`}
+                    title={t("sort.mostListened")}
+                  >
+                    🔥 {t("sort.mostListened")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResultsSort("az")}
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${
+                      resultsSort === "az"
+                        ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
+                        : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                    }`}
+                    title={t("sort.az")}
+                  >
+                    🔤 {t("sort.az")}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <ul className="grid gap-1 sm:grid-cols-2">
-            {results.map((result) => (
+            {(sortedResults ?? results).map((result) => (
               <li key={result.id} className="min-w-0">
                 <button
                   type="button"

@@ -9,6 +9,7 @@ const LABELS: Record<SortKey, UiKey> = {
   longest: "sort.longest",
   shortest: "sort.shortest",
   unplayed: "sort.unplayed",
+  titleAsc: "sort.titleAsc",
 };
 
 export function EpisodeSort({
