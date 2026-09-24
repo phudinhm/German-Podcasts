@@ -68,9 +68,32 @@ export function FullscreenPlayer() {
   const [currentTime, setCurrentTime] = useState(0);
   const [settings, setSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
+  // settingsMounted keeps the panel in the DOM for one --dropdown-close-dur
+  // after closing so the t-dropdown close scale/fade can play. settingsEntered
+  // is delayed by one frame past mounting so a fresh open transitions from the
+  // pre-open state instead of appearing with .is-open already applied on its
+  // very first painted frame, which a CSS transition has nothing to animate from.
+  const [settingsMounted, setSettingsMounted] = useState(false);
+  const [settingsEntered, setSettingsEntered] = useState(false);
+  const settingsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [docked, setDocked] = useState(false);
   const [speed, setSpeed] = useState(1);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (showSettings) {
+      window.clearTimeout(settingsCloseTimerRef.current);
+      setSettingsMounted(true);
+      setSettingsEntered(false);
+      const raf = requestAnimationFrame(() => setSettingsEntered(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setSettingsEntered(false);
+    const closeDur =
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dropdown-close-dur")) || 150;
+    settingsCloseTimerRef.current = setTimeout(() => setSettingsMounted(false), closeDur);
+    return () => window.clearTimeout(settingsCloseTimerRef.current);
+  }, [showSettings]);
 
   const SPEEDS = [0.8, 1.0, 1.2, 1.5];
   const cycleSpeed = () => {
@@ -226,8 +249,14 @@ export function FullscreenPlayer() {
           </div>
         </div>
 
-        {showSettings ? (
-          <div className="absolute left-4 right-4 top-16 z-30 rounded-2xl bg-[var(--surface)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
+        {settingsMounted ? (
+          <div
+            data-origin="top-right"
+            aria-hidden={!showSettings}
+            className={`t-dropdown absolute left-4 right-4 top-16 z-30 rounded-2xl bg-[var(--surface)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl ${
+              settingsEntered ? "is-open" : showSettings ? "" : "is-closing"
+            }`}
+          >
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--rule)]">
               <span className="text-[13px] font-semibold text-[var(--ink)]">{t("common.settings")}</span>
               <button

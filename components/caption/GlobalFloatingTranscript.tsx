@@ -19,6 +19,13 @@ export function GlobalFloatingTranscript() {
   const { track, handle, showTranscript, setShowTranscript, transcriptCollapsed, setTranscriptCollapsed, inlineVisible } = usePlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const [settings, setSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
+  // Split from the raw visibility condition so closing can play the
+  // panel-reveal transition before the panel (and its live subscriptions)
+  // actually unmounts, instead of popping out the instant any of track /
+  // showTranscript / shouldFloat flips - which is every one of the ways
+  // this panel is meant to disappear, not just the close button.
+  const [mounted, setMounted] = useState(false);
+  const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -44,7 +51,22 @@ export function GlobalFloatingTranscript() {
   }, [handle]);
 
   const shouldFloat = pathname !== "/" || !inlineVisible;
-  if (!track || !showTranscript || !shouldFloat) return null;
+  const shouldShow = Boolean(track) && showTranscript && shouldFloat;
+
+  useEffect(() => {
+    if (shouldShow) {
+      setMounted(true);
+      const raf = requestAnimationFrame(() => setOpen(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setOpen(false);
+    const closeDur =
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--panel-close-dur")) || 350;
+    const timeout = setTimeout(() => setMounted(false), closeDur);
+    return () => clearTimeout(timeout);
+  }, [shouldShow]);
+
+  if (!mounted) return null;
 
   const onSeekWithPlay = (seconds: number) => {
     handle.seekTo(seconds, true);
@@ -56,7 +78,8 @@ export function GlobalFloatingTranscript() {
   return (
     <aside
       aria-label="Floating Transcript"
-      className="hidden sm:block fixed z-40 max-w-xl transition-all duration-300 pointer-events-auto sm:left-6 sm:w-[480px] max-sm:inset-x-3 drop-shadow-[0_12px_40px_rgba(0,0,0,0.15)]"
+      data-open={open ? "true" : "false"}
+      className="t-panel-slide hidden sm:block fixed z-40 max-w-xl sm:left-6 sm:w-[480px] max-sm:inset-x-3 drop-shadow-[0_12px_40px_rgba(0,0,0,0.15)]"
       style={{
         // Stacks neatly above the quick navigation pill on the left
         bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",

@@ -51,7 +51,31 @@ export function SettingsMenu() {
   const { theme, resolved, setTheme, accent, setAccent } = useTheme();
   const { zoom, zoomIn, zoomOut, resetZoom } = useZoom();
   const [open, setOpen] = useState(false);
+  // mounted keeps the menu in the DOM for one --dropdown-close-dur after
+  // closing so the t-dropdown close scale/fade can play. entered is delayed
+  // by one frame past mounting so a fresh open actually transitions from the
+  // pre-open (scaled down, transparent) state instead of the menu appearing
+  // with .is-open already applied on its very first painted frame, which a
+  // CSS transition has nothing to animate from.
+  const [mounted, setMounted] = useState(false);
+  const [entered, setEntered] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      window.clearTimeout(closeTimerRef.current);
+      setMounted(true);
+      setEntered(false);
+      const raf = requestAnimationFrame(() => setEntered(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setEntered(false);
+    const closeDur =
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dropdown-close-dur")) || 150;
+    closeTimerRef.current = setTimeout(() => setMounted(false), closeDur);
+    return () => window.clearTimeout(closeTimerRef.current);
+  }, [open]);
 
   // A menu that only closes by pressing its own button is a menu people leave
   // open by accident and then tap through.
@@ -90,8 +114,15 @@ export function SettingsMenu() {
         <span className="hidden sm:inline">{lang.toUpperCase()}</span>
       </button>
 
-      {open ? (
-        <div role="menu" className="card absolute right-0 z-50 mt-2 w-[210px] overflow-hidden p-2 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-2xl">
+      {mounted ? (
+        <div
+          role="menu"
+          data-origin="top-right"
+          aria-hidden={!open}
+          className={`t-dropdown card absolute right-0 z-50 mt-2 w-[210px] overflow-hidden p-2 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-2xl ${
+            entered ? "is-open" : open ? "" : "is-closing"
+          }`}
+        >
           <p className="px-2 pb-1 pt-1 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-faint)]">
             {t("theme.title")}
           </p>
