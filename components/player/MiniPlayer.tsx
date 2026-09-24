@@ -190,17 +190,13 @@ export function MiniPlayer() {
 
   const mobileTabBar = (
     <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-[var(--paper-raised)]/95 backdrop-blur-2xl border-t border-[var(--rule)] pb-[env(safe-area-inset-bottom,14px)] pt-1.5 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
-      <Link href="/" className={`flex flex-col items-center gap-0.5 w-16 transition-colors ${pathname === "/" ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
+      <Link href="/" className={`flex flex-col items-center gap-0.5 w-20 transition-colors ${pathname === "/" ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
         <span className="text-[22px] leading-none">🎧</span>
         <span className="text-[10px] font-medium">{t("nav.listenTab")}</span>
       </Link>
-      <Link href="/library" className={`flex flex-col items-center gap-0.5 w-16 transition-colors ${pathname.startsWith("/library") ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
+      <Link href="/library" className={`flex flex-col items-center gap-0.5 w-20 transition-colors ${pathname.startsWith("/library") ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
         <span className="text-[22px] leading-none">📚</span>
         <span className="text-[10px] font-medium">{t("nav.libraryTab")}</span>
-      </Link>
-      <Link href="/about" className={`flex flex-col items-center gap-0.5 w-16 transition-colors ${pathname.startsWith("/about") ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
-        <span className="text-[22px] leading-none">ℹ️</span>
-        <span className="text-[10px] font-medium">{t("nav.aboutTab")}</span>
       </Link>
     </div>
   );

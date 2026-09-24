@@ -234,20 +234,6 @@ export function SettingsMenu() {
               </button>
             ) : null}
           </div>
-
-          <div className="mt-1 border-t border-[var(--rule)] pt-1 sm:hidden">
-            <Link
-              href="/about"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] hover:bg-[var(--surface)]"
-            >
-              <span aria-hidden className="w-3.5 text-center text-[var(--ink-faint)]">
-                ?
-              </span>
-              {t("nav.about")}
-            </Link>
-          </div>
         </div>
       ) : null}
 
