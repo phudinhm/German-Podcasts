@@ -125,6 +125,7 @@ export function ListenClient() {
   const playing = player.track;
   const playerRef = useRef<HTMLDivElement | null>(null);
   const openedFeedRef = useRef<string | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setCaptionSettings(loadCaptionSettings());
@@ -318,6 +319,25 @@ export function ListenClient() {
     }
   }, [t]);
 
+  /**
+   * Opens a show the way a click should: fetches it AND pushes a history
+   * entry, so the browser's own back button retraces search results and
+   * shows one step at a time instead of leaving the page. Setting the ref
+   * before the URL changes means the effect below - which reacts to that
+   * same `feed=` param - recognises this feed as already open and does not
+   * fetch it a second time.
+   */
+  const openShow = useCallback(
+    (target: DiscoverResult) => {
+      if (target.feedUrl) {
+        openedFeedRef.current = target.feedUrl;
+        router.push(`/?feed=${encodeURIComponent(target.feedUrl)}`, { scroll: false });
+      }
+      void openFeed(target);
+    },
+    [openFeed, router],
+  );
+
   const search = useCallback(
     async (term: string) => {
       if (!term.trim()) return;
@@ -349,14 +369,14 @@ export function ListenClient() {
           return next;
         });
 
-        if (found.length === 1 && found[0].feedUrl) void openFeed(found[0]);
+        if (found.length === 1 && found[0].feedUrl) openShow(found[0]);
       } catch {
         setError(t("listen.searchFailed"));
       } finally {
         setSearching(false);
       }
     },
-    [t, openFeed],
+    [t, openShow],
   );
 
   // ---- playing -----------------------------------------------------------
@@ -474,38 +494,52 @@ export function ListenClient() {
     };
   }, [playing, setInlineVisible]);
 
-  /** Returns to browsing without disturbing whatever is playing. */
-  const browse = useCallback(() => {
+  /** Clears a shown feed without touching history - used both by the
+   * buttons below (which push their own new entry) and by the browser's
+   * own back button (which has already changed the URL on its own, so
+   * pushing again here would fight it). */
+  const closeFeedView = useCallback(() => {
     setFeed(null);
     setShow(null);
+    setVisible(PAGE_SIZE);
+    openedFeedRef.current = null;
+  }, []);
+
+  /** Returns to browsing without disturbing whatever is playing. */
+  const browse = useCallback(() => {
+    closeFeedView();
     setResults(null);
     setError(null);
-    setVisible(PAGE_SIZE);
     // Drop ?feed= as well, otherwise the URL still claims a show is open and
     // picking that same show from the library again would be a dead click.
-    openedFeedRef.current = null;
-    if (params.get("feed")) router.replace("/", { scroll: false });
-  }, [params, router]);
+    // A push, not a replace: closing a show is itself something worth
+    // retracing, the same as opening one.
+    if (params.get("feed")) router.push("/", { scroll: false });
+  }, [closeFeedView, params, router]);
 
   /** Returns to search results if they exist, otherwise returns to full browse. */
   const backToResultsOrBrowse = useCallback(() => {
     if (results && results.length > 0) {
-      setFeed(null);
-      setShow(null);
+      closeFeedView();
       setError(null);
-      setVisible(PAGE_SIZE);
-      openedFeedRef.current = null;
-      if (params.get("feed")) router.replace("/", { scroll: false });
+      if (params.get("feed")) router.push("/", { scroll: false });
     } else {
       browse();
     }
-  }, [results, browse, params, router]);
+  }, [results, browse, closeFeedView, params, router]);
 
   // The library links here with the feed to open, so following a saved show
-  // lands on its episodes rather than on a search box.
+  // lands on its episodes rather than on a search box. The same effect also
+  // undoes a show once the browser's own back button clears `feed=` from the
+  // URL again - `openShow` above pushes that URL forward, so stepping back
+  // through history has to be able to step this state back too.
   const requestedFeed = params.get("feed");
   useEffect(() => {
-    if (!requestedFeed || openedFeedRef.current === requestedFeed) return;
+    if (!requestedFeed) {
+      if (openedFeedRef.current) closeFeedView();
+      return;
+    }
+    if (openedFeedRef.current === requestedFeed) return;
     openedFeedRef.current = requestedFeed;
     const saved = listShows().find((item) => item.feedUrl === requestedFeed);
     void openFeed({
@@ -518,12 +552,33 @@ export function ListenClient() {
       origin: (saved?.origin as DiscoverResult["origin"]) ?? "rss",
       pageUrl: saved?.pageUrl ?? null,
     });
-  }, [requestedFeed, openFeed]);
+  }, [requestedFeed, openFeed, closeFeedView]);
 
   const episodes = useMemo(
     () => sortEpisodes(feed?.episodes ?? [], sort, recents),
     [feed, sort, recents],
   );
+
+  // Loads the next page itself once the sentinel below the list scrolls
+  // near view, rather than waiting for someone to find and tap a button -
+  // the same IntersectionObserver pattern already used above for the mini
+  // player's visibility.
+  useEffect(() => {
+    if (visible >= episodes.length) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setVisible((value) => Math.min(episodes.length, value + PAGE_SIZE));
+      },
+      // Starts loading a good scroll before the sentinel is actually on
+      // screen, so the next page is already there by the time it would be.
+      { rootMargin: "600px 0px 0px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [visible, episodes.length]);
+
   const mixed = Boolean(playing && playing.url && isMixedContent(playing.url));
 
   // The lede explains what the app is, which is worth a screen exactly once.
@@ -872,7 +927,7 @@ export function ListenClient() {
                 <button
                   type="button"
                   className="row-hover flex w-full items-start gap-3 p-2.5 text-left"
-                  onClick={() => void openFeed(result)}
+                  onClick={() => openShow(result)}
                   disabled={!result.feedUrl}
                 >
                   <Art src={result.artwork} alt="" size={56} seed={result.title} />
@@ -1073,10 +1128,8 @@ export function ListenClient() {
           </ul>
 
           {visible < episodes.length ? (
-            <div className="mt-3 flex justify-center">
-              <button type="button" className="btn" onClick={() => setVisible((value) => value + PAGE_SIZE)}>
-                {t("common.more")} ({episodes.length - visible})
-              </button>
+            <div ref={loadMoreRef} className="mt-3 flex justify-center py-4">
+              <span className="text-[12px] text-[var(--ink-faint)]">{t("common.loading")}</span>
             </div>
           ) : null}
 
@@ -1111,7 +1164,7 @@ export function ListenClient() {
           recentSources={recentSources}
           favoriteEpisodes={favoriteEpisodes}
           onOpenShow={(saved) =>
-            void openFeed({
+            openShow({
               id: `rss:${saved.feedUrl}`,
               title: saved.title,
               publisher: saved.publisher,
@@ -1123,7 +1176,7 @@ export function ListenClient() {
             })
           }
           onOpenRecentSource={(source) =>
-            void openFeed({
+            openShow({
               id: `rss:${source.feedUrl}`,
               title: source.title,
               publisher: source.publisher,

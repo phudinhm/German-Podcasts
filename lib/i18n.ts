@@ -83,6 +83,7 @@ const en = {
 
   "player.buffering": "buffering",
   "player.position": "Position in the stream",
+  "player.jumpToTime": "Jump to time",
   "player.back10": "Back 10 seconds",
   "player.forward30": "Forward 30 seconds",
   "player.speed": "Speed",
@@ -356,6 +357,7 @@ const de: Record<UiKey, string> = {
   "listen.openDirect": "Audiodatei öffnen",
   "player.buffering": "puffert",
   "player.position": "Position im Stream",
+  "player.jumpToTime": "Zu Zeitpunkt springen",
   "player.back10": "10 Sekunden zurück",
   "player.forward30": "30 Sekunden vor",
   "player.speed": "Tempo",
@@ -603,6 +605,7 @@ const vi: Record<UiKey, string> = {
   "listen.openDirect": "Mở tệp âm thanh",
   "player.buffering": "đang đệm",
   "player.position": "Vị trí trong luồng",
+  "player.jumpToTime": "Nhảy đến thời điểm",
   "player.back10": "Lùi 10 giây",
   "player.forward30": "Tiến 30 giây",
   "player.speed": "Tốc độ",
