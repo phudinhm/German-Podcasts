@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUi } from "@/lib/i18n";
+import { usePlayer } from "@/components/player/PlayerProvider";
 import {
   liveCaptionService,
   type CaptionSegment,
@@ -45,6 +46,14 @@ export function LiveTranscriptPanel({
   isFloating = false,
 }: LiveTranscriptPanelProps) {
   const { t, lang } = useUi();
+  const {
+    track,
+    onGenerateTranscript,
+    generatingTranscript,
+    generateTranscriptError,
+    transcriptOffsetSec,
+    setTranscriptOffsetSec,
+  } = usePlayer();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [autoScroll, setAutoScroll] = useState(settings.autoScroll);
@@ -89,9 +98,12 @@ export function LiveTranscriptPanel({
     return unsub;
   }, []);
 
-  // Determine active segment based on current playback time
+  // Determine active segment based on current playback time, corrected for
+  // any country-inserted ad break pushing the real audio out of step with
+  // the transcript's own timestamps (see the sync control in CaptionSettings).
+  const contentTime = currentTime - transcriptOffsetSec;
   const activeSegmentId = segments.find(
-    (s) => currentTime >= s.start - 0.5 && currentTime <= s.end + 0.5,
+    (s) => contentTime >= s.start - 0.5 && contentTime <= s.end + 0.5,
   )?.id;
 
   // Smart Auto-scroll: auto scroll to active item unless user deliberately scrolled away
@@ -308,6 +320,9 @@ export function LiveTranscriptPanel({
               settings={settings}
               onChange={onUpdateSettings}
               compact
+              sourceLang={track?.sourceLang}
+              syncOffsetSec={transcriptOffsetSec}
+              onSyncOffsetChange={setTranscriptOffsetSec}
             />
             {onToggleCollapse && (
               <button
@@ -410,12 +425,31 @@ export function LiveTranscriptPanel({
           <div className="py-12 text-center text-[13px] text-[var(--ink-faint)]">
             {searchQuery ? (
               <p>{t("caption.noMatch")}</p>
-            ) : (
+            ) : generatingTranscript ? (
               <div className="space-y-2">
-                <p>{t("caption.waiting")}</p>
+                <p className="font-medium text-[var(--ink)]">{t("caption.generating")}</p>
                 <p className="text-[11.5px] max-w-sm mx-auto text-[var(--ink-faint)]">
-                  {t("caption.chromeTip")}
+                  {t("caption.generatingHint")}
                 </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p>{t("caption.noTranscript")}</p>
+                {generateTranscriptError ? (
+                  <p className="text-[11.5px] max-w-sm mx-auto text-rose-500">
+                    {generateTranscriptError === "too-large"
+                      ? t("caption.generateTooLarge")
+                      : generateTranscriptError === "no-key"
+                        ? t("caption.generateNoProvider")
+                        : t("caption.generateFailed")}
+                  </p>
+                ) : null}
+                {track?.url ? (
+                  <button type="button" onClick={onGenerateTranscript} className="btn btn-primary px-3.5 py-1.5 text-[12.5px]">
+                    {t("caption.generateTranscript")}
+                  </button>
+                ) : null}
+                <p className="text-[11.5px] max-w-sm mx-auto text-[var(--ink-faint)]">{t("caption.chromeTip")}</p>
               </div>
             )}
           </div>
@@ -438,8 +472,9 @@ export function LiveTranscriptPanel({
                     <button
                       type="button"
                       onClick={() => {
-                        // 0.25s pre-roll buffer so the very first word or consonant is never cut off
-                        const target = Math.max(0, seg.start - 0.25);
+                        // 0.25s pre-roll buffer so the very first word or consonant is never cut off,
+                        // plus the sync offset to convert back from transcript time to real audio time.
+                        const target = Math.max(0, seg.start - 0.25 + transcriptOffsetSec);
                         onSeek(target);
                       }}
                       className="font-mono text-[11px] font-semibold text-[var(--ink-faint)] group-hover:text-[var(--accent)] rounded bg-[var(--surface)] px-1.5 py-0.5 transition active:scale-95 flex items-center gap-1"
@@ -485,7 +520,22 @@ export function LiveTranscriptPanel({
                       })}
                     </p>
 
-                    {settings.showTranslation && seg.translation && (
+                    {settings.showTranslation && seg.translations ? (
+                      <div className="mt-1 space-y-0.5">
+                        {Object.entries(seg.translations).map(([lang, text]) => (
+                          <p
+                            key={lang}
+                            className="text-[var(--ink-soft)] select-text"
+                            style={{ fontSize: `${Math.max(12, Math.round(settings.fontSize * 0.8))}px` }}
+                          >
+                            <span className="mr-1.5 font-mono text-[10px] uppercase text-[var(--ink-faint)]">
+                              {lang}
+                            </span>
+                            {text}
+                          </p>
+                        ))}
+                      </div>
+                    ) : settings.showTranslation && seg.translation ? (
                       <p
                         className="mt-1 text-[var(--ink-soft)] select-text"
                         style={{
@@ -494,7 +544,7 @@ export function LiveTranscriptPanel({
                       >
                         {seg.translation}
                       </p>
-                    )}
+                    ) : null}
 
                     {/* AI Grammar explanation if loaded */}
                     {grammarNotes[seg.id] && (

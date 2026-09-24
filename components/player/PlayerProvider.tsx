@@ -16,6 +16,7 @@ import type { SpokenLang } from "@/lib/language";
 import { pickBestTranscript } from "@/lib/server/transcript";
 import { liveCaptionService } from "@/lib/liveCaption";
 import { generateTranscript, loadPublishedTranscript, type GenerateTranscriptError } from "@/lib/transcriptPipeline";
+import { getTranscriptOffset, setTranscriptOffset } from "@/lib/transcriptSync";
 
 export interface Track {
   /** Stable id, used to tell "same episode" from "new episode". */
@@ -93,6 +94,16 @@ interface PlayerContextValue {
   onGenerateTranscript: () => void;
   generatingTranscript: boolean;
   generateTranscriptError: GenerateTranscriptError | null;
+  /**
+   * Manual correction, in seconds, for a transcript timed against the
+   * ad-free master while the episode's actual stream has a dynamically
+   * inserted, country-varying ad break spliced in ahead of it - the two
+   * clocks then drift apart by a roughly constant amount for the rest of
+   * the episode. Lives here rather than on any one transcript surface for
+   * the same reason `track` does: every one of them needs the same value.
+   */
+  transcriptOffsetSec: number;
+  setTranscriptOffsetSec: (offsetSec: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -322,6 +333,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [track?.id]);
 
+  // Loads whatever correction was last dialed in for this specific episode,
+  // if any - the ad break's length tends to repeat for the same episode and
+  // listener, even though it varies from show to show and country to country.
+  const [transcriptOffsetSec, setTranscriptOffsetSecState] = useState(0);
+  useEffect(() => {
+    setTranscriptOffsetSecState(track ? getTranscriptOffset(track.id) : 0);
+  }, [track?.id]);
+  const setTranscriptOffsetSec = useCallback(
+    (offsetSec: number) => {
+      setTranscriptOffsetSecState(offsetSec);
+      if (track) setTranscriptOffset(track.id, offsetSec);
+    },
+    [track],
+  );
+
   const value = useMemo<PlayerContextValue>(
     () => ({
       track,
@@ -345,6 +371,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       onGenerateTranscript,
       generatingTranscript,
       generateTranscriptError,
+      transcriptOffsetSec,
+      setTranscriptOffsetSec,
     }),
     [
       track,
@@ -364,6 +392,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       onGenerateTranscript,
       generatingTranscript,
       generateTranscriptError,
+      transcriptOffsetSec,
+      setTranscriptOffsetSec,
     ],
   );
 

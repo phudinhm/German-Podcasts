@@ -43,7 +43,8 @@ export function TranscriptReader({
   fontSize,
 }: TranscriptReaderProps) {
   const { t } = useUi();
-  const { track, onGenerateTranscript, generatingTranscript, generateTranscriptError } = usePlayer();
+  const { track, onGenerateTranscript, generatingTranscript, generateTranscriptError, transcriptOffsetSec } =
+    usePlayer();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
   const activeRef = useRef<HTMLSpanElement | null>(null);
 
@@ -52,8 +53,13 @@ export function TranscriptReader({
     return liveCaptionService.onTranscript(setSegments);
   }, []);
 
+  // The transcript's own clock, once a dynamically inserted ad break (its
+  // length varying by country, sometimes by request) has pushed the real
+  // audio out of step with it - see the sync control in CaptionSettings.
+  const contentTime = currentTime - transcriptOffsetSec;
+
   const activeSegmentId = segments.find(
-    (s) => currentTime >= s.start - 0.5 && currentTime <= s.end + 0.5,
+    (s) => contentTime >= s.start - 0.5 && contentTime <= s.end + 0.5,
   )?.id;
 
   useEffect(() => {
@@ -110,7 +116,7 @@ export function TranscriptReader({
               <span key={seg.id}>
                 <span
                   ref={isActive ? activeRef : null}
-                  onClick={() => onSeek(Math.max(0, seg.start - 0.25))}
+                  onClick={() => onSeek(Math.max(0, seg.start - 0.25 + transcriptOffsetSec))}
                   className={`cursor-pointer transition-colors duration-300 ${
                     isActive ? "font-semibold text-white" : "hover:text-white/70"
                   }`}

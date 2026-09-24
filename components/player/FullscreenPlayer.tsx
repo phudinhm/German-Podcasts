@@ -54,7 +54,16 @@ const NOW_PLAYING_VARS: CSSProperties = {
  * survives navigation while it's up.
  */
 export function FullscreenPlayer() {
-  const { track, handle, mediaState, retry, fullscreenOpen, setFullscreenOpen } = usePlayer();
+  const {
+    track,
+    handle,
+    mediaState,
+    retry,
+    fullscreenOpen,
+    setFullscreenOpen,
+    transcriptOffsetSec,
+    setTranscriptOffsetSec,
+  } = usePlayer();
   const { t } = useUi();
   const [currentTime, setCurrentTime] = useState(0);
   const [settings, setSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
@@ -168,6 +177,8 @@ export function FullscreenPlayer() {
               onChange={handleUpdateSettings}
               compact
               sourceLang={track.sourceLang}
+              syncOffsetSec={transcriptOffsetSec}
+              onSyncOffsetChange={setTranscriptOffsetSec}
             />
           </div>
         ) : null}

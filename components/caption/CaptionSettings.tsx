@@ -125,6 +125,14 @@ interface CaptionSettingsProps {
    * valid translation targets be worked out, so the language picker chips
    * render only where a caller passes it (the full-screen reader, so far). */
   sourceLang?: SpokenLang;
+  /**
+   * Manual correction, in seconds, for a transcript timed against the
+   * ad-free master while the actual stream has a dynamically inserted,
+   * country-varying ad break spliced in ahead of it. Rendered only where a
+   * caller tracks one for the current episode (the full-screen reader).
+   */
+  syncOffsetSec?: number;
+  onSyncOffsetChange?: (offsetSec: number) => void;
 }
 
 const LANG_LABEL: Record<"de" | "en" | "vi", "caption.langDe" | "caption.langEn" | "caption.langVi"> = {
@@ -133,7 +141,14 @@ const LANG_LABEL: Record<"de" | "en" | "vi", "caption.langDe" | "caption.langEn"
   vi: "caption.langVi",
 };
 
-export function CaptionSettings({ settings, onChange, compact = false, sourceLang }: CaptionSettingsProps) {
+export function CaptionSettings({
+  settings,
+  onChange,
+  compact = false,
+  sourceLang,
+  syncOffsetSec,
+  onSyncOffsetChange,
+}: CaptionSettingsProps) {
   const { t } = useUi();
 
   const update = (partial: Partial<CaptionSettingsState>) => {
@@ -265,6 +280,44 @@ export function CaptionSettings({ settings, onChange, compact = false, sourceLan
           </button>
         ))}
       </div>
+
+      {/* Manual correction for a country-inserted ad break that has pushed
+          the real audio out of step with the transcript's own timestamps -
+          there is no way to detect the ad itself, so this nudges by hand. */}
+      {onSyncOffsetChange ? (
+        <div className="flex items-center rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-0.5">
+          <span className="pl-1.5 pr-0.5 text-[10px] uppercase tracking-wide text-[var(--ink-faint)]">
+            {t("caption.sync")}
+          </span>
+          <button
+            type="button"
+            onClick={() => onSyncOffsetChange((syncOffsetSec ?? 0) - 1)}
+            className="rounded px-2 py-1 font-bold transition hover:bg-[var(--paper-raised)]"
+            title={t("caption.syncEarlier")}
+            aria-label={t("caption.syncEarlier")}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => onSyncOffsetChange(0)}
+            className="min-w-[34px] px-1 text-center font-mono text-[11px] font-medium text-[var(--ink-soft)]"
+            title={t("caption.syncReset")}
+          >
+            {(syncOffsetSec ?? 0) > 0 ? "+" : ""}
+            {syncOffsetSec ?? 0}s
+          </button>
+          <button
+            type="button"
+            onClick={() => onSyncOffsetChange((syncOffsetSec ?? 0) + 1)}
+            className="rounded px-2 py-1 font-bold transition hover:bg-[var(--paper-raised)]"
+            title={t("caption.syncLater")}
+            aria-label={t("caption.syncLater")}
+          >
+            +
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

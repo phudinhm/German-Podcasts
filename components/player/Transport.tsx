@@ -15,6 +15,15 @@ function formatTime(seconds: number): string {
   return `${minutes}:${String(secs).padStart(2, "0")}`;
 }
 
+/** Accepts "ss", "mm:ss" or "hh:mm:ss" (each part 1+ digits); anything else,
+ * including a negative or empty part, is not a time someone meant to type. */
+function parseTimeInput(raw: string): number | null {
+  const parts = raw.trim().split(":");
+  if (parts.length < 1 || parts.length > 3 || parts.some((part) => !/^\d+$/.test(part))) return null;
+  const nums = parts.map(Number);
+  return nums.reduce((total, part) => total * 60 + part, 0);
+}
+
 /**
  * Transport bar for a streamed audio or video element.
  *
@@ -47,8 +56,15 @@ export function Transport({
   const bufferRef = useRef<HTMLDivElement | null>(null);
   const timeRef = useRef<HTMLSpanElement | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
+  const timeInputRef = useRef<HTMLInputElement | null>(null);
   const { t } = useUi();
   const [playing, setPlaying] = useState(false);
+  // Tapping the elapsed-time label turns it into a "jump to time" field -
+  // the one way to reach an arbitrary point directly by typing, rather than
+  // dragging or repeated skip-button taps, which matters most on an episode
+  // long enough that dragging a stretched-thin scrubber is imprecise.
+  const [editingTime, setEditingTime] = useState(false);
+  const [timeInput, setTimeInput] = useState("");
 
   useEffect(() => {
     let frame = 0;
@@ -96,14 +112,50 @@ export function Transport({
 
   const duration = state.duration || handle.getDuration();
 
+  useEffect(() => {
+    if (editingTime) timeInputRef.current?.select();
+  }, [editingTime]);
+
+  const startEditingTime = () => {
+    setTimeInput(formatTime(handle.getTime()));
+    setEditingTime(true);
+  };
+
+  const commitTimeInput = () => {
+    const seconds = parseTimeInput(timeInput);
+    if (seconds !== null) {
+      handle.seekTo(Math.max(0, duration > 0 ? Math.min(duration, seconds) : seconds), true);
+    }
+    setEditingTime(false);
+  };
+
   const scrubber = (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      <span
-        ref={timeRef}
-        className="w-[44px] shrink-0 text-right font-mono text-[11px] tabular-nums text-[var(--ink-soft)]"
-      >
-        0:00
-      </span>
+      {editingTime ? (
+        <input
+          ref={timeInputRef}
+          type="text"
+          inputMode="numeric"
+          value={timeInput}
+          onChange={(event) => setTimeInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commitTimeInput();
+            if (event.key === "Escape") setEditingTime(false);
+          }}
+          onBlur={commitTimeInput}
+          aria-label={t("player.jumpToTime")}
+          className="w-[44px] shrink-0 rounded border border-[var(--accent)] bg-[var(--paper-raised)] text-right font-mono text-[11px] tabular-nums text-[var(--ink)] outline-none"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={startEditingTime}
+          title={t("player.jumpToTime")}
+          className="w-[44px] shrink-0 text-right font-mono text-[11px] tabular-nums text-[var(--ink-soft)] transition hover:text-[var(--accent)]"
+        >
+          <span ref={timeRef}>0:00</span>
+        </button>
+      )}
       <div
         ref={barRef}
         role="slider"
