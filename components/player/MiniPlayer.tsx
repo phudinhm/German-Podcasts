@@ -339,11 +339,9 @@ export function MiniPlayer() {
     );
   }
 
-  // Hide the dock if the inline player is on screen - the full-screen "now
-  // playing" view is a separate overlay (mounted once in the layout) and
-  // stays reachable regardless, so there is nothing here it needs to wait for.
+  // Hide the dock if the inline player is on screen, but keep the mobile tab bar visible
   if (inlineVisible) {
-    return null;
+    return mobileTabBar;
   }
 
   const isExpandedDesktop = isHovered || pinned;

@@ -69,7 +69,16 @@ export function FullscreenPlayer() {
   const [settings, setSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [docked, setDocked] = useState(false);
+  const [speed, setSpeed] = useState(1);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const SPEEDS = [0.8, 1.0, 1.2, 1.5];
+  const cycleSpeed = () => {
+    const nextIdx = (SPEEDS.indexOf(speed) + 1) % SPEEDS.length;
+    const nextSpeed = SPEEDS[nextIdx];
+    setSpeed(nextSpeed);
+    handle.setRate(nextSpeed);
+  };
 
   useEffect(() => {
     setSettings(loadCaptionSettings());
@@ -78,6 +87,11 @@ export function FullscreenPlayer() {
   const handleUpdateSettings = (next: CaptionSettingsState) => {
     setSettings(next);
     saveCaptionSettings(next);
+  };
+
+  const toggleLanguage = () => {
+    const nextLang = translationLang === "vi" ? "en" : "vi";
+    handleUpdateSettings({ ...settings, translationLang: nextLang });
   };
 
   // Un-docks the artwork/transport (if docked) and restarts the quiet timer.
@@ -177,21 +191,39 @@ export function FullscreenPlayer() {
           >
             ⌄
           </button>
-          <p className="max-w-[55%] truncate text-[12px] font-medium uppercase tracking-wider text-[var(--ink-faint)]">
+          <p className="max-w-[42%] truncate text-[12px] font-medium uppercase tracking-wider text-[var(--ink-faint)]">
             {track.showTitle}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setShowSettings((v) => !v);
-              resetAutoHide();
-            }}
-            className={`icon-btn text-[13px] font-semibold transition ${showSettings ? "bg-white/20 text-white" : ""}`}
-            aria-expanded={showSettings}
-            title={t("caption.textSize")}
-          >
-            Aa
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={cycleSpeed}
+              className="px-2 py-0.5 text-[11px] font-mono font-semibold rounded-full border border-white/20 bg-white/10 hover:bg-white/20 text-white transition active:scale-95"
+              title="Playback speed"
+            >
+              {speed}×
+            </button>
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="px-2 py-0.5 text-[11px] font-semibold rounded-full border border-white/20 bg-white/10 hover:bg-white/20 text-amber-200 transition active:scale-95"
+              title="Switch translation language"
+            >
+              {translationLang.toUpperCase()}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowSettings((v) => !v);
+                resetAutoHide();
+              }}
+              className={`icon-btn text-[13px] font-semibold transition ${showSettings ? "bg-white/20 text-white" : ""}`}
+              aria-expanded={showSettings}
+              title={t("caption.textSize")}
+            >
+              Aa
+            </button>
+          </div>
         </div>
 
         {showSettings ? (
