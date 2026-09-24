@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUi } from "@/lib/i18n";
 import { liveCaptionService, type CaptionSegment } from "@/lib/liveCaption";
+import { translateUntranslatedSegments } from "@/lib/transcriptPipeline";
 import { usePlayer } from "./PlayerProvider";
 
 import { FONT_FAMILIES, type FontFamily, type CaptionTheme, captionThemeStyle } from "../caption/CaptionSettings";
@@ -55,11 +56,35 @@ export function TranscriptReader({
     usePlayer();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
   const activeRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setSegments(liveCaptionService.getTranscript());
     return liveCaptionService.onTranscript(setSegments);
   }, []);
+
+  useEffect(() => {
+    if (!showTranslation || segments.length === 0) return;
+    const hasMissing = segments.some((s) => s.text.trim() && !s.translations?.[translationLang]);
+    if (!hasMissing) return;
+    const timer = window.setTimeout(() => {
+      void translateUntranslatedSegments(segments, translationLang);
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [segments, showTranslation, translationLang]);
+
+  const handleReaderScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container || !showTranslation || segments.length === 0) return;
+    const maxScroll = Math.max(1, container.scrollHeight - container.clientHeight);
+    const ratio = Math.max(0, Math.min(1, container.scrollTop / maxScroll));
+    const approxIdx = Math.max(0, Math.floor(ratio * segments.length) - 4);
+    const viewportFirst = [
+      ...segments.slice(approxIdx, approxIdx + 30),
+      ...segments,
+    ];
+    void translateUntranslatedSegments(viewportFirst, translationLang);
+  };
 
   const contentTime = currentTime - transcriptOffsetSec;
 
@@ -129,6 +154,8 @@ export function TranscriptReader({
 
   return (
     <div
+      ref={scrollContainerRef}
+      onScroll={handleReaderScroll}
       className={`h-full overflow-y-auto px-4 sm:px-8 transition-colors duration-500 rounded-2xl ${
         !isModern ? "bg-[var(--surface)]" : ""
       }`}

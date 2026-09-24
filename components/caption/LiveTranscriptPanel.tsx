@@ -7,6 +7,7 @@ import {
   liveCaptionService,
   type CaptionSegment,
 } from "@/lib/liveCaption";
+import { translateUntranslatedSegments } from "@/lib/transcriptPipeline";
 import {
   CaptionSettings,
   captionThemeStyle,
@@ -145,7 +146,25 @@ export function LiveTranscriptPanel({
     container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
   }, [segments.length, autoScroll, userScrolledUp, currentTime]);
 
-  // Handle scroll events to detect user manual scrolling
+  const targetTranslateLang: "de" | "en" | "vi" =
+    settings.translationLang === "auto"
+      ? lang === "vi"
+        ? "vi"
+        : "en"
+      : settings.translationLang;
+
+  // Ensure all segments (top to bottom) get translated continuously
+  useEffect(() => {
+    if (!settings.showTranslation || segments.length === 0) return;
+    const hasMissing = segments.some((s) => s.text.trim() && !s.translations?.[targetTranslateLang]);
+    if (!hasMissing) return;
+    const timer = window.setTimeout(() => {
+      void translateUntranslatedSegments(segments, targetTranslateLang);
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [segments, settings.showTranslation, targetTranslateLang]);
+
+  // Handle scroll events to detect user manual scrolling & immediately translate scrolled-to lines
   const handleScroll = () => {
     const container = containerRef.current;
     if (!container) return;
@@ -155,6 +174,17 @@ export function LiveTranscriptPanel({
       setUserScrolledUp(true);
     } else if (isNearBottom) {
       setUserScrolledUp(false);
+    }
+
+    if (settings.showTranslation && segments.length > 0) {
+      const maxScroll = Math.max(1, container.scrollHeight - container.clientHeight);
+      const ratio = Math.max(0, Math.min(1, container.scrollTop / maxScroll));
+      const approxIdx = Math.max(0, Math.floor(ratio * segments.length) - 4);
+      const viewportFirst = [
+        ...segments.slice(approxIdx, approxIdx + 30),
+        ...segments,
+      ];
+      void translateUntranslatedSegments(viewportFirst, targetTranslateLang);
     }
   };
 

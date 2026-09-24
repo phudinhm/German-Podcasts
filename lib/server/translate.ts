@@ -60,6 +60,9 @@ export async function translate(
   const llm = await translateWithLLM(text, targetLang, sourceLang, engine);
   if (llm) return { text: llm, source: "anthropic" };
 
+  const gtx = await translateWithGoogleGTX(text, targetLang, sourceLang);
+  if (gtx) return { text: gtx, source: "google" };
+
   const free = await translateWithMyMemory(text, targetLang, sourceLang);
   if (free) return { text: free, source: "mymemory" };
 
@@ -194,6 +197,52 @@ async function translateWithLLM(text: string, lang: Lang, sourceLang: Lang, engi
   return result?.trim() ?? null;
 }
 
+export async function translateWithGoogleGTX(
+  text: string,
+  lang: Lang,
+  sourceLang: Lang,
+): Promise<string | null> {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    const params = new URLSearchParams({
+      client: "gtx",
+      sl: sourceLang,
+      tl: lang,
+      dt: "t",
+      q: trimmed,
+    });
+    const response = await fetch(`https://translate.googleapis.com/translate_a/single?${params}`, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as unknown;
+    if (!Array.isArray(data) || !Array.isArray(data[0])) return null;
+    const combined = (data[0] as Array<unknown>)
+      .map((part) => (Array.isArray(part) && typeof part[0] === "string" ? part[0] : ""))
+      .join("")
+      .trim();
+    return combined || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function translateBatchWithGoogleGTX(
+  texts: string[],
+  lang: Lang,
+  sourceLang: Lang,
+): Promise<string[]> {
+  return Promise.all(
+    texts.map(async (t) => {
+      if (!t.trim()) return "";
+      const res = await translateWithGoogleGTX(t, lang, sourceLang);
+      return res ?? "";
+    }),
+  );
+}
+
 export async function translateBatchWithLLM(texts: string[], lang: Lang, sourceLang: Lang, engine: string): Promise<string[] | null> {
   const inputObj: Record<string, string> = {};
   texts.forEach((t, i) => { inputObj[String(i)] = t; });
@@ -202,26 +251,36 @@ export async function translateBatchWithLLM(texts: string[], lang: Lang, sourceL
     system: `You are a translator. You will receive a JSON object of text snippets in ${LANG_NAME[sourceLang]}. Translate each snippet into natural ${LANG_NAME[lang]}.
 Return ONLY a JSON object where keys are the same indices and values are the translated strings. Do not combine or drop any snippets.`,
     user: JSON.stringify(inputObj),
-    maxTokens: 2500,
+    maxTokens: 3000,
     json: true,
   }, engine);
-  if (!result) return null;
-  
-  try {
-    let raw = result.trim();
-    if (raw.startsWith("```json")) raw = raw.replace(/^```json\n?/, "").replace(/\n?```$/, "");
-    if (raw.startsWith("```")) raw = raw.replace(/^```\n?/, "").replace(/\n?```$/, "");
-    
-    const parsed = JSON.parse(raw);
-    if (typeof parsed === "object" && parsed !== null) {
-      // Map it back to array based on the original indices
-      return texts.map((_, i) => String(parsed[String(i)] || ""));
+
+  if (result) {
+    try {
+      let raw = result.trim();
+      if (raw.startsWith("```json")) raw = raw.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+      if (raw.startsWith("```")) raw = raw.replace(/^```\n?/, "").replace(/\n?```$/, "");
+      
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === "object" && parsed !== null) {
+        // Map back to array based on original indices, and fill any missing lines via Google GTX
+        const mapped = await Promise.all(
+          texts.map(async (orig, i) => {
+            const val = String(parsed[String(i)] || "").trim();
+            if (val) return val;
+            if (!orig.trim()) return "";
+            return (await translateWithGoogleGTX(orig, lang, sourceLang)) ?? "";
+          }),
+        );
+        return mapped;
+      }
+    } catch (e) {
+      console.error("[translateBatchWithLLM] failed to parse JSON:", e);
     }
-    return null;
-  } catch (e) {
-    console.error("[translateBatchWithLLM] failed to parse JSON:", e);
-    return null;
   }
+
+  // Fallback to parallel Google GTX batch so translation never stops when LLM rate-limits
+  return translateBatchWithGoogleGTX(texts, lang, sourceLang);
 }
 
 export interface ClaudeRequest {

@@ -36,24 +36,13 @@ export async function POST(request: Request) {
   }
 
   if (texts?.length) {
-    // Try to translate as a batch if LLM is enabled, as sequential fallback is rate limited and slow.
-    if (engine !== "auto" || process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY) {
-      const batchResult = await translateBatchWithLLM(texts, lang, sourceLang, engine);
-      if (batchResult) {
-        return NextResponse.json({
-          texts: batchResult,
-          source: "llm-batch",
-        });
-      }
+    const batchResult = await translateBatchWithLLM(texts, lang, sourceLang, engine);
+    if (batchResult) {
+      return NextResponse.json({
+        texts: batchResult,
+        source: "llm-batch",
+      });
     }
-
-    // Sequential fallback
-    const results = [];
-    for (const item of texts) results.push(await translate(item, lang, sourceLang, engine));
-    return NextResponse.json({
-      texts: results.map((result) => result.text),
-      source: results[0]?.source ?? "none",
-    });
   }
 
   const result = await translate(text, lang, sourceLang, engine);

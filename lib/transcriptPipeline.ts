@@ -13,6 +13,60 @@ interface TranslatableSegment {
   text: string;
 }
 
+const inFlightIds = new Set<string>();
+
+/**
+ * Immediately translates a slice of segments (e.g. when the user scrolls down
+ * to a part of the transcript that background translation hasn't reached yet).
+ */
+export async function translateUntranslatedSegments(
+  segments: Array<{ id: string; text: string; translations?: Partial<Record<"de" | "en" | "vi", string>> }>,
+  targetLang: "de" | "en" | "vi",
+  sourceLang: SpokenLang = "de",
+): Promise<void> {
+  const missing = segments.filter(
+    (s) => s.text.trim() && !s.translations?.[targetLang] && !inFlightIds.has(`${s.id}:${targetLang}`),
+  );
+  if (missing.length === 0) return;
+
+  let engine = "auto";
+  try {
+    const raw = window.localStorage.getItem("hoerbar.caption.settings.v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.translationEngine) engine = parsed.translationEngine;
+    }
+  } catch {}
+
+  const batch = missing.slice(0, TRANSLATE_CHUNK_SIZE);
+  for (const seg of batch) inFlightIds.add(`${seg.id}:${targetLang}`);
+
+  try {
+    const res = await fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        texts: batch.map((s) => s.text),
+        lang: targetLang,
+        sourceLang,
+        engine,
+      }),
+    }).catch(() => null);
+
+    if (res?.ok) {
+      const data = (await res.json()) as { texts?: Array<string | null> };
+      const updates = batch
+        .map((seg, idx) => ({ id: seg.id, text: data.texts?.[idx] ?? "" }))
+        .filter((u) => u.text);
+      if (updates.length > 0) {
+        liveCaptionService.setSegmentTranslations(targetLang, updates);
+      }
+    }
+  } finally {
+    for (const seg of batch) inFlightIds.delete(`${seg.id}:${targetLang}`);
+  }
+}
+
 /**
  * Translates transcript lines, prioritizing the user's chosen language first,
  * updating the shared transcript in real-time as each chunk arrives.
@@ -36,7 +90,7 @@ export async function autoTranslateSegments(
   } catch {}
 
   const targets = translationTargetsFor(sourceLang);
-  // Prioritize user's preferred target language first so it displays immediately
+  // Prioritize user's preferred target language first so all lines in that language finish rapidly
   const orderedTargets = [
     preferredLang,
     ...targets.filter((t) => t !== preferredLang),
@@ -48,11 +102,21 @@ export async function autoTranslateSegments(
     for (let i = 0; i < toTranslate.length; i += TRANSLATE_CHUNK_SIZE) {
       if (isCancelled()) return;
       const chunk = toTranslate.slice(i, i + TRANSLATE_CHUNK_SIZE);
-      const res = await fetch("/api/translate", {
+      let res = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ texts: chunk.map((s) => s.text), lang: targetLang, sourceLang, engine }),
       }).catch(() => null);
+
+      // Retry once if the network or serverless cold-start hiccuped
+      if (!res?.ok && !isCancelled()) {
+        res = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texts: chunk.map((s) => s.text), lang: targetLang, sourceLang, engine }),
+        }).catch(() => null);
+      }
+
       if (!res?.ok || isCancelled()) continue;
       const data = (await res.json()) as { texts?: Array<string | null> };
       const updates = chunk
