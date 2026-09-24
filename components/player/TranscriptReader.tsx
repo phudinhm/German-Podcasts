@@ -243,13 +243,13 @@ export function TranscriptReader({
         <p className={`max-w-xs text-[12.5px] ${generatingHint}`}>
           {t("caption.generatingHint")}
         </p>
-        {!generatingTranscript && track?.url ? (
+        {track?.url ? (
           <button
             type="button"
             onClick={onGenerateTranscript}
             className={`rounded-full px-4 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${btnClasses}`}
           >
-            {t("caption.generateTranscript")}
+            ⚡ {t("caption.generateTranscript")}
           </button>
         ) : null}
       </div>

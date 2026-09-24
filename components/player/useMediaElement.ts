@@ -35,6 +35,7 @@ export function useMediaElement(rawSrc: string | null): {
   const src = useMemo(() => (rawSrc ? upgradeToHttps(rawSrc) : null), [rawSrc]);
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const readyRef = useRef(false);
+  const rateRef = useRef(1);
   const [state, setState] = useState<MediaElementState>({
     ready: false,
     duration: 0,
@@ -69,9 +70,16 @@ export function useMediaElement(rawSrc: string | null): {
 
     setState({ ready: false, duration: 0, buffered: 0, loading: true, error: null });
     media.preservesPitch = true;
+    media.defaultPlaybackRate = rateRef.current;
+    media.playbackRate = rateRef.current;
 
     function onLoadedMetadata() {
       readyRef.current = true;
+      if (media) {
+        media.preservesPitch = true;
+        media.defaultPlaybackRate = rateRef.current;
+        media.playbackRate = rateRef.current;
+      }
       setState((prev) => ({
         ...prev,
         ready: true,
@@ -98,6 +106,12 @@ export function useMediaElement(rawSrc: string | null): {
       setState((prev) => ({ ...prev, loading: true }));
     }
     function onPlaying() {
+      if (media) {
+        media.preservesPitch = true;
+        if (Math.abs(media.playbackRate - rateRef.current) > 0.01) {
+          media.playbackRate = rateRef.current;
+        }
+      }
       setState((prev) => ({ ...prev, loading: false, error: null }));
     }
     function onError() {
@@ -168,9 +182,11 @@ export function useMediaElement(rawSrc: string | null): {
       media.currentTime = Math.max(0, Math.min(seconds, limit));
     },
     setRate: (rate) => {
+      rateRef.current = rate;
       const media = mediaRef.current;
       if (!media) return;
       media.preservesPitch = true;
+      media.defaultPlaybackRate = rate;
       media.playbackRate = rate;
     },
     setMuted: (muted) => {

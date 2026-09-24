@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlayerHandle } from "./player/types";
+import { usePlayer } from "./player/PlayerProvider";
 import { useUi } from "@/lib/i18n";
 
 export const RATES = [
@@ -16,8 +17,8 @@ function formatTime(seconds: number): string {
 
 export function StreamControls({ handle }: { handle: PlayerHandle }) {
   const { t, lang } = useUi();
+  const { playbackRate: rate, setPlaybackRate } = usePlayer();
   const locale = lang === "de" ? "de-DE" : lang === "vi" ? "vi-VN" : "en-GB";
-  const [rate, setRate] = useState(1);
   const [pointA, setPointA] = useState<number | null>(null);
   const [pointB, setPointB] = useState<number | null>(null);
   const [looping, setLooping] = useState(false);
@@ -28,12 +29,8 @@ export function StreamControls({ handle }: { handle: PlayerHandle }) {
 
   const applyRate = (next: number) => {
     const clamped = Math.round(Math.max(0.4, Math.min(2.5, next)) * 100) / 100;
-    setRate(clamped);
+    setPlaybackRate(clamped);
   };
-
-  useEffect(() => {
-    handle.setRate(rate);
-  }, [handle, rate]);
 
   useEffect(() => {
     let frame = 0;

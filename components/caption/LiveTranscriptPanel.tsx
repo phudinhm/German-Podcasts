@@ -631,9 +631,9 @@ export function LiveTranscriptPanel({
                 <p className="text-[11.5px] max-w-sm mx-auto text-[var(--ink-faint)]">
                   {t("caption.generatingHint")}
                 </p>
-                {!generatingTranscript && track?.url ? (
+                {track?.url ? (
                   <button type="button" onClick={onGenerateTranscript} className="btn btn-primary px-3.5 py-1.5 text-[12.5px]">
-                    {t("caption.generateTranscript")}
+                    ⚡ {t("caption.generateTranscript")}
                   </button>
                 ) : null}
               </div>

@@ -99,6 +99,8 @@ interface PlayerContextValue {
   isVideoTrack: boolean;
   transcriptOffsetSec: number;
   setTranscriptOffsetSec: (offsetSec: number) => void;
+  playbackRate: number;
+  setPlaybackRate: (rate: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -130,6 +132,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [showTranscript, setShowTranscript] = useState(true);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [playbackRate, setPlaybackRateState] = useState(1);
+  const playbackRateRef = useRef(1);
 
   const play = useCallback(
     (next: Track) => {
@@ -156,6 +160,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       // Start playback immediately (do NOT wait for transcript completion)
       window.setTimeout(() => {
+        media.handle.setRate(playbackRateRef.current);
         media.handle.play();
       }, 60);
     },
@@ -260,14 +265,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const time = handle.getTime();
         navigator.mediaSession.setPositionState({
           duration: Math.max(0, duration),
-          playbackRate: 1,
+          playbackRate,
           position: Math.min(duration, Math.max(0, time)),
         });
       } catch {}
     }, 2000);
 
     return () => clearInterval(timer);
-  }, [track, media.state.ready, handle]);
+  }, [track, media.state.ready, handle, playbackRate]);
 
   const setStage = useCallback((element: HTMLElement | null) => {
     setStageElement(element);
@@ -282,12 +287,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const [generatingTranscript, setGeneratingTranscript] = useState(false);
   const [generateTranscriptError, setGenerateTranscriptError] = useState<GenerateTranscriptError | null>(null);
-  const generateCancelledRef = useRef(false);
+  const generationRunIdRef = useRef(0);
 
   // Automatically load or generate the transcript in parallel while the episode plays
   useEffect(() => {
     liveCaptionService.clearTranscript();
-    generateCancelledRef.current = false;
+    const runId = ++generationRunIdRef.current;
     setGenerateTranscriptError(null);
     setWaitingForTranscript(false);
 
@@ -296,8 +301,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    let cancelled = false;
-    const isCancelled = () => cancelled || generateCancelledRef.current;
+    const isCancelled = () => generationRunIdRef.current !== runId;
 
     const loadOrGenerateInParallel = async () => {
       const best = track.transcripts?.length ? pickBestTranscript(track.transcripts) : null;
@@ -335,20 +339,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     void loadOrGenerateInParallel();
 
     return () => {
-      cancelled = true;
-      generateCancelledRef.current = true;
+      if (generationRunIdRef.current === runId) {
+        generationRunIdRef.current++;
+      }
     };
   }, [track?.id, track?.url]);
 
+  // Explicit generate trigger: ALWAYS works at any playback speed (1.0x, 1.5x, 2.0x)
+  // and is NEVER blocked if an earlier background run is still in progress.
   const onGenerateTranscript = useCallback(() => {
-    if (!track?.url || generatingTranscript) return;
-    generateCancelledRef.current = false;
+    if (!track?.url) return;
+    const runId = ++generationRunIdRef.current;
+    const isCancelled = () => generationRunIdRef.current !== runId;
     setGeneratingTranscript(true);
     setGenerateTranscriptError(null);
     void generateTranscript(
       track.url,
       track.sourceLang ?? "de",
-      () => generateCancelledRef.current,
+      isCancelled,
       {
         title: track.title,
         showTitle: track.showTitle,
@@ -356,11 +364,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         durationSec: track.durationSec,
       },
     ).then(() => {
-      if (generateCancelledRef.current) return;
+      if (isCancelled()) return;
       setGeneratingTranscript(false);
       setGenerateTranscriptError(null);
     });
-  }, [track, generatingTranscript]);
+  }, [track]);
+
+  const setPlaybackRate = useCallback(
+    (nextRate: number) => {
+      const clamped = Math.round(Math.max(0.4, Math.min(2.5, nextRate)) * 100) / 100;
+      playbackRateRef.current = clamped;
+      setPlaybackRateState(clamped);
+      media.handle.setRate(clamped);
+      // If user speeds up audio and transcript is empty and not currently generating, auto-trigger generation
+      if (
+        track?.url &&
+        liveCaptionService.getTranscript().length === 0 &&
+        !generatingTranscript
+      ) {
+        onGenerateTranscript();
+      }
+    },
+    [media.handle, track?.url, generatingTranscript, onGenerateTranscript],
+  );
 
   const [transcriptOffsetSec, setTranscriptOffsetSecState] = useState(0);
   useEffect(() => {
@@ -450,6 +476,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       isVideoTrack,
       transcriptOffsetSec,
       setTranscriptOffsetSec,
+      playbackRate,
+      setPlaybackRate,
     }),
     [
       track,
@@ -474,6 +502,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       isVideoTrack,
       transcriptOffsetSec,
       setTranscriptOffsetSec,
+      playbackRate,
+      setPlaybackRate,
     ],
   );
 

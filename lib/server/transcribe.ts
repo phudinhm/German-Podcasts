@@ -17,16 +17,16 @@ const GROQ_MODELS = ["whisper-large-v3-turbo", "whisper-large-v3"] as const;
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"] as const;
 
 /**
- * Ultra-fast progressive chunking:
- * - Chunk 0 is 750 KB (~45 seconds of audio) -> downloads in ~120ms, transcribes in ~0.5s!
- * - Chunk 1 is 2 MB (~2 minutes of audio) -> arrives ~1s later.
- * - Subsequent chunks are 5 MB (~5.5 minutes each), pre-transcribed in parallel!
+ * Ultra-fast progressive chunking (after stripping ID3v2 cover art):
+ * - Chunk 0 is 1.25 MB of pure audio (~80 seconds of speech) -> transcribes in ~0.5s!
+ * - Chunk 1 is 3 MB (~3 minutes of speech).
+ * - Subsequent chunks are 6 MB (~6.5 minutes each).
  */
-const FIRST_CHUNK_BYTES = 750 * 1024;
-const SECOND_CHUNK_BYTES = 2 * 1024 * 1024;
-const SUBSEQUENT_CHUNK_BYTES = 5 * 1024 * 1024;
+const FIRST_CHUNK_BYTES = Math.floor(1.25 * 1024 * 1024);
+const SECOND_CHUNK_BYTES = 3 * 1024 * 1024;
+const SUBSEQUENT_CHUNK_BYTES = 6 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 64 * 1024 * 1024;
-const MIN_VALID_CHUNK_BYTES = 12 * 1024;
+const MIN_VALID_CHUNK_BYTES = 16 * 1024;
 const TRANSCRIBE_TIMEOUT_MS = 38_000;
 
 export type TranscribeResult =
@@ -605,19 +605,21 @@ export async function* transcribeAudioStream(
   };
 
   const reader = response.body.getReader();
-  // Fast 12MB cap for MP4 container so download + transcription finishes rapidly;
-  // 750KB for first MP3 chunk so first lines appear in ~0.5s!
   let currentTargetSize = isMp4 ? 12 * 1024 * 1024 : FIRST_CHUNK_BYTES;
   let currentBuffer = new Uint8Array(currentTargetSize);
   let offset = 0;
   let chunkIndex = 0;
   let totalDownloaded = 0;
 
+  type SafeChunkOutcome =
+    | { ok: true; value: { index: number; segments: TranscriptSegment[]; chunkDuration: number } }
+    | { ok: false; error: unknown };
+
   const rawQueue: Array<{
     slice: Uint8Array;
     index: number;
     duration: number;
-    promise?: Promise<{ index: number; segments: TranscriptSegment[]; chunkDuration: number }>;
+    promise?: Promise<SafeChunkOutcome>;
   }> = [];
   let isDownloadDone = false;
   let downloadError: Error | null = null;
@@ -629,10 +631,21 @@ export async function* transcribeAudioStream(
       if (inFlightCount >= MAX_CONCURRENT_TRANSCRIBES) break;
       if (!item.promise) {
         inFlightCount++;
-        item.promise = transcribeChunk(item.slice, item.index, item.duration).finally(() => {
-          inFlightCount--;
-          pumpParallelTranscriptions();
-        });
+        const startDelay = inFlightCount > 1 ? 350 : 0;
+        item.promise = (async (): Promise<SafeChunkOutcome> => {
+          if (startDelay > 0) {
+            await new Promise((r) => setTimeout(r, startDelay));
+          }
+          try {
+            const value = await transcribeChunk(item.slice, item.index, item.duration);
+            return { ok: true, value };
+          } catch (error) {
+            return { ok: false, error };
+          } finally {
+            inFlightCount--;
+            pumpParallelTranscriptions();
+          }
+        })();
       }
     }
   };
@@ -640,7 +653,10 @@ export async function* transcribeAudioStream(
   const enqueueChunk = (buffer: Uint8Array, length: number, index: number) => {
     if (length < MIN_VALID_CHUNK_BYTES && index > 0) return;
     if (isMp4 && index > 0) return;
-    const slice = buffer.slice(0, length);
+    const rawSlice = buffer.slice(0, length);
+    // Align every MP3 chunk (including chunk 0!) to the first valid MPEG-1 Layer 3 sync frame
+    const syncOffset = !isMp4 ? findFirstMp3SyncOffset(rawSlice, 0) : 0;
+    const slice = syncOffset > 0 && syncOffset < rawSlice.length - 4096 ? rawSlice.slice(syncOffset) : rawSlice;
     const duration = isMp4 ? 0 : estimateMp3Duration(slice);
     if (!isMp4 && duration < 0.4 && index > 0) return;
     rawQueue.push({ slice, index, duration });
@@ -648,6 +664,11 @@ export async function* transcribeAudioStream(
   };
 
   const downloadTask = (async () => {
+    // Strip ID3v2 tag (which often contains 500KB-2MB of embedded JPEG cover art) from the start of MP3 streams
+    let headerChecked = isMp4;
+    let id3BytesRemainingToSkip = 0;
+    let headerProbe = new Uint8Array(0);
+
     try {
       while (true) {
         if (signal?.aborted) {
@@ -660,11 +681,44 @@ export async function* transcribeAudioStream(
           break;
         }
 
+        let chunkData = value;
+
+        if (!headerChecked) {
+          const merged = new Uint8Array(headerProbe.length + chunkData.length);
+          merged.set(headerProbe, 0);
+          merged.set(chunkData, headerProbe.length);
+          if (merged.length < 10) {
+            headerProbe = merged;
+            continue;
+          }
+          headerChecked = true;
+          if (merged[0] === 0x49 && merged[1] === 0x44 && merged[2] === 0x33) {
+            const id3Size =
+              ((merged[6] & 0x7f) << 21) |
+              ((merged[7] & 0x7f) << 14) |
+              ((merged[8] & 0x7f) << 7) |
+              (merged[9] & 0x7f);
+            id3BytesRemainingToSkip = 10 + id3Size;
+          }
+          chunkData = merged;
+          headerProbe = new Uint8Array(0);
+        }
+
+        if (id3BytesRemainingToSkip > 0) {
+          if (chunkData.length <= id3BytesRemainingToSkip) {
+            id3BytesRemainingToSkip -= chunkData.length;
+            continue;
+          } else {
+            chunkData = chunkData.subarray(id3BytesRemainingToSkip);
+            id3BytesRemainingToSkip = 0;
+          }
+        }
+
         let valueOffset = 0;
-        while (valueOffset < value.length) {
+        while (valueOffset < chunkData.length) {
           const remainingSpace = currentTargetSize - offset;
-          const bytesToCopy = Math.min(remainingSpace, value.length - valueOffset);
-          currentBuffer.set(value.subarray(valueOffset, valueOffset + bytesToCopy), offset);
+          const bytesToCopy = Math.min(remainingSpace, chunkData.length - valueOffset);
+          currentBuffer.set(chunkData.subarray(valueOffset, valueOffset + bytesToCopy), offset);
           offset += bytesToCopy;
           valueOffset += bytesToCopy;
           totalDownloaded += bytesToCopy;
@@ -717,11 +771,16 @@ export async function* transcribeAudioStream(
       processedCount++;
       pumpParallelTranscriptions();
 
-      try {
-        const taskPromise = item.promise ?? transcribeChunk(item.slice, item.index, item.duration);
-        const chunkResult = await taskPromise;
-        const chunkSegments = chunkResult.segments;
-        const measuredDuration = chunkResult.chunkDuration;
+      const outcome: SafeChunkOutcome = item.promise
+        ? await item.promise
+        : await transcribeChunk(item.slice, item.index, item.duration).then(
+            (value) => ({ ok: true as const, value }),
+            (error) => ({ ok: false as const, error })
+          );
+
+      if (outcome.ok) {
+        const chunkSegments = outcome.value.segments;
+        const measuredDuration = outcome.value.chunkDuration;
 
         if (chunkSegments.length > 0) {
           let maxEndInChunk = 0;
@@ -744,7 +803,7 @@ export async function* transcribeAudioStream(
           hasYieldedAny = true;
           yield finalSegments;
         }
-      } catch {
+      } else {
         if (item.duration > 0) {
           currentTimeOffset += item.duration;
         }

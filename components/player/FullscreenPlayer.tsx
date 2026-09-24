@@ -185,6 +185,8 @@ export function FullscreenPlayer() {
     setTranscriptOffsetSec,
     isVideoTrack,
     waitingForTranscript,
+    playbackRate: speed,
+    setPlaybackRate,
   } = usePlayer();
   const videoStageRef = useVideoStage(Boolean(fullscreenOpen && isVideoTrack));
   const { t } = useUi();
@@ -197,13 +199,11 @@ export function FullscreenPlayer() {
   const [vocabCount, setVocabCount] = useState(0);
   const [playerTheme, setPlayerTheme] = useState<PlayerThemeId>("amber");
   const [docked, setDocked] = useState(false);
-  const [speed, setSpeed] = useState(1);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const applySpeed = (nextSpeed: number) => {
     const clamped = Math.round(Math.max(0.4, Math.min(2.5, nextSpeed)) * 100) / 100;
-    setSpeed(clamped);
-    handle.setRate(clamped);
+    setPlaybackRate(clamped);
   };
 
   useEffect(() => {

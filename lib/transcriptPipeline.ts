@@ -204,6 +204,21 @@ export async function generateTranscript(
     return { ok: true as const };
   };
 
+  let totalSegments = 0;
+
+  // Fast 4-second preview timer: if the user speeds up audio (1.5x / 2.0x) or
+  // upstream CDN takes >4s for the first Whisper chunk, immediately show contextual
+  // preview segments so the transcript panel is never blank, then replace seamlessly
+  // when the first Whisper chunk arrives.
+  const previewTimer =
+    typeof window !== "undefined"
+      ? window.setTimeout(() => {
+          if (!isCancelled() && totalSegments === 0 && liveCaptionService.getTranscript().length === 0) {
+            applyClientFallback();
+          }
+        }, 4000)
+      : undefined;
+
   const res = await fetch("/api/transcribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -218,19 +233,32 @@ export async function generateTranscript(
   }).catch(() => null);
 
   if (!res || !res.ok || !res.body) {
+    if (previewTimer) clearTimeout(previewTimer);
     return applyClientFallback();
   }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let totalSegments = 0;
 
-  liveCaptionService.clearTranscript();
+  const pushRealSegments = (incoming: FetchedSegment[]) => {
+    if (previewTimer) clearTimeout(previewTimer);
+    const mapped = incoming.map((s) => ({ ...s, isFinal: true }));
+    if (totalSegments === 0) {
+      // First real AI chunk: replace any temporary preview cleanly
+      liveCaptionService.loadTranscript(mapped);
+    } else {
+      liveCaptionService.appendTranscript(mapped);
+    }
+    totalSegments += incoming.length;
+    notifyReady();
+    void autoTranslateSegments(incoming, sourceLang, isCancelled);
+  };
 
   try {
     while (true) {
       if (isCancelled()) {
+        if (previewTimer) clearTimeout(previewTimer);
         reader.cancel();
         return totalSegments > 0 ? { ok: true } : { ok: false, error: "transcription-failed" };
       }
@@ -246,6 +274,7 @@ export async function generateTranscript(
         try {
           const data = JSON.parse(line) as { segments?: FetchedSegment[]; error?: string; reason?: string };
           if (data.error) {
+            if (previewTimer) clearTimeout(previewTimer);
             if (totalSegments > 0) {
               notifyReady();
               return { ok: true };
@@ -253,10 +282,7 @@ export async function generateTranscript(
             return applyClientFallback();
           }
           if (data.segments && data.segments.length > 0) {
-            totalSegments += data.segments.length;
-            liveCaptionService.appendTranscript(data.segments.map((s) => ({ ...s, isFinal: true })));
-            notifyReady();
-            void autoTranslateSegments(data.segments, sourceLang, isCancelled);
+            pushRealSegments(data.segments);
           }
         } catch {
           // Parse error, ignore and continue
@@ -268,22 +294,21 @@ export async function generateTranscript(
       try {
         const data = JSON.parse(buffer) as { segments?: FetchedSegment[]; error?: string; reason?: string };
         if (data.segments && data.segments.length > 0) {
-          totalSegments += data.segments.length;
-          liveCaptionService.appendTranscript(data.segments.map((s) => ({ ...s, isFinal: true })));
-          notifyReady();
-          void autoTranslateSegments(data.segments, sourceLang, isCancelled);
+          pushRealSegments(data.segments);
         }
       } catch {
         // Parse error
       }
     }
   } catch {
+    if (previewTimer) clearTimeout(previewTimer);
     if (totalSegments > 0) {
       notifyReady();
       return { ok: true };
     }
   }
 
+  if (previewTimer) clearTimeout(previewTimer);
   if (isCancelled()) return { ok: false, error: "transcription-failed" };
   if (totalSegments === 0) {
     return applyClientFallback();
