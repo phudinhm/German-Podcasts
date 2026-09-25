@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUi } from "@/lib/i18n";
+import { useSwipe } from "@/lib/useSwipe";
 import {
   clearRecents,
   forgetRecent,
@@ -21,14 +22,6 @@ import {
 import { usePlayer } from "./player/PlayerProvider";
 import { LibraryPanel } from "./listen/LibraryPanel";
 
-/**
- * The library on a page of its own.
- *
- * It also appears on the front page, but only when nothing else is open, and
- * that turned out to be the wrong place to leave it: once you had opened a
- * show there was no way back to your own shelf without clearing the search.
- * A page you can reach from anywhere fixes that.
- */
 export function LibraryClient() {
   const { t } = useUi();
   const router = useRouter();
@@ -57,8 +50,13 @@ export function LibraryClient() {
     recentSources.length === 0 &&
     favoriteEpisodes.length === 0;
 
+  const librarySwipe = useSwipe({
+    threshold: 65,
+    onSwipeRight: () => router.push("/"),
+  });
+
   return (
-    <div>
+    <div {...librarySwipe} className="animate-panel-in">
       <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs">
         <Link
           href="/"

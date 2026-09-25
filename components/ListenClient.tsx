@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedEpisode, FeedResult } from "@/lib/server/feed";
 import type { DiscoverResult } from "@/lib/server/discover";
 import { useUi } from "@/lib/i18n";
+import { useSwipe } from "@/lib/useSwipe";
 import { isMixedContent } from "@/lib/media";
 import {
   forgetRecent,
@@ -636,8 +637,22 @@ export function ListenClient() {
   // user and the thing they came back for.
   const idle = !playing && !feed && !results;
 
+  const pageSwipe = useSwipe({
+    threshold: 65,
+    onSwipeRight: () => {
+      if (feed || (results && results.length > 0)) {
+        backToResultsOrBrowse();
+      }
+    },
+    onSwipeLeft: () => {
+      if (!feed && !results) {
+        router.push("/library");
+      }
+    },
+  });
+
   return (
-    <div>
+    <div {...pageSwipe}>
       {idle ? (
         <header className="mb-4 max-w-2xl">
           <h1 className="text-[24px] font-semibold sm:text-[27px]">{t("listen.title")}</h1>

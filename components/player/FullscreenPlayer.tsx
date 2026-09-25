@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useUi } from "@/lib/i18n";
+import { useSwipe } from "@/lib/useSwipe";
 import { resolveTranslationLang } from "@/lib/language";
 import { listVocabulary } from "@/lib/vocabulary";
 import { usePlayer, useVideoStage } from "./PlayerProvider";
@@ -295,6 +296,40 @@ export function FullscreenPlayer() {
     };
   }, [fullscreenOpen, setFullscreenOpen]);
 
+  const [dragY, setDragY] = useState(0);
+  const [swipeHud, setSwipeHud] = useState<string | null>(null);
+  const hudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashHud = useCallback((text: string) => {
+    setSwipeHud(text);
+    if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+    hudTimerRef.current = setTimeout(() => setSwipeHud(null), 900);
+  }, []);
+
+  const topSwipe = useSwipe({
+    threshold: 55,
+    onDragMove: (dx, dy) => {
+      if (dy > 0 && Math.abs(dy) > Math.abs(dx)) {
+        setDragY(Math.min(260, dy * 0.78));
+      }
+    },
+    onDragEnd: () => {
+      setDragY(0);
+    },
+    onSwipeDown: () => {
+      setDragY(0);
+      setFullscreenOpen(false);
+    },
+    onSwipeLeft: () => {
+      handle.seekTo(handle.getTime() + 30, true);
+      flashHud("+30s ↻");
+    },
+    onSwipeRight: () => {
+      handle.seekTo(Math.max(0, handle.getTime() - 10), true);
+      flashHud("↺ -10s");
+    },
+  });
+
   if (!track || !fullscreenOpen) return null;
 
   const onSeekWithPlay = (seconds: number) => {
@@ -323,9 +358,29 @@ export function FullscreenPlayer() {
         className={`pointer-events-none fixed inset-0 transition-colors duration-500 ${activeThemeConfig.overlayClass}`}
       />
 
-      <div className="relative mx-auto flex h-full w-full max-w-2xl flex-col px-3 pt-[max(env(safe-area-inset-top,0px),12px)] pb-[max(env(safe-area-inset-bottom,0px),14px)] sm:px-6">
+      {swipeHud ? (
+        <div className="pointer-events-none fixed left-1/2 top-16 z-50 -translate-x-1/2 rounded-full bg-black/80 px-4 py-1.5 font-mono text-xs font-bold text-amber-300 shadow-xl backdrop-blur-md animate-panel-in">
+          {swipeHud}
+        </div>
+      ) : null}
+
+      <div
+        className="relative mx-auto flex h-full w-full max-w-2xl flex-col px-3 pt-[max(env(safe-area-inset-top,0px),8px)] pb-[max(env(safe-area-inset-bottom,0px),14px)] sm:px-6 transition-transform duration-200 ease-out"
+        style={dragY > 0 ? { transform: `translateY(${dragY}px)` } : undefined}
+      >
+        {/* Swipe-down gesture handle */}
+        <div
+          {...topSwipe}
+          className="flex flex-col items-center pt-1 pb-0.5 cursor-grab active:cursor-grabbing select-none"
+        >
+          <span className="h-1.5 w-11 rounded-full bg-white/25 transition-colors hover:bg-white/40" />
+        </div>
+
         {/* Top bar */}
-        <div className="flex shrink-0 items-center justify-between gap-2 py-1">
+        <div
+          {...topSwipe}
+          className="flex shrink-0 items-center justify-between gap-2 py-1 select-none"
+        >
           <button
             type="button"
             onClick={() => setFullscreenOpen(false)}
@@ -478,7 +533,7 @@ export function FullscreenPlayer() {
 
         {/* YouTube-style Top Center Video Player when playing a video podcast */}
         {isVideoTrack ? (
-          <div className="mt-1 mb-2 flex flex-col items-center shrink-0">
+          <div {...topSwipe} className="mt-1 mb-2 flex flex-col items-center shrink-0 select-none">
             <div
               ref={videoStageRef}
               className="mx-auto w-full max-w-xl aspect-video max-h-[28vh] sm:max-h-[34vh] rounded-2xl overflow-hidden bg-black border border-white/20 shadow-2xl"
@@ -488,7 +543,10 @@ export function FullscreenPlayer() {
             </p>
           </div>
         ) : !docked ? (
-          <div className="mt-1 mb-1 flex shrink-0 items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 backdrop-blur-md">
+          <div
+            {...topSwipe}
+            className="mt-1 mb-1 flex shrink-0 items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 backdrop-blur-md select-none"
+          >
             <Art src={track.artwork} alt="" size={52} seed={track.showTitle || track.title} />
             <div className="min-w-0 flex-1">
               <h1 className="line-clamp-1 text-sm sm:text-base font-bold leading-snug text-[var(--ink)]">

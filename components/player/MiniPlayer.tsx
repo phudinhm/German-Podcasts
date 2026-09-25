@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUi } from "@/lib/i18n";
+import { useSwipe } from "@/lib/useSwipe";
 import { usePlayer } from "./PlayerProvider";
 import { usePopout } from "./usePopout";
 import { Art } from "../listen/Art";
@@ -187,6 +188,14 @@ export function MiniPlayer() {
       setIsHovered(false);
     }, 400);
   };
+
+  const dockSwipe = useSwipe({
+    threshold: 42,
+    onSwipeUp: () => setFullscreenOpen(true),
+    onSwipeDown: () => stop(),
+    onSwipeLeft: () => handle.seekTo(handle.getTime() + 30, true),
+    onSwipeRight: () => handle.seekTo(Math.max(0, handle.getTime() - 10), true),
+  });
 
   const mobileTabBar = (
     <nav
@@ -583,8 +592,9 @@ export function MiniPlayer() {
       {/* ========================================================================= */}
       {mobileTabBar}
       <div
+        {...dockSwipe}
         data-dock="mobile-iphone"
-        className="animate-dock-in fixed inset-x-2.5 z-[45] sm:hidden rounded-2xl glass-panel text-[var(--ink)] p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.24)] transition-all overflow-hidden"
+        className="animate-dock-in fixed inset-x-2.5 z-[45] sm:hidden rounded-2xl glass-panel text-[var(--ink)] px-2.5 pt-1.5 pb-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.24)] transition-all overflow-hidden select-none"
         style={{ bottom: "calc(58px + env(safe-area-inset-bottom, 10px))" }}
       >
         {/* Module D: Thin progress bar on dock */}
@@ -595,6 +605,9 @@ export function MiniPlayer() {
             style={{ width: 0 }}
           />
         </div>
+
+        {/* Subtle swipe-up pill */}
+        <div className="mx-auto mb-1 h-1 w-8 rounded-full bg-[var(--ink-faint)]/35" aria-hidden />
 
         <div className="flex items-center justify-between gap-2">
           {/* Tapping track info opens the full "now playing" screen */}
