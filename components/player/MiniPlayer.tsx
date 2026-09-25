@@ -189,8 +189,9 @@ export function MiniPlayer() {
     }, 400);
   };
 
-  const dockSwipe = useSwipe({
+  const { handlers: dockSwipeHandlers, drag: dockDrag } = useSwipe({
     threshold: 42,
+    trackDrag: true,
     onSwipeUp: () => setFullscreenOpen(true),
     onSwipeDown: () => stop(),
     onSwipeLeft: () => handle.seekTo(handle.getTime() + 30, true),
@@ -592,11 +593,27 @@ export function MiniPlayer() {
       {/* ========================================================================= */}
       {mobileTabBar}
       <div
-        {...dockSwipe}
+        {...dockSwipeHandlers}
         data-dock="mobile-iphone"
-        className="animate-dock-in fixed inset-x-2.5 z-[45] sm:hidden rounded-2xl glass-panel text-[var(--ink)] px-2.5 pt-1.5 pb-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.24)] transition-all overflow-hidden select-none"
-        style={{ bottom: "calc(58px + env(safe-area-inset-bottom, 10px))" }}
+        className={`animate-dock-in fixed inset-x-2.5 z-[45] sm:hidden rounded-[22px] glass-panel text-[var(--ink)] px-2.5 pt-1.5 pb-2.5 shadow-[0_14px_40px_rgba(0,0,0,0.28)] overflow-hidden select-none ${
+          dockDrag.active ? "transition-none" : "transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+        }`}
+        style={{
+          bottom: "calc(58px + env(safe-area-inset-bottom, 10px))",
+          transform: dockDrag.active
+            ? `translate3d(${Math.max(-52, Math.min(52, dockDrag.x * 0.36))}px, ${Math.max(-44, Math.min(48, dockDrag.y * 0.45))}px, 0) scale(${
+                dockDrag.y < -12 ? 1.025 : dockDrag.y > 12 ? 0.975 : 1
+              })`
+            : undefined,
+        }}
       >
+        {/* Dynamic Island horizontal seek pill indicator when dragging left/right */}
+        {dockDrag.active && Math.abs(dockDrag.x) > 18 && Math.abs(dockDrag.x) > Math.abs(dockDrag.y) ? (
+          <div className="pointer-events-none absolute right-3 top-1.5 z-20 rounded-full bg-[var(--accent)] px-2 py-0.5 font-mono text-[10px] font-bold text-white shadow-sm">
+            {dockDrag.x < 0 ? "+30s ↻" : "↺ -10s"}
+          </div>
+        ) : null}
+
         {/* Module D: Thin progress bar on dock */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-[var(--rule)]/60">
           <div

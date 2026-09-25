@@ -345,17 +345,28 @@ export function FullscreenPlayer() {
     duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
   const remainingSec = duration > 0 ? Math.max(0, duration - currentTime) : 0;
 
+  const sheetOpacity = Math.max(0.18, 1 - dragY / 420);
+  const sheetScale = Math.max(0.92, 1 - dragY / 2800);
+
   return (
-    <div className="fixed inset-0 z-[80] overflow-hidden" style={activeThemeConfig.vars}>
-      <div aria-hidden className="pointer-events-none fixed inset-0 bg-[var(--paper)] transition-colors duration-500" />
+    <div className="fixed inset-0 z-[80] overflow-hidden animate-ios-sheet" style={activeThemeConfig.vars}>
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 bg-[var(--paper)] transition-colors duration-500"
+        style={{ opacity: sheetOpacity }}
+      />
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 bg-cover bg-center opacity-75 blur-3xl saturate-150 transition-all duration-700"
-        style={track.artwork ? { backgroundImage: `url(${track.artwork})` } : undefined}
+        style={{
+          ...(track.artwork ? { backgroundImage: `url(${track.artwork})` } : {}),
+          opacity: sheetOpacity * 0.75,
+        }}
       />
       <div
         aria-hidden
         className={`pointer-events-none fixed inset-0 transition-colors duration-500 ${activeThemeConfig.overlayClass}`}
+        style={{ opacity: sheetOpacity }}
       />
 
       {swipeHud ? (
@@ -365,15 +376,26 @@ export function FullscreenPlayer() {
       ) : null}
 
       <div
-        className="relative mx-auto flex h-full w-full max-w-2xl flex-col px-3 pt-[max(env(safe-area-inset-top,0px),8px)] pb-[max(env(safe-area-inset-bottom,0px),14px)] sm:px-6 transition-transform duration-200 ease-out"
-        style={dragY > 0 ? { transform: `translateY(${dragY}px)` } : undefined}
+        className={`relative mx-auto flex h-full w-full max-w-2xl flex-col px-3 pt-[max(env(safe-area-inset-top,0px),8px)] pb-[max(env(safe-area-inset-bottom,0px),14px)] sm:px-6 ${
+          dragY > 0 ? "transition-none" : "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+        }`}
+        style={
+          dragY > 0
+            ? {
+                transform: `translate3d(0, ${dragY}px, 0) scale(${sheetScale})`,
+                borderTopLeftRadius: 32,
+                borderTopRightRadius: 32,
+                boxShadow: "0 -16px 48px rgba(0,0,0,0.45)",
+              }
+            : undefined
+        }
       >
-        {/* Swipe-down gesture handle */}
+        {/* iOS grabber pill */}
         <div
           {...topSwipe}
           className="flex flex-col items-center pt-1 pb-0.5 cursor-grab active:cursor-grabbing select-none"
         >
-          <span className="h-1.5 w-11 rounded-full bg-white/25 transition-colors hover:bg-white/40" />
+          <span className="h-1.5 w-11 rounded-full bg-white/30 transition-colors hover:bg-white/45" />
         </div>
 
         {/* Top bar */}

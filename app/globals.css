@@ -23,11 +23,11 @@
   --color-accent-soft: #fdf1de;
   --color-accent-ring: #e0870f;
 
-  /* Roboto is the typeface YouTube uses; the stack degrades to the platform UI
-     font when the webfont has not arrived, which keeps metrics close. */
-  --font-display: Roboto, "Roboto Flex", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  --font-body: Roboto, "Roboto Flex", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  --font-mono: "Roboto Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Prioritize Apple SF Pro / system font stack for native iOS typography feel,
+     falling back to Roboto and Segoe UI on other platforms. */
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Roboto, "Roboto Flex", system-ui, "Segoe UI", Arial, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Roboto Flex", system-ui, "Segoe UI", Arial, sans-serif;
+  --font-mono: "SF Mono", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 
 /*
@@ -59,8 +59,9 @@
   --row-active: #fdf1de;
   --shadow-card: 0 1px 2px rgb(20 20 15 / 0.04), 0 10px 28px -12px rgb(20 20 15 / 0.14), inset 0 1px 0 rgb(255 255 255 / 0.7);
   --shadow-pop: 0 4px 12px rgb(20 20 15 / 0.08), 0 20px 48px -16px rgb(20 20 15 / 0.28), inset 0 1px 0 rgb(255 255 255 / 0.8);
-  --radius: 16px;
+  --radius: 18px;
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -424,11 +425,13 @@ h3 {
    * elements that carry both classes.
    */
   .glass-panel {
-    background: color-mix(in oklab, var(--paper-raised) 88%, transparent);
-    backdrop-filter: blur(28px) saturate(180%);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
-    border: 1px solid color-mix(in oklab, var(--rule) 75%, transparent);
-    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.08);
+    background: color-mix(in oklab, var(--paper-raised) 82%, transparent);
+    backdrop-filter: blur(40px) saturate(210%);
+    -webkit-backdrop-filter: blur(40px) saturate(210%);
+    border: 0.5px solid color-mix(in oklab, var(--rule) 80%, rgb(255 255 255 / 0.28));
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.12),
+      inset 0 0.5px 0 rgb(255 255 255 / 0.35);
   }
 
   /* A flat, borderless surface, the way modern video interfaces group content. */
@@ -774,16 +777,31 @@ h3 {
     }
   }
 
+  @keyframes iosSheetIn {
+    from {
+      opacity: 0.85;
+      transform: translate3d(0, 100%, 0) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
   .stagger-in {
-    animation: fadeInUp 280ms var(--ease-spring) both;
+    animation: fadeInUp 280ms var(--ease-ios) both;
   }
 
   .animate-panel-in {
-    animation: panelSpringIn 300ms var(--ease-spring) both;
+    animation: panelSpringIn 320ms var(--ease-ios) both;
   }
 
   .animate-dock-in {
-    animation: dockSpringUp 340ms var(--ease-spring) both;
+    animation: dockSpringUp 360ms var(--ease-ios) both;
+  }
+
+  .animate-ios-sheet {
+    animation: iosSheetIn 380ms var(--ease-ios) both;
   }
 
   /* Performance: skip layout/paint for offscreen rows in large lists */

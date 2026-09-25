@@ -637,10 +637,13 @@ export function ListenClient() {
   // user and the thing they came back for.
   const idle = !playing && !feed && !results;
 
-  const pageSwipe = useSwipe({
-    threshold: 65,
+  const canSwipeBack = Boolean(feed || (results && results.length > 0));
+
+  const { handlers: pageSwipeHandlers, drag: pageDrag } = useSwipe({
+    threshold: 62,
+    trackDrag: true,
     onSwipeRight: () => {
-      if (feed || (results && results.length > 0)) {
+      if (canSwipeBack) {
         backToResultsOrBrowse();
       }
     },
@@ -651,8 +654,45 @@ export function ListenClient() {
     },
   });
 
+  const activeSwipeOffsetX =
+    pageDrag.active && Math.abs(pageDrag.x) > Math.abs(pageDrag.y)
+      ? canSwipeBack && pageDrag.x > 0
+        ? Math.min(88, pageDrag.x * 0.34)
+        : !feed && !results && pageDrag.x < 0
+          ? Math.max(-64, pageDrag.x * 0.28)
+          : 0
+      : 0;
+
   return (
-    <div {...pageSwipe}>
+    <div
+      {...pageSwipeHandlers}
+      className={
+        pageDrag.active
+          ? "transition-none"
+          : "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+      }
+      style={
+        activeSwipeOffsetX !== 0
+          ? { transform: `translate3d(${activeSwipeOffsetX}px, 0, 0)` }
+          : undefined
+      }
+    >
+      {/* iOS Interactive Swipe-Back Edge Pill */}
+      {canSwipeBack && pageDrag.active && pageDrag.x > 14 ? (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed left-2.5 top-1/2 z-50 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full glass-panel text-[22px] font-bold text-[var(--accent)] shadow-xl"
+          style={{
+            opacity: Math.min(1, pageDrag.x / 58),
+            transform: `translate3d(${Math.min(18, pageDrag.x * 0.22)}px, -50%, 0) scale(${
+              pageDrag.x >= 58 ? 1.08 : 0.92
+            })`,
+          }}
+        >
+          ‹
+        </div>
+      ) : null}
+
       {idle ? (
         <header className="mb-4 max-w-2xl">
           <h1 className="text-[24px] font-semibold sm:text-[27px]">{t("listen.title")}</h1>

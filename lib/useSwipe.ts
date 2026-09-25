@@ -1,18 +1,32 @@
 "use client";
 
-import { useRef, type TouchEventHandler } from "react";
+import { useRef, useState, type TouchEventHandler } from "react";
 
 export interface SwipeOptions {
-  /** Minimum distance in px to trigger a swipe (default: 52). */
+  /** Minimum distance in px to trigger a swipe (default: 48). */
   threshold?: number;
-  /** Maximum time in ms for a swipe gesture (default: 750). */
+  /** Minimum velocity in px/ms to trigger a fast flick swipe even below distance threshold (default: 0.42). */
+  velocityThreshold?: number;
+  /** Maximum time in ms for a swipe gesture (default: 800). */
   maxDurationMs?: number;
+  /** Track live horizontal/vertical drag state for iOS 1:1 finger following. */
+  trackDrag?: boolean;
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
   onSwipeUp?: () => void;
   onSwipeDown?: () => void;
-  onDragMove?: (dx: number, dy: number) => void;
-  onDragEnd?: () => void;
+  onDragMove?: (dx: number, dy: number, isEdge: boolean) => void;
+  onDragEnd?: (dx: number, dy: number, vx: number, vy: number) => void;
+}
+
+function triggerLightHaptic() {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate(8);
+    }
+  } catch {
+    // Ignore on unsupported devices
+  }
 }
 
 function isInsideHorizontalScrollable(target: EventTarget | null): boolean {
@@ -41,59 +55,107 @@ function isInsideHorizontalScrollable(target: EventTarget | null): boolean {
 }
 
 /**
- * Lightweight, zero-dependency touch swipe hook for mobile & tablet gestures.
- * Safely ignores horizontal carousels (.scroll-row) and form inputs (<input>, range sliders).
+ * iOS-grade touch gesture hook with velocity flick detection, edge-swipe recognition,
+ * rubber-band damping, and 1:1 interactive finger tracking.
  */
 export function useSwipe(options: SwipeOptions) {
-  const threshold = options.threshold ?? 52;
-  const maxDurationMs = options.maxDurationMs ?? 750;
+  const threshold = options.threshold ?? 48;
+  const velocityThreshold = options.velocityThreshold ?? 0.42;
+  const maxDurationMs = options.maxDurationMs ?? 800;
+
+  const [drag, setDrag] = useState<{ x: number; y: number; active: boolean; isEdge: boolean }>({
+    x: 0,
+    y: 0,
+    active: false,
+    isEdge: false,
+  });
 
   const stateRef = useRef<{
     startX: number;
     startY: number;
+    lastX: number;
+    lastY: number;
     startTime: number;
     ignoreHorizontal: boolean;
+    isEdge: boolean;
+    lockedAxis: "x" | "y" | null;
     active: boolean;
   } | null>(null);
 
   const onTouchStart: TouchEventHandler<HTMLElement> = (e) => {
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
+    const isEdge = t.clientX <= 36 || t.clientX >= window.innerWidth - 36;
     stateRef.current = {
       startX: t.clientX,
       startY: t.clientY,
-      startTime: Date.now(),
-      ignoreHorizontal: isInsideHorizontalScrollable(e.target),
+      lastX: t.clientX,
+      lastY: t.clientY,
+      startTime: performance.now(),
+      ignoreHorizontal: !isEdge && isInsideHorizontalScrollable(e.target),
+      isEdge,
+      lockedAxis: null,
       active: true,
     };
+    if (options.trackDrag) {
+      setDrag({ x: 0, y: 0, active: true, isEdge });
+    }
   };
 
   const onTouchMove: TouchEventHandler<HTMLElement> = (e) => {
     const st = stateRef.current;
     if (!st || !st.active || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = t.clientX - st.startX;
+    const dy = t.clientY - st.startY;
+    st.lastX = t.clientX;
+    st.lastY = t.clientY;
+
+    if (!st.lockedAxis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      st.lockedAxis = Math.abs(dx) > Math.abs(dy) * 1.15 ? "x" : "y";
+    }
+
     if (options.onDragMove) {
-      const t = e.touches[0];
-      options.onDragMove(t.clientX - st.startX, t.clientY - st.startY);
+      options.onDragMove(dx, dy, st.isEdge);
+    }
+    if (options.trackDrag) {
+      const effectiveX = st.ignoreHorizontal && st.lockedAxis === "x" ? 0 : dx;
+      setDrag({ x: effectiveX, y: dy, active: true, isEdge: st.isEdge });
     }
   };
 
-  const onTouchEnd: TouchEventHandler<HTMLElement> = (e) => {
+  const finishGesture = (clientX: number, clientY: number) => {
     const st = stateRef.current;
     stateRef.current = null;
-    options.onDragEnd?.();
-    if (!st || !st.active || e.changedTouches.length === 0) return;
+    if (options.trackDrag) {
+      setDrag({ x: 0, y: 0, active: false, isEdge: false });
+    }
+    if (!st || !st.active) {
+      options.onDragEnd?.(0, 0, 0, 0);
+      return;
+    }
 
-    const elapsed = Date.now() - st.startTime;
-    if (elapsed > maxDurationMs) return;
+    const elapsed = Math.max(1, performance.now() - st.startTime);
+    const dx = clientX - st.startX;
+    const dy = clientY - st.startY;
+    const vx = dx / elapsed;
+    const vy = dy / elapsed;
 
-    const t = e.changedTouches[0];
-    const dx = t.clientX - st.startX;
-    const dy = t.clientY - st.startY;
+    options.onDragEnd?.(dx, dy, vx, vy);
+
+    if (elapsed > maxDurationMs && Math.abs(vx) < velocityThreshold && Math.abs(vy) < velocityThreshold) {
+      return;
+    }
+
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
+    const absVx = Math.abs(vx);
+    const absVy = Math.abs(vy);
 
-    if (absX > absY * 1.25 && absX >= threshold) {
+    // Horizontal iOS swipe (distance threshold OR fast flick velocity)
+    if (absX > absY * 1.2 && (absX >= threshold || (absX >= 22 && absVx >= velocityThreshold))) {
       if (st.ignoreHorizontal) return;
+      triggerLightHaptic();
       if (dx < 0) {
         options.onSwipeLeft?.();
       } else {
@@ -102,7 +164,9 @@ export function useSwipe(options: SwipeOptions) {
       return;
     }
 
-    if (absY > absX * 1.25 && absY >= threshold) {
+    // Vertical iOS swipe (distance threshold OR fast flick velocity)
+    if (absY > absX * 1.2 && (absY >= threshold || (absY >= 22 && absVy >= velocityThreshold))) {
+      triggerLightHaptic();
       if (dy < 0) {
         options.onSwipeUp?.();
       } else {
@@ -111,12 +175,28 @@ export function useSwipe(options: SwipeOptions) {
     }
   };
 
+  const onTouchEnd: TouchEventHandler<HTMLElement> = (e) => {
+    const st = stateRef.current;
+    const t = e.changedTouches[0];
+    finishGesture(t ? t.clientX : st?.lastX ?? 0, t ? t.clientY : st?.lastY ?? 0);
+  };
+
   const onTouchCancel: TouchEventHandler<HTMLElement> = () => {
     stateRef.current = null;
-    options.onDragEnd?.();
+    if (options.trackDrag) {
+      setDrag({ x: 0, y: 0, active: false, isEdge: false });
+    }
+    options.onDragEnd?.(0, 0, 0, 0);
   };
 
   return {
+    handlers: {
+      onTouchStart,
+      onTouchMove,
+      onTouchEnd,
+      onTouchCancel,
+    },
+    drag,
     onTouchStart,
     onTouchMove,
     onTouchEnd,
