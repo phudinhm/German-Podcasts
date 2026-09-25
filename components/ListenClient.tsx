@@ -30,6 +30,7 @@ import { usePlayer, useVideoStage, type Track } from "./player/PlayerProvider";
 import { Transport } from "./player/Transport";
 import { StreamControls } from "./StreamControls";
 import { Art } from "./listen/Art";
+import { LibraryPanel } from "./listen/LibraryPanel";
 import { EpisodeSort } from "./listen/EpisodeSort";
 import { sortEpisodes, type SortKey } from "@/lib/episodeSort";
 import { LiveCaptionOverlay } from "./caption/LiveCaptionOverlay";
@@ -1533,7 +1534,48 @@ export function ListenClient() {
         </section>
       ) : null}
 
-      {/* ---------------- quick link to library & catalog ---------------- */}
+      {/* ---------------- library (Recently played & Continue listening on Listen tab) ---------------- */}
+      {!feed && !results ? (
+        <LibraryPanel
+          shows={shows}
+          recents={recents}
+          recentSources={recentSources}
+          favoriteEpisodes={favoriteEpisodes}
+          onOpenShow={(saved) =>
+            openShow({
+              id: `rss:${saved.feedUrl}`,
+              title: saved.title,
+              publisher: saved.publisher,
+              description: "",
+              artwork: saved.artwork,
+              feedUrl: saved.feedUrl,
+              origin: saved.origin as DiscoverResult["origin"],
+              pageUrl: saved.pageUrl ?? null,
+            })
+          }
+          onOpenRecentSource={(source) =>
+            openShow({
+              id: `rss:${source.feedUrl}`,
+              title: source.title,
+              publisher: source.publisher,
+              description: "",
+              artwork: source.artwork,
+              feedUrl: source.feedUrl,
+              origin: (source.origin as DiscoverResult["origin"]) ?? "rss",
+              pageUrl: source.pageUrl ?? null,
+            })
+          }
+          onPlayRecent={playRecent}
+          onForget={(id) => forgetRecent(id)}
+          onUnfollow={(saved) => toggleShow(saved)}
+          onToggleFavoriteEpisode={(fav) => {
+            toggleFavoriteEpisode(fav);
+            refreshLibrary();
+          }}
+        />
+      ) : null}
+
+      {/* ---------------- quick link to library catalog ---------------- */}
       {!feed && !results ? (
         <div className="mt-6 rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
           <div className="min-w-0 flex-1">

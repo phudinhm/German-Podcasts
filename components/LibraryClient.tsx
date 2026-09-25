@@ -1,55 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUi } from "@/lib/i18n";
 import { useSwipe } from "@/lib/useSwipe";
-import {
-  clearRecents,
-  forgetRecent,
-  listRecents,
-  listShows,
-  toggleShow,
-  listRecentSources,
-  listFavoriteEpisodes,
-  toggleFavoriteEpisode,
-  type RecentEpisode,
-  type SavedShow,
-  type RecentSource,
-  type FavoriteEpisode,
-} from "@/lib/library";
-import { usePlayer } from "./player/PlayerProvider";
-import { LibraryPanel } from "./listen/LibraryPanel";
 import { DiscoverPanel } from "./listen/DiscoverPanel";
 
 export function LibraryClient() {
   const { t } = useUi();
   const router = useRouter();
-  const player = usePlayer();
-  const [shows, setShows] = useState<SavedShow[]>([]);
-  const [recents, setRecents] = useState<RecentEpisode[]>([]);
-  const [recentSources, setRecentSources] = useState<RecentSource[]>([]);
-  const [favoriteEpisodes, setFavoriteEpisodes] = useState<FavoriteEpisode[]>([]);
-
-  const refresh = useCallback(() => {
-    setShows(listShows());
-    setRecents(listRecents());
-    setRecentSources(listRecentSources());
-    setFavoriteEpisodes(listFavoriteEpisodes());
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    window.addEventListener("hoerbar:library-changed", refresh);
-    return () => window.removeEventListener("hoerbar:library-changed", refresh);
-  }, [refresh]);
-
-  const empty =
-    shows.length === 0 &&
-    recents.length === 0 &&
-    recentSources.length === 0 &&
-    favoriteEpisodes.length === 0;
 
   const { handlers: librarySwipeHandlers, drag: libraryDrag } = useSwipe({
     threshold: 62,
@@ -103,39 +62,6 @@ export function LibraryClient() {
         <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">{t("library.lede")}</p>
       </header>
 
-      {!empty ? (
-        <LibraryPanel
-          shows={shows}
-          recents={recents}
-          recentSources={recentSources}
-          favoriteEpisodes={favoriteEpisodes}
-          /* Opening a show from here hands off to the listening page, which
-             is where a feed is actually browsed. */
-          onOpenShow={(show) => router.push(`/?feed=${encodeURIComponent(show.feedUrl)}`)}
-          onOpenRecentSource={(source) => router.push(`/?feed=${encodeURIComponent(source.feedUrl)}`)}
-          onPlayRecent={(entry) => {
-            player.play({
-              id: entry.id,
-              title: entry.title,
-              showTitle: entry.showTitle,
-              artwork: entry.artwork,
-              description: entry.description,
-              kind: "audio",
-              url: entry.url,
-              durationSec: entry.durationSec,
-              publishedAt: entry.publishedAt,
-              startAt: entry.finished ? 0 : entry.position,
-            });
-          }}
-          onForget={(id) => forgetRecent(id)}
-          onUnfollow={(show) => toggleShow(show)}
-          onToggleFavoriteEpisode={(fav) => {
-            toggleFavoriteEpisode(fav);
-            refresh();
-          }}
-        />
-      ) : null}
-
       {/* Curated Directory (128 Shows by CEFR Level & Topic) + Live Charts */}
       <DiscoverPanel
         onPick={(term) => {
@@ -143,20 +69,7 @@ export function LibraryClient() {
         }}
       />
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--rule)] pt-4">
-        {recents.length > 0 ? (
-          <button
-            type="button"
-            className="btn text-[12.5px]"
-            onClick={() => {
-              if (window.confirm(t("library.clearConfirm"))) clearRecents();
-            }}
-          >
-            {t("library.clear")}
-          </button>
-        ) : (
-          <span />
-        )}
+      <div className="mt-8 flex flex-wrap items-center justify-end gap-3 border-t border-[var(--rule)] pt-4">
         <div className="flex items-center gap-2">
           <Link
             href="/"
