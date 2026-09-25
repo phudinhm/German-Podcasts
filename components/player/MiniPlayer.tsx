@@ -262,28 +262,44 @@ export function MiniPlayer() {
       <button
         type="button"
         onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
-        className="btn h-9 w-9 shrink-0 rounded-full p-0 text-[11px]"
+        className="btn h-9 w-9 shrink-0 rounded-full p-0 text-[11px] transition-all hover:scale-105 active:scale-90 border border-[var(--rule)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)] shadow-xs"
         aria-label={t("player.back10")}
         title={t("player.back10")}
       >
-        <span aria-hidden>&minus;10</span>
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <text x="12" y="15.5" fontSize="7.5" fontWeight="bold" textAnchor="middle" fill="currentColor" stroke="none">10</text>
+        </svg>
       </button>
       <button
         type="button"
         onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
-        className="btn btn-primary h-11 w-11 shrink-0 rounded-full p-0 text-[14px]"
+        className="btn btn-primary h-11 w-11 shrink-0 rounded-full p-0 transition-all hover:scale-105 active:scale-90 shadow-md shadow-[var(--accent)]/25 hover:shadow-lg hover:shadow-[var(--accent)]/35"
         aria-label={playing ? t("common.pause") : t("common.play")}
       >
-        {playing ? "❚❚" : "▶"}
+        {playing ? (
+          <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" className="w-4 h-4 ml-0.5 fill-current" aria-hidden="true">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
       </button>
       <button
         type="button"
         onClick={() => handle.seekTo(handle.getTime() + 30, true)}
-        className="btn h-9 w-9 shrink-0 rounded-full p-0 text-[11px]"
+        className="btn h-9 w-9 shrink-0 rounded-full p-0 text-[11px] transition-all hover:scale-105 active:scale-90 border border-[var(--rule)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)] shadow-xs"
         aria-label={t("player.forward30")}
         title={t("player.forward30")}
       >
-        <span aria-hidden>+30</span>
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+          <path d="M21 3v5h-5" />
+          <text x="12" y="15.5" fontSize="7.5" fontWeight="bold" textAnchor="middle" fill="currentColor" stroke="none">30</text>
+        </svg>
       </button>
     </>
   );
@@ -460,10 +476,18 @@ export function MiniPlayer() {
                   e.stopPropagation();
                   handle.isPlaying() ? handle.pause() : handle.play();
                 }}
-                className="btn btn-primary h-7 w-7 rounded-full p-0 text-[11px] shrink-0"
+                className="btn btn-primary h-7 w-7 rounded-full p-0 transition-transform active:scale-90 shadow-sm shrink-0"
                 aria-label={playing ? t("common.pause") : t("common.play")}
               >
-                {playing ? "❚❚" : "▶"}
+                {playing ? (
+                  <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current" aria-hidden="true">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="w-3 h-3 ml-0.5 fill-current" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
               </button>
             </div>
           ) : (
@@ -665,41 +689,60 @@ export function MiniPlayer() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
-              className="btn h-8 w-8 rounded-full p-0 text-[10.5px] font-semibold"
+              className="btn h-8.5 w-8.5 rounded-full p-0 flex items-center justify-center transition-all active:scale-90 border border-[var(--rule)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)] shadow-xs"
               aria-label={t("player.back10")}
               title={t("player.back10")}
             >
-              -10
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <text x="12" y="15.5" fontSize="7.5" fontWeight="bold" textAnchor="middle" fill="currentColor" stroke="none">10</text>
+              </svg>
             </button>
             <button
               type="button"
               onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
-              className="btn btn-primary h-10 w-10 rounded-full p-0 text-[14px] shadow-md"
+              className="btn btn-primary h-10 w-10 rounded-full p-0 flex items-center justify-center transition-all active:scale-90 shadow-md shadow-[var(--accent)]/30 hover:shadow-lg"
               aria-label={playing ? t("common.pause") : t("common.play")}
             >
-              {playing ? "❚❚" : "▶"}
+              {playing ? (
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="w-4 h-4 ml-0.5 fill-current" aria-hidden="true">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
             </button>
             <button
               type="button"
               onClick={() => handle.seekTo(handle.getTime() + 30, true)}
-              className="btn h-8 w-8 rounded-full p-0 text-[10.5px] font-semibold"
+              className="btn h-8.5 w-8.5 rounded-full p-0 flex items-center justify-center transition-all active:scale-90 border border-[var(--rule)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)] shadow-xs"
               aria-label={t("player.forward30")}
               title={t("player.forward30")}
             >
-              +30
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+                <text x="12" y="15.5" fontSize="7.5" fontWeight="bold" textAnchor="middle" fill="currentColor" stroke="none">30</text>
+              </svg>
             </button>
             <button
               type="button"
               onClick={stop}
-              className="icon-btn h-7 w-7 text-[15px] text-[var(--ink-faint)]"
+              className="icon-btn h-7.5 w-7.5 rounded-full flex items-center justify-center text-[var(--ink-faint)] hover:text-[var(--ink)] active:scale-90 transition-all ml-0.5"
               aria-label={t("player.miniClose")}
               title={t("player.miniClose")}
             >
-              &times;
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
           </div>
         </div>

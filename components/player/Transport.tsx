@@ -178,13 +178,17 @@ export function Transport({
            in, which is the difference between scrubbing and scrolling the page. */
         className="group relative -my-2 flex min-w-0 flex-1 cursor-pointer touch-none items-center py-2"
       >
-        <span className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--rule)]/70 transition-all group-hover:h-2.5">
+        <span className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--rule)]/60 transition-all group-hover:h-2.5">
           <span
             ref={bufferRef}
-            className="absolute inset-y-0 left-0 bg-[var(--ink-faint)]/25 rounded-full"
+            className="absolute inset-y-0 left-0 bg-[var(--ink-faint)]/20 rounded-full transition-all duration-300"
             style={{ width: 0 }}
           />
-          <span ref={fillRef} className="absolute inset-y-0 left-0 bg-[var(--accent)] rounded-full transition-all" style={{ width: 0 }} />
+          <span
+            ref={fillRef}
+            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[var(--accent)] via-amber-500 to-[var(--accent-ring,var(--accent))]"
+            style={{ width: 0 }}
+          />
         </span>
       </div>
       <span className="w-[44px] shrink-0 font-mono text-[11px] tabular-nums text-[var(--ink-faint)]">
@@ -194,32 +198,48 @@ export function Transport({
   );
 
   const buttons = (
-    <div className="flex shrink-0 items-center justify-center gap-2.5">
+    <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-2.5">
       <button
         type="button"
-        className="btn h-10 w-10 shrink-0 rounded-full p-0 text-[12px] sm:h-9 sm:w-9 transition active:scale-95 shadow-xs border border-[var(--rule)]"
+        className="btn h-9 w-9 shrink-0 rounded-full p-0 text-[11px] transition-all hover:scale-105 active:scale-90 shadow-xs border border-[var(--rule)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
         onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
         aria-label={t("player.back10")}
         title={t("player.back10")}
       >
-        <span aria-hidden>−10s</span>
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <text x="12" y="15.5" fontSize="7.5" fontWeight="bold" textAnchor="middle" fill="currentColor" stroke="none">10</text>
+        </svg>
       </button>
       <button
         type="button"
-        className="btn btn-primary h-12 w-12 shrink-0 rounded-full p-0 text-[16px] sm:h-11 sm:w-11 sm:text-[14px] transition active:scale-95 shadow-md shadow-[var(--accent)]/20"
+        className="btn btn-primary h-11 w-11 shrink-0 rounded-full p-0 transition-all hover:scale-105 active:scale-90 shadow-md shadow-[var(--accent)]/25 hover:shadow-lg hover:shadow-[var(--accent)]/35"
         onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
         aria-label={playing ? t("common.pause") : t("common.play")}
       >
-        {playing ? "❚❚" : "▶"}
+        {playing ? (
+          <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" className="w-4 h-4 ml-0.5 fill-current" aria-hidden="true">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
       </button>
       <button
         type="button"
-        className="btn h-10 w-10 shrink-0 rounded-full p-0 text-[12px] sm:h-9 sm:w-9 transition active:scale-95 shadow-xs border border-[var(--rule)]"
+        className="btn h-9 w-9 shrink-0 rounded-full p-0 text-[11px] transition-all hover:scale-105 active:scale-90 shadow-xs border border-[var(--rule)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
         onClick={() => handle.seekTo(handle.getTime() + 30, true)}
         aria-label={t("player.forward30")}
         title={t("player.forward30")}
       >
-        <span aria-hidden>+30s</span>
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+          <path d="M21 3v5h-5" />
+          <text x="12" y="15.5" fontSize="7.5" fontWeight="bold" textAnchor="middle" fill="currentColor" stroke="none">30</text>
+        </svg>
       </button>
     </div>
   );

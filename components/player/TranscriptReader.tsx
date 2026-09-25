@@ -390,13 +390,19 @@ export function TranscriptReader({
                   }`}
                 >
                   <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold ${
                       isLightTheme
                         ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                         : "bg-white/10 text-amber-200"
                     }`}
                   >
-                    <span>{isActive ? "●" : "▶"}</span>
+                    {isActive ? (
+                      <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse inline-block" />
+                    ) : (
+                      <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 fill-current inline-block" aria-hidden="true">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    )}
                     <span>
                       {formatSegTime(Math.max(0, seg.start + transcriptOffsetSec))} –{" "}
                       {formatSegTime(Math.max(0, seg.end + transcriptOffsetSec))}

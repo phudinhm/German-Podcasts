@@ -8,6 +8,7 @@ import { resolveTranslationLang } from "@/lib/language";
 import { listVocabulary } from "@/lib/vocabulary";
 import { usePlayer, useVideoStage } from "./PlayerProvider";
 import { Art } from "../listen/Art";
+import { AudioVisualizer } from "../caption/AudioVisualizer";
 import { TranscriptReader } from "./TranscriptReader";
 import { VocabularyModal } from "../caption/VocabularyModal";
 import {
@@ -418,6 +419,7 @@ export function FullscreenPlayer() {
   const [vocabCount, setVocabCount] = useState(0);
   const [playerTheme, setPlayerTheme] = useState<PlayerThemeId>("light");
   const [docked, setDocked] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const applySpeed = (nextSpeed: number) => {
@@ -521,6 +523,22 @@ export function FullscreenPlayer() {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [fullscreenOpen, handle]);
+
+  useEffect(() => {
+    const el = mediaElement();
+    if (!el) return;
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    setPlaying(!el.paused);
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
+    el.addEventListener("ended", onPause);
+    return () => {
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
+      el.removeEventListener("ended", onPause);
+    };
+  }, [mediaElement, track]);
 
   useEffect(() => {
     if (!fullscreenOpen) return;
@@ -916,35 +934,68 @@ export function FullscreenPlayer() {
         ) : !docked ? (
           <div
             {...topSwipe}
-            className={`mt-1 mb-1 flex shrink-0 items-center gap-3.5 rounded-2xl border px-3.5 py-2.5 backdrop-blur-md select-none ${
+            className={`mt-1 mb-1 flex shrink-0 items-center gap-3.5 rounded-2xl border px-3.5 py-2.5 backdrop-blur-md select-none transition-all ${
               isLight
-                ? "border-[var(--rule)] bg-[var(--paper-raised)]/90 shadow-xs"
-                : "border-white/10 bg-white/[0.04]"
+                ? "border-[var(--rule)] bg-[var(--paper-raised)]/90 shadow-sm"
+                : "border-white/10 bg-white/[0.04] shadow-md shadow-black/20"
             }`}
           >
-            <Art src={track.artwork} alt="" size={52} seed={track.showTitle || track.title} />
+            <div className="relative shrink-0">
+              <div className="overflow-hidden rounded-xl shadow-md ring-1 ring-black/10 dark:ring-white/10">
+                <Art src={track.artwork} alt="" size={52} seed={track.showTitle || track.title} />
+              </div>
+              {playing && (
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] shadow-xs">
+                  <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
+                </span>
+              )}
+            </div>
             <div className="min-w-0 flex-1">
               <h1 className="line-clamp-1 text-sm sm:text-base font-bold leading-snug text-[var(--ink)]">
                 {track.title}
               </h1>
-              <p className="mt-0.5 truncate text-xs text-[var(--ink-soft)]">
-                {track.showTitle}
-              </p>
+              <div className="mt-0.5 flex items-center gap-2">
+                <p className="truncate text-xs text-[var(--ink-soft)]">
+                  {track.showTitle}
+                </p>
+                <AudioVisualizer isPlaying={playing} barCount={4} />
+              </div>
             </div>
             <button
               type="button"
               onClick={() => setDocked(true)}
-              className={`rounded-xl border px-2.5 py-1 text-[11px] transition ${
+              className={`flex items-center gap-1 rounded-xl border px-2.5 py-1 text-[11px] font-medium transition active:scale-95 ${
                 isLight
                   ? "border-[var(--rule)] bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
                   : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
               }`}
               title="Thu gọn tiêu đề để mở rộng khung đọc transcript"
             >
-              Thu gọn
+              <span>Thu gọn</span>
+              <svg viewBox="0 0 24 24" className="w-3 h-3 stroke-current fill-none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m18 15-6-6-6 6" />
+              </svg>
             </button>
           </div>
-        ) : null}
+        ) : (
+          <div className="mt-0.5 mb-1 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setDocked(false)}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-[11px] font-medium transition active:scale-95 ${
+                isLight
+                  ? "border-[var(--rule)] bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                  : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+              }`}
+              title="Hiện lại thông tin tập podcast"
+            >
+              <span className="truncate max-w-[240px]">{track.title}</span>
+              <svg viewBox="0 0 24 24" className="w-3 h-3 stroke-current fill-none shrink-0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Main Transcript Reader (Directly below Top-Center Video, just like YouTube) */}
         <div className="mt-1 min-h-0 flex-1">
@@ -1068,18 +1119,23 @@ export function FullscreenPlayer() {
           ) : null}
 
           {/* Row 1: Subtle interactive progress bar with elapsed, percentage & remaining time */}
-          <div className="mb-2 flex items-center gap-2.5">
+          <div className="mb-2.5 flex items-center gap-2.5">
             <span className="w-10 text-right font-mono text-[11px] tabular-nums text-[var(--ink-soft)]">
               {formatClock(currentTime)}
             </span>
 
-            <div className="relative flex-1 flex items-center">
-              <div className={`h-1.5 w-full overflow-hidden rounded-full ${isLight ? "bg-black/10" : "bg-white/15"}`}>
+            <div className="group relative flex-1 flex items-center py-1.5 cursor-pointer">
+              <div className={`h-1.5 group-hover:h-2 w-full overflow-hidden rounded-full transition-all ${isLight ? "bg-black/10" : "bg-white/15"}`}>
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-400 to-amber-400 transition-all duration-150"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
+              {/* Refined glowing thumb knob */}
+              <div
+                className="pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-white shadow-[0_0_10px_rgba(245,158,11,0.6)] border-2 border-amber-500 transition-transform duration-100 group-hover:scale-125"
+                style={{ left: `${Math.min(100, Math.max(0, progressPct))}%` }}
+              />
               <input
                 type="range"
                 min={0}
@@ -1115,30 +1171,35 @@ export function FullscreenPlayer() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") setDocked((d) => !d);
               }}
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left"
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left group"
               title="Bấm để ẩn/hiện thông tin tập ở phía trên"
             >
-              <Art src={track.artwork} alt="" size={38} seed={track.showTitle || track.title} />
+              <div className="shrink-0 rounded-xl overflow-hidden shadow-xs ring-1 ring-black/5 dark:ring-white/10 group-hover:scale-105 transition-transform">
+                <Art src={track.artwork} alt="" size={38} seed={track.showTitle || track.title} />
+              </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[12.5px] font-semibold text-[var(--ink)]">
+                <p className="truncate text-[12.5px] font-semibold text-[var(--ink)] group-hover:text-[var(--accent)] transition-colors">
                   {track.title}
                 </p>
-                <p className="truncate text-[10.5px] text-[var(--ink-faint)]">
-                  {track.showTitle}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-[10.5px] text-[var(--ink-faint)]">
+                    {track.showTitle}
+                  </p>
+                  <AudioVisualizer isPlaying={playing} barCount={3} />
+                </div>
               </div>
             </div>
 
             {/* Multi-level Speed stepper & menu button */}
             <div
               className={`flex items-center rounded-full border p-0.5 ${
-                isLight ? "border-[var(--rule)] bg-[var(--surface)]" : "border-white/15 bg-black/30"
+                isLight ? "border-[var(--rule)] bg-[var(--surface)] shadow-xs" : "border-white/15 bg-black/30"
               }`}
             >
               <button
                 type="button"
                 onClick={() => applySpeed(speed - 0.1)}
-                className="flex h-7 w-6 items-center justify-center rounded-full text-xs font-bold text-[var(--ink-soft)] hover:bg-black/10 dark:hover:bg-white/15 hover:text-[var(--ink)]"
+                className="flex h-7 w-6.5 items-center justify-center rounded-full text-xs font-bold text-[var(--ink-soft)] hover:bg-black/10 dark:hover:bg-white/15 hover:text-[var(--ink)] active:scale-90 transition"
                 title="Giảm tốc độ 0.1×"
               >
                 −
@@ -1146,7 +1207,7 @@ export function FullscreenPlayer() {
               <button
                 type="button"
                 onClick={() => setShowSpeedPicker((v) => !v)}
-                className="px-1.5 font-mono text-[11.5px] font-bold text-[var(--accent)]"
+                className="px-2 font-mono text-[11.5px] font-bold text-[var(--accent)] hover:opacity-80 transition"
                 title="Chọn tốc độ phát nhiều mức (0.5× - 2.0×)"
               >
                 {speed}×
@@ -1154,26 +1215,31 @@ export function FullscreenPlayer() {
               <button
                 type="button"
                 onClick={() => applySpeed(speed + 0.1)}
-                className="flex h-7 w-6 items-center justify-center rounded-full text-xs font-bold text-[var(--ink-soft)] hover:bg-black/10 dark:hover:bg-white/15 hover:text-[var(--ink)]"
+                className="flex h-7 w-6.5 items-center justify-center rounded-full text-xs font-bold text-[var(--ink-soft)] hover:bg-black/10 dark:hover:bg-white/15 hover:text-[var(--ink)] active:scale-90 transition"
                 title="Tăng tốc độ 0.1×"
               >
                 +
               </button>
             </div>
 
-            {/* Transport controls: -10s, Play/Pause, +15s */}
-            <div className="flex shrink-0 items-center gap-1.5">
+            {/* Transport controls: -10s, Play/Pause, +30s */}
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
-                className={`flex h-9 w-9 items-center justify-center rounded-full border font-mono text-[11px] font-semibold transition active:scale-95 ${
+                className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border transition-all active:scale-90 hover:scale-105 shadow-xs ${
                   isLight
-                    ? "border-[var(--rule)] bg-[var(--surface)] text-[var(--ink)] hover:bg-black/10"
-                    : "border-white/15 bg-white/10 text-white hover:bg-white/20"
+                    ? "border-[var(--rule)] bg-[var(--surface)] text-[var(--ink)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
+                    : "border-white/15 bg-white/10 text-white hover:bg-white/20 hover:border-white/30"
                 }`}
                 title="Tua lùi 10 giây"
+                aria-label={t("player.back10")}
               >
-                -10s
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                  <text x="12" y="15.5" fontSize="7.5" fontWeight="bold" textAnchor="middle" fill="currentColor" stroke="none">10</text>
+                </svg>
               </button>
 
               <button
@@ -1182,23 +1248,36 @@ export function FullscreenPlayer() {
                   if (handle.isPlaying()) handle.pause();
                   else handle.play();
                 }}
-                aria-label={handle.isPlaying() ? t("common.pause") : t("common.play")}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white font-bold shadow-lg transition hover:opacity-95 active:scale-95"
+                aria-label={playing ? t("common.pause") : t("common.play")}
+                className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[var(--accent)] text-white font-bold shadow-lg shadow-[var(--accent)]/30 transition-all hover:scale-105 hover:shadow-xl hover:shadow-[var(--accent)]/40 active:scale-95"
               >
-                {handle.isPlaying() ? "❚❚" : "▶"}
+                {playing ? (
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 ml-0.5 fill-current" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
               </button>
 
               <button
                 type="button"
-                onClick={() => handle.seekTo(handle.getTime() + 15, true)}
-                className={`flex h-9 w-9 items-center justify-center rounded-full border font-mono text-[11px] font-semibold transition active:scale-95 ${
+                onClick={() => handle.seekTo(handle.getTime() + 30, true)}
+                className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border transition-all active:scale-90 hover:scale-105 shadow-xs ${
                   isLight
-                    ? "border-[var(--rule)] bg-[var(--surface)] text-[var(--ink)] hover:bg-black/10"
-                    : "border-white/15 bg-white/10 text-white hover:bg-white/20"
+                    ? "border-[var(--rule)] bg-[var(--surface)] text-[var(--ink)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
+                    : "border-white/15 bg-white/10 text-white hover:bg-white/20 hover:border-white/30"
                 }`}
-                title="Tua tới 15 giây"
+                title="Tua tới 30 giây"
+                aria-label={t("player.forward30")}
               >
-                +15s
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                  <path d="M21 3v5h-5" />
+                  <text x="12" y="15.5" fontSize="7.5" fontWeight="bold" textAnchor="middle" fill="currentColor" stroke="none">30</text>
+                </svg>
               </button>
             </div>
           </div>
