@@ -289,12 +289,12 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
           </div>
         </div>
 
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3">
           {sortedCatalog.map((item: Suggestion) => (
-            <li key={`${item.label}|${item.lang}`} className="min-w-0 cv-item">
+            <li key={`${item.label}|${item.lang}`} className="min-w-0">
               <button
                 type="button"
-                className="group relative flex h-full w-full flex-col justify-between rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-4 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/50 hover:shadow-md active:scale-[0.985]"
+                className="group relative flex h-full w-full flex-col justify-between rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-4 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/60 hover:shadow-md active:scale-[0.985]"
                 onClick={() => onPick(item.feedUrl ?? item.query)}
               >
                 <div>

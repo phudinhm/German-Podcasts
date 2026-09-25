@@ -589,6 +589,8 @@ h3 {
   .scroll-row {
     display: flex;
     overflow-x: auto;
+    padding-top: 4px;
+    margin-top: -4px;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
@@ -807,10 +809,13 @@ h3 {
     animation: iosSheetIn 380ms var(--ease-ios) both;
   }
 
-  /* Performance: skip layout/paint for offscreen rows in large lists */
+  /* Performance: skip layout/paint for offscreen rows in large lists while preserving hover lift & border headroom */
   .cv-item {
     content-visibility: auto;
     contain-intrinsic-size: 0 76px;
+    overflow-clip-margin: 10px;
+    padding-top: 3px;
+    padding-bottom: 3px;
   }
 }
 
