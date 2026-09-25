@@ -21,6 +21,7 @@ import {
 } from "@/lib/library";
 import { usePlayer } from "./player/PlayerProvider";
 import { LibraryPanel } from "./listen/LibraryPanel";
+import { DiscoverPanel } from "./listen/DiscoverPanel";
 
 export function LibraryClient() {
   const { t } = useUi();
@@ -102,80 +103,78 @@ export function LibraryClient() {
         <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">{t("library.lede")}</p>
       </header>
 
-      {empty ? (
-        <div className="card p-6 text-center">
-          <p className="text-[14px] text-[var(--ink-soft)]">{t("library.empty")}</p>
-          <button type="button" className="btn btn-primary mt-4" onClick={() => router.push("/")}>
-            {t("library.browse")}
+      {!empty ? (
+        <LibraryPanel
+          shows={shows}
+          recents={recents}
+          recentSources={recentSources}
+          favoriteEpisodes={favoriteEpisodes}
+          /* Opening a show from here hands off to the listening page, which
+             is where a feed is actually browsed. */
+          onOpenShow={(show) => router.push(`/?feed=${encodeURIComponent(show.feedUrl)}`)}
+          onOpenRecentSource={(source) => router.push(`/?feed=${encodeURIComponent(source.feedUrl)}`)}
+          onPlayRecent={(entry) => {
+            player.play({
+              id: entry.id,
+              title: entry.title,
+              showTitle: entry.showTitle,
+              artwork: entry.artwork,
+              description: entry.description,
+              kind: "audio",
+              url: entry.url,
+              durationSec: entry.durationSec,
+              publishedAt: entry.publishedAt,
+              startAt: entry.finished ? 0 : entry.position,
+            });
+          }}
+          onForget={(id) => forgetRecent(id)}
+          onUnfollow={(show) => toggleShow(show)}
+          onToggleFavoriteEpisode={(fav) => {
+            toggleFavoriteEpisode(fav);
+            refresh();
+          }}
+        />
+      ) : null}
+
+      {/* Curated Directory (128 Shows by CEFR Level & Topic) + Live Charts */}
+      <DiscoverPanel
+        onPick={(term) => {
+          router.push(`/?q=${encodeURIComponent(term)}`);
+        }}
+      />
+
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--rule)] pt-4">
+        {recents.length > 0 ? (
+          <button
+            type="button"
+            className="btn text-[12.5px]"
+            onClick={() => {
+              if (window.confirm(t("library.clearConfirm"))) clearRecents();
+            }}
+          >
+            {t("library.clear")}
+          </button>
+        ) : (
+          <span />
+        )}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="btn text-[12.5px] flex items-center gap-1.5"
+          >
+            <span aria-hidden>←</span>
+            <span>{t("common.back")} ({t("nav.listen")})</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="btn text-[12.5px] flex items-center gap-1"
+          >
+            <span aria-hidden>↑</span>
+            <span>{t("common.scrollToTop")}</span>
           </button>
         </div>
-      ) : (
-        <>
-          <LibraryPanel
-            shows={shows}
-            recents={recents}
-            recentSources={recentSources}
-            favoriteEpisodes={favoriteEpisodes}
-            /* Opening a show from here hands off to the listening page, which
-               is where a feed is actually browsed. */
-            onOpenShow={(show) => router.push(`/?feed=${encodeURIComponent(show.feedUrl)}`)}
-            onOpenRecentSource={(source) => router.push(`/?feed=${encodeURIComponent(source.feedUrl)}`)}
-            onPlayRecent={(entry) => {
-              player.play({
-                id: entry.id,
-                title: entry.title,
-                showTitle: entry.showTitle,
-                artwork: entry.artwork,
-                description: entry.description,
-                kind: "audio",
-                url: entry.url,
-                durationSec: entry.durationSec,
-                publishedAt: entry.publishedAt,
-                startAt: entry.finished ? 0 : entry.position,
-              });
-            }}
-            onForget={(id) => forgetRecent(id)}
-            onUnfollow={(show) => toggleShow(show)}
-            onToggleFavoriteEpisode={(fav) => {
-              toggleFavoriteEpisode(fav);
-              refresh();
-            }}
-          />
-
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--rule)] pt-4">
-            {recents.length > 0 ? (
-              <button
-                type="button"
-                className="btn text-[12.5px]"
-                onClick={() => {
-                  if (window.confirm(t("library.clearConfirm"))) clearRecents();
-                }}
-              >
-                {t("library.clear")}
-              </button>
-            ) : (
-              <span />
-            )}
-            <div className="flex items-center gap-2">
-              <Link
-                href="/"
-                className="btn text-[12.5px] flex items-center gap-1.5"
-              >
-                <span aria-hidden>←</span>
-                <span>{t("common.back")} ({t("nav.listen")})</span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                className="btn text-[12.5px] flex items-center gap-1"
-              >
-                <span aria-hidden>↑</span>
-                <span>{t("common.scrollToTop")}</span>
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+      </div>
     </div>
   );
 }

@@ -29,9 +29,7 @@ import {
 import { usePlayer, useVideoStage, type Track } from "./player/PlayerProvider";
 import { Transport } from "./player/Transport";
 import { StreamControls } from "./StreamControls";
-import { DiscoverPanel } from "./listen/DiscoverPanel";
 import { Art } from "./listen/Art";
-import { LibraryPanel } from "./listen/LibraryPanel";
 import { EpisodeSort } from "./listen/EpisodeSort";
 import { sortEpisodes, type SortKey } from "@/lib/episodeSort";
 import { LiveCaptionOverlay } from "./caption/LiveCaptionOverlay";
@@ -564,12 +562,15 @@ export function ListenClient() {
     }
   }, [player.isVideoTrack, setVideoPipMode]);
 
+  const openedQueryRef = useRef<string | null>(null);
+
   /** Returns to browsing without disturbing whatever is playing. */
   const browse = useCallback(() => {
     closeFeedView();
     setResults(null);
     setError(null);
-    if (params.get("feed")) router.push("/", { scroll: false });
+    openedQueryRef.current = null;
+    if (params.get("feed") || params.get("q")) router.push("/", { scroll: false });
   }, [closeFeedView, params, router]);
 
   useEffect(() => {
@@ -614,6 +615,18 @@ export function ListenClient() {
       pageUrl: saved?.pageUrl ?? null,
     });
   }, [requestedFeed, openFeed, closeFeedView]);
+
+  const requestedQuery = params.get("q");
+  useEffect(() => {
+    if (!requestedQuery) {
+      openedQueryRef.current = null;
+      return;
+    }
+    if (openedQueryRef.current === requestedQuery) return;
+    openedQueryRef.current = requestedQuery;
+    setQuery(requestedQuery);
+    void search(requestedQuery);
+  }, [requestedQuery, search]);
 
   const episodes = useMemo(() => {
     let list = feed?.episodes ?? [];
@@ -1520,54 +1533,25 @@ export function ListenClient() {
         </section>
       ) : null}
 
-      {/* ---------------- library ---------------- */}
+      {/* ---------------- quick link to library & catalog ---------------- */}
       {!feed && !results ? (
-        <LibraryPanel
-          shows={shows}
-          recents={recents}
-          recentSources={recentSources}
-          favoriteEpisodes={favoriteEpisodes}
-          onOpenShow={(saved) =>
-            openShow({
-              id: `rss:${saved.feedUrl}`,
-              title: saved.title,
-              publisher: saved.publisher,
-              description: "",
-              artwork: saved.artwork,
-              feedUrl: saved.feedUrl,
-              origin: saved.origin as DiscoverResult["origin"],
-              pageUrl: saved.pageUrl ?? null,
-            })
-          }
-          onOpenRecentSource={(source) =>
-            openShow({
-              id: `rss:${source.feedUrl}`,
-              title: source.title,
-              publisher: source.publisher,
-              description: "",
-              artwork: source.artwork,
-              feedUrl: source.feedUrl,
-              origin: (source.origin as DiscoverResult["origin"]) ?? "rss",
-              pageUrl: source.pageUrl ?? null,
-            })
-          }
-          onPlayRecent={playRecent}
-          onForget={(id) => forgetRecent(id)}
-          onToggleFavoriteEpisode={(fav) => {
-            toggleFavoriteEpisode(fav);
-            refreshLibrary();
-          }}
-        />
-      ) : null}
-
-      {/* ---------------- discovery ---------------- */}
-      {!feed && !results ? (
-        <DiscoverPanel
-          onPick={(term) => {
-            setQuery(term);
-            void search(term);
-          }}
-        />
+        <div className="mt-6 rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+          <div className="min-w-0 flex-1">
+            <p className="text-[14.5px] font-semibold text-[var(--ink)]">
+              📚 Danh sách 128 Kênh Podcast (A1–C2) & Bảng xếp hạng
+            </p>
+            <p className="mt-0.5 text-[12.5px] text-[var(--ink-soft)]">
+              Toàn bộ bảng xếp hạng Apple Podcasts và danh mục 128 kênh học theo cấp độ CEFR / chủ đề nằm trong tab <strong>{t("nav.library")}</strong>.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/library")}
+            className="btn btn-primary shrink-0 px-4 py-2 text-[13px] font-semibold"
+          >
+            <span>📚 Mở {t("nav.library")} →</span>
+          </button>
+        </div>
       ) : null}
 
       {/* Floating quick navigation (visible when scrolled down or when in feed/results) */}
