@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useUi } from "@/lib/i18n";
+import { useTheme, type Theme } from "@/lib/theme";
 import { useSwipe } from "@/lib/useSwipe";
 import { resolveTranslationLang } from "@/lib/language";
 import { listVocabulary } from "@/lib/vocabulary";
@@ -23,29 +24,43 @@ const PLAYER_THEME_KEY = "hoerbar.playerTheme.v1";
 export type PlayerThemeId =
   | "light"
   | "daylight"
+  | "sepia"
+  | "sakura"
+  | "matcha"
+  | "lavender"
+  | "sky"
+  | "peach"
   | "amber"
   | "oled"
   | "ocean"
   | "forest"
   | "rose"
   | "amethyst"
-  | "sepia";
+  | "espresso"
+  | "cyber";
 
 export const PLAYER_THEMES: Record<
   PlayerThemeId,
   {
     name: string;
     swatch: string;
+    accentDot: string;
     isLight?: boolean;
+    siteTheme: Theme;
     overlayClass: string;
     vars: CSSProperties;
   }
 > = {
+  // =========================================================================
+  // 8 LIGHT THEMES (GIAO DIỆN SÁNG)
+  // =========================================================================
   light: {
     name: "Light Paper (Sáng ấm)",
     swatch: "#faf7f2",
+    accentDot: "#b45309",
     isLight: true,
-    overlayClass: "bg-[#faf7f2]/88",
+    siteTheme: "light",
+    overlayClass: "bg-[#faf7f2]/90",
     vars: {
       ["--paper" as string]: "#faf7f2",
       ["--paper-raised" as string]: "#ffffff",
@@ -62,8 +77,10 @@ export const PLAYER_THEMES: Record<
   daylight: {
     name: "Pure Daylight (Trắng sáng)",
     swatch: "#ffffff",
+    accentDot: "#0284c7",
     isLight: true,
-    overlayClass: "bg-slate-50/90",
+    siteTheme: "daylight",
+    overlayClass: "bg-slate-50/92",
     vars: {
       ["--paper" as string]: "#f8fafc",
       ["--paper-raised" as string]: "#ffffff",
@@ -77,10 +94,136 @@ export const PLAYER_THEMES: Record<
       ["--accent-soft" as string]: "#e0f2fe",
     },
   },
+  sepia: {
+    name: "Warm Sepia (Sách cổ)",
+    swatch: "#f5eee2",
+    accentDot: "#b45309",
+    isLight: true,
+    siteTheme: "sepia",
+    overlayClass: "bg-[#f5eee2]/92",
+    vars: {
+      ["--paper" as string]: "#f5eee2",
+      ["--paper-raised" as string]: "#fbf6ec",
+      ["--ink" as string]: "#2b2118",
+      ["--ink-soft" as string]: "#5c4938",
+      ["--ink-faint" as string]: "#87715c",
+      ["--rule" as string]: "#e3d5c1",
+      ["--surface" as string]: "#ede2d0",
+      ["--accent" as string]: "#b45309",
+      ["--accent-ring" as string]: "#d97706",
+      ["--accent-soft" as string]: "#f3e2c7",
+    },
+  },
+  sakura: {
+    name: "Sakura Blossom (Hồng đào)",
+    swatch: "#fff5f7",
+    accentDot: "#e11d48",
+    isLight: true,
+    siteTheme: "sakura",
+    overlayClass: "bg-[#fff5f7]/92",
+    vars: {
+      ["--paper" as string]: "#fff5f7",
+      ["--paper-raised" as string]: "#ffffff",
+      ["--ink" as string]: "#2d1219",
+      ["--ink-soft" as string]: "#633340",
+      ["--ink-faint" as string]: "#945d6c",
+      ["--rule" as string]: "#f8d7e0",
+      ["--surface" as string]: "#fce8ee",
+      ["--accent" as string]: "#e11d48",
+      ["--accent-ring" as string]: "#f43f5e",
+      ["--accent-soft" as string]: "#ffe4e9",
+    },
+  },
+  matcha: {
+    name: "Matcha Mint (Xanh trà)",
+    swatch: "#f2fbf7",
+    accentDot: "#059669",
+    isLight: true,
+    siteTheme: "matcha",
+    overlayClass: "bg-[#f2fbf7]/92",
+    vars: {
+      ["--paper" as string]: "#f2fbf7",
+      ["--paper-raised" as string]: "#ffffff",
+      ["--ink" as string]: "#0e291e",
+      ["--ink-soft" as string]: "#2e5946",
+      ["--ink-faint" as string]: "#578570",
+      ["--rule" as string]: "#d1ede0",
+      ["--surface" as string]: "#e6f6ee",
+      ["--accent" as string]: "#059669",
+      ["--accent-ring" as string]: "#10b981",
+      ["--accent-soft" as string]: "#d1fae5",
+    },
+  },
+  lavender: {
+    name: "Lavender Mist (Oải hương)",
+    swatch: "#f7f5ff",
+    accentDot: "#7c3aed",
+    isLight: true,
+    siteTheme: "lavender",
+    overlayClass: "bg-[#f7f5ff]/92",
+    vars: {
+      ["--paper" as string]: "#f7f5ff",
+      ["--paper-raised" as string]: "#ffffff",
+      ["--ink" as string]: "#1e1538",
+      ["--ink-soft" as string]: "#4c3d75",
+      ["--ink-faint" as string]: "#7868a3",
+      ["--rule" as string]: "#e4def7",
+      ["--surface" as string]: "#efeafd",
+      ["--accent" as string]: "#7c3aed",
+      ["--accent-ring" as string]: "#8b5cf6",
+      ["--accent-soft" as string]: "#ede9fe",
+    },
+  },
+  sky: {
+    name: "Nordic Ice (Xanh băng)",
+    swatch: "#f0f8ff",
+    accentDot: "#0284c7",
+    isLight: true,
+    siteTheme: "sky",
+    overlayClass: "bg-[#f0f8ff]/92",
+    vars: {
+      ["--paper" as string]: "#f0f8ff",
+      ["--paper-raised" as string]: "#ffffff",
+      ["--ink" as string]: "#0c2238",
+      ["--ink-soft" as string]: "#315273",
+      ["--ink-faint" as string]: "#5e82a6",
+      ["--rule" as string]: "#d4e8fa",
+      ["--surface" as string]: "#e5f2fc",
+      ["--accent" as string]: "#0284c7",
+      ["--accent-ring" as string]: "#38bdf8",
+      ["--accent-soft" as string]: "#e0f2fe",
+    },
+  },
+  peach: {
+    name: "Sunset Peach (Cam đào)",
+    swatch: "#fff7ed",
+    accentDot: "#ea580c",
+    isLight: true,
+    siteTheme: "peach",
+    overlayClass: "bg-[#fff7ed]/92",
+    vars: {
+      ["--paper" as string]: "#fff7ed",
+      ["--paper-raised" as string]: "#ffffff",
+      ["--ink" as string]: "#2e180b",
+      ["--ink-soft" as string]: "#663d24",
+      ["--ink-faint" as string]: "#996647",
+      ["--rule" as string]: "#f7dec4",
+      ["--surface" as string]: "#fdeddb",
+      ["--accent" as string]: "#ea580c",
+      ["--accent-ring" as string]: "#f97316",
+      ["--accent-soft" as string]: "#ffedd5",
+    },
+  },
+
+  // =========================================================================
+  // 8 DARK THEMES (GIAO DIỆN TỐI)
+  // =========================================================================
   amber: {
-    name: "Amber Classic",
-    swatch: "#f59e0b",
-    overlayClass: "bg-black/75",
+    name: "Amber Classic (Đêm vàng)",
+    swatch: "#17191d",
+    accentDot: "#fbbf24",
+    siteTheme: "dark",
+    overlayClass: "bg-black/78",
     vars: {
       ["--paper" as string]: "#0b0c0e",
       ["--paper-raised" as string]: "#1e2024",
@@ -95,8 +238,10 @@ export const PLAYER_THEMES: Record<
     },
   },
   oled: {
-    name: "Midnight OLED",
-    swatch: "#18181b",
+    name: "Midnight OLED (Đen tuyền)",
+    swatch: "#000000",
+    accentDot: "#ffffff",
+    siteTheme: "midnight",
     overlayClass: "bg-black/92",
     vars: {
       ["--paper" as string]: "#000000",
@@ -106,15 +251,17 @@ export const PLAYER_THEMES: Record<
       ["--ink-faint" as string]: "#71717a",
       ["--rule" as string]: "#27272a",
       ["--surface" as string]: "#141417",
-      ["--accent" as string]: "#ffffff",
-      ["--accent-ring" as string]: "#ffffff",
+      ["--accent" as string]: "#fbbf24",
+      ["--accent-ring" as string]: "#fbbf24",
       ["--accent-soft" as string]: "#1f1f23",
     },
   },
   ocean: {
-    name: "Nordic Ocean",
-    swatch: "#0ea5e9",
-    overlayClass: "bg-slate-950/80",
+    name: "Nordic Ocean (Biển đêm)",
+    swatch: "#06111f",
+    accentDot: "#38bdf8",
+    siteTheme: "ocean",
+    overlayClass: "bg-slate-950/82",
     vars: {
       ["--paper" as string]: "#06111f",
       ["--paper-raised" as string]: "#0d2138",
@@ -129,9 +276,11 @@ export const PLAYER_THEMES: Record<
     },
   },
   forest: {
-    name: "Emerald Matcha",
-    swatch: "#10b981",
-    overlayClass: "bg-emerald-950/80",
+    name: "Emerald Forest (Rừng đêm)",
+    swatch: "#061811",
+    accentDot: "#34d399",
+    siteTheme: "forest",
+    overlayClass: "bg-emerald-950/82",
     vars: {
       ["--paper" as string]: "#061811",
       ["--paper-raised" as string]: "#0d291e",
@@ -146,9 +295,11 @@ export const PLAYER_THEMES: Record<
     },
   },
   rose: {
-    name: "Sunset Rose",
-    swatch: "#f43f5e",
-    overlayClass: "bg-rose-950/80",
+    name: "Sunset Rose (Đỏ rượu)",
+    swatch: "#1a0810",
+    accentDot: "#fb7185",
+    siteTheme: "rose",
+    overlayClass: "bg-rose-950/82",
     vars: {
       ["--paper" as string]: "#1a0810",
       ["--paper-raised" as string]: "#2d111e",
@@ -163,9 +314,11 @@ export const PLAYER_THEMES: Record<
     },
   },
   amethyst: {
-    name: "Royal Amethyst",
-    swatch: "#a855f7",
-    overlayClass: "bg-purple-950/80",
+    name: "Royal Amethyst (Tím đêm)",
+    swatch: "#110820",
+    accentDot: "#c084fc",
+    siteTheme: "amethyst",
+    overlayClass: "bg-purple-950/82",
     vars: {
       ["--paper" as string]: "#110820",
       ["--paper-raised" as string]: "#21123a",
@@ -179,10 +332,12 @@ export const PLAYER_THEMES: Record<
       ["--accent-soft" as string]: "#351e5a",
     },
   },
-  sepia: {
-    name: "Warm Sepia",
-    swatch: "#d97706",
-    overlayClass: "bg-stone-950/80",
+  espresso: {
+    name: "Mocha Espresso (Cà phê)",
+    swatch: "#1c1610",
+    accentDot: "#f59e0b",
+    siteTheme: "espresso",
+    overlayClass: "bg-stone-950/82",
     vars: {
       ["--paper" as string]: "#1c1610",
       ["--paper-raised" as string]: "#2c231a",
@@ -194,6 +349,25 @@ export const PLAYER_THEMES: Record<
       ["--accent" as string]: "#f59e0b",
       ["--accent-ring" as string]: "#f59e0b",
       ["--accent-soft" as string]: "#423426",
+    },
+  },
+  cyber: {
+    name: "Cyber Neon (Xanh Neon)",
+    swatch: "#090b1a",
+    accentDot: "#22d3ee",
+    siteTheme: "cyber",
+    overlayClass: "bg-indigo-950/85",
+    vars: {
+      ["--paper" as string]: "#090b1a",
+      ["--paper-raised" as string]: "#131733",
+      ["--ink" as string]: "#ecfeff",
+      ["--ink-soft" as string]: "#a5f3fc",
+      ["--ink-faint" as string]: "#67e8f9",
+      ["--rule" as string]: "#252c5c",
+      ["--surface" as string]: "#181d3f",
+      ["--accent" as string]: "#22d3ee",
+      ["--accent-ring" as string]: "#06b6d4",
+      ["--accent-soft" as string]: "#162e45",
     },
   },
 };
@@ -231,6 +405,7 @@ export function FullscreenPlayer() {
   } = usePlayer();
   const videoStageRef = useVideoStage(Boolean(fullscreenOpen && isVideoTrack));
   const { t } = useUi();
+  const { theme: siteTheme, resolved: siteResolved, setTheme: setSiteTheme } = useTheme();
   const [currentTime, setCurrentTime] = useState(0);
   const [settings, setSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
@@ -249,7 +424,36 @@ export function FullscreenPlayer() {
 
   useEffect(() => {
     setSettings(loadCaptionSettings());
-    const syncWithSiteTheme = () => {
+  }, []);
+
+  // Automatically sync playerTheme with the global site theme whenever siteTheme or siteResolved changes
+  useEffect(() => {
+    const siteToPlayerMap: Record<Theme, PlayerThemeId> = {
+      system: siteResolved === "dark" ? "amber" : "light",
+      light: "light",
+      daylight: "daylight",
+      sepia: "sepia",
+      sakura: "sakura",
+      matcha: "matcha",
+      lavender: "lavender",
+      sky: "sky",
+      peach: "peach",
+      dark: "amber",
+      midnight: "oled",
+      ocean: "ocean",
+      forest: "forest",
+      rose: "rose",
+      amethyst: "amethyst",
+      espresso: "espresso",
+      cyber: "cyber",
+    };
+    if (siteTheme !== "system") {
+      const mapped = siteToPlayerMap[siteTheme] ?? "light";
+      setPlayerTheme(mapped);
+      try {
+        localStorage.setItem(PLAYER_THEME_KEY, mapped);
+      } catch {}
+    } else {
       try {
         const savedTheme = localStorage.getItem(PLAYER_THEME_KEY) as PlayerThemeId | null;
         if (savedTheme && PLAYER_THEMES[savedTheme]) {
@@ -257,26 +461,9 @@ export function FullscreenPlayer() {
           return;
         }
       } catch {}
-      const isSiteDark =
-        typeof document !== "undefined" && document.documentElement.classList.contains("dark");
-      setPlayerTheme(isSiteDark ? "amber" : "light");
-    };
-    syncWithSiteTheme();
-
-    if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
-      const obs = new MutationObserver(() => {
-        const isSiteDark = document.documentElement.classList.contains("dark");
-        setPlayerTheme((prev) => {
-          if (isSiteDark && (prev === "light" || prev === "daylight")) return "amber";
-          if (!isSiteDark && prev !== "light" && prev !== "daylight") return "light";
-          return prev;
-        });
-      });
-      obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-      return () => obs.disconnect();
+      setPlayerTheme(siteResolved === "dark" ? "amber" : "light");
     }
-    return undefined;
-  }, []);
+  }, [siteTheme, siteResolved]);
 
   useEffect(() => {
     const updateVocabCount = () => setVocabCount(listVocabulary().length);
@@ -287,6 +474,10 @@ export function FullscreenPlayer() {
 
   const handleSelectPlayerTheme = (id: PlayerThemeId) => {
     setPlayerTheme(id);
+    const cfg = PLAYER_THEMES[id];
+    if (cfg?.siteTheme) {
+      setSiteTheme(cfg.siteTheme);
+    }
     try {
       localStorage.setItem(PLAYER_THEME_KEY, id);
     } catch {
@@ -595,10 +786,10 @@ export function FullscreenPlayer() {
 
         {/* Theme Picker Popover */}
         {showThemePicker && (
-          <div className="absolute left-3 right-3 sm:left-auto sm:right-6 sm:w-80 top-14 z-30 rounded-2xl bg-[var(--paper-raised)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute left-3 right-3 sm:left-auto sm:right-6 sm:w-96 max-h-[78vh] overflow-y-auto top-14 z-30 rounded-2xl bg-[var(--paper-raised)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
             <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[var(--rule)]">
               <span className="text-xs font-bold text-[var(--ink)]">
-                🎨 Chọn chủ đề giao diện (Light / Dark)
+                🎨 Bảng màu giao diện (16 Chủ đề Sáng & Tối)
               </span>
               <button
                 type="button"
@@ -608,29 +799,75 @@ export function FullscreenPlayer() {
                 ✕
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(PLAYER_THEMES) as PlayerThemeId[]).map((id) => {
-                const item = PLAYER_THEMES[id];
-                const active = playerTheme === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => handleSelectPlayerTheme(id)}
-                    className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-xs font-medium transition ${
-                      active
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)] font-semibold shadow-sm"
-                        : "border-[var(--rule)] bg-[var(--surface)]/60 text-[var(--ink-soft)] hover:bg-[var(--surface)]"
-                    }`}
-                  >
-                    <span
-                      className="h-4 w-4 shrink-0 rounded-full border border-black/20 shadow-inner"
-                      style={{ backgroundColor: item.swatch }}
-                    />
-                    <span className="truncate">{item.name}</span>
-                  </button>
-                );
-              })}
+
+            <p className="mb-1.5 text-[11px] font-semibold text-[var(--ink-soft)]">
+              ☀️ Giao diện Sáng (8 màu)
+            </p>
+            <div className="grid grid-cols-2 gap-1.5 mb-3">
+              {(Object.keys(PLAYER_THEMES) as PlayerThemeId[])
+                .filter((id) => PLAYER_THEMES[id].isLight)
+                .map((id) => {
+                  const item = PLAYER_THEMES[id];
+                  const active = playerTheme === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => handleSelectPlayerTheme(id)}
+                      className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left text-[11.5px] font-medium transition ${
+                        active
+                          ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)] font-semibold shadow-sm"
+                          : "border-[var(--rule)] bg-[var(--surface)]/60 text-[var(--ink-soft)] hover:bg-[var(--surface)]"
+                      }`}
+                    >
+                      <span
+                        className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-black/20 shadow-inner"
+                        style={{ backgroundColor: item.swatch }}
+                      >
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: item.accentDot }}
+                        />
+                      </span>
+                      <span className="truncate">{item.name}</span>
+                    </button>
+                  );
+                })}
+            </div>
+
+            <p className="mb-1.5 text-[11px] font-semibold text-[var(--ink-soft)]">
+              🌙 Giao diện Tối (8 màu)
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(Object.keys(PLAYER_THEMES) as PlayerThemeId[])
+                .filter((id) => !PLAYER_THEMES[id].isLight)
+                .map((id) => {
+                  const item = PLAYER_THEMES[id];
+                  const active = playerTheme === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => handleSelectPlayerTheme(id)}
+                      className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left text-[11.5px] font-medium transition ${
+                        active
+                          ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)] font-semibold shadow-sm"
+                          : "border-[var(--rule)] bg-[var(--surface)]/60 text-[var(--ink-soft)] hover:bg-[var(--surface)]"
+                      }`}
+                    >
+                      <span
+                        className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-white/25 shadow-inner"
+                        style={{ backgroundColor: item.swatch }}
+                      >
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: item.accentDot }}
+                        />
+                      </span>
+                      <span className="truncate">{item.name}</span>
+                    </button>
+                  );
+                })}
             </div>
           </div>
         )}

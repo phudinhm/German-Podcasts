@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ACCENT_COLORS,
   ACCENT_KEY,
+  LIGHT_THEMES,
   THEME_KEY,
   THEMES,
   ThemeContext,
@@ -84,22 +85,32 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       ? systemDark
         ? "dark"
         : "light"
-      : theme === "light" || theme === "sepia"
+      : LIGHT_THEMES.includes(theme)
         ? "light"
         : "dark";
 
   useEffect(() => {
+    document.documentElement.classList.toggle("dark", resolved === "dark");
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
       const colorMap: Record<Theme, string> = {
         system: resolved === "dark" ? "#0d0e11" : "#ffffff",
-        light: "#ffffff",
+        light: "#fbfaf9",
+        daylight: "#f8fafc",
         sepia: "#f5eee2",
+        sakura: "#fff5f7",
+        matcha: "#f2fbf7",
+        lavender: "#f7f5ff",
+        sky: "#f0f8ff",
+        peach: "#fff7ed",
         dark: "#0d0e11",
+        midnight: "#000000",
         ocean: "#071321",
         forest: "#071912",
-        midnight: "#000000",
         rose: "#1a0911",
+        amethyst: "#110820",
+        espresso: "#16100c",
+        cyber: "#090b1a",
       };
       meta.setAttribute("content", colorMap[theme] ?? "#0d0e11");
     }

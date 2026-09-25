@@ -5,45 +5,78 @@ import { createContext, useContext } from "react";
 export type Theme =
   | "system"
   | "light"
-  | "dark"
+  | "daylight"
   | "sepia"
+  | "sakura"
+  | "matcha"
+  | "lavender"
+  | "sky"
+  | "peach"
+  | "dark"
+  | "midnight"
   | "ocean"
   | "forest"
-  | "midnight"
-  | "rose";
+  | "rose"
+  | "amethyst"
+  | "espresso"
+  | "cyber";
+
+export const LIGHT_THEMES: Theme[] = [
+  "light",
+  "daylight",
+  "sepia",
+  "sakura",
+  "matcha",
+  "lavender",
+  "sky",
+  "peach",
+];
 
 export const THEMES: Theme[] = [
   "system",
   "light",
-  "dark",
+  "daylight",
   "sepia",
+  "sakura",
+  "matcha",
+  "lavender",
+  "sky",
+  "peach",
+  "dark",
+  "midnight",
   "ocean",
   "forest",
-  "midnight",
   "rose",
+  "amethyst",
+  "espresso",
+  "cyber",
 ];
 
 export const THEME_KEY = "hoerbar.theme.v1";
 
 export type AccentColor =
   | "amber"
-  | "blue"
-  | "teal"
+  | "orange"
+  | "gold"
   | "green"
+  | "teal"
+  | "cyan"
+  | "blue"
   | "indigo"
   | "purple"
-  | "rose"
-  | "gold";
+  | "rose";
 
 export const ACCENT_COLORS: AccentColor[] = [
   "amber",
-  "blue",
-  "teal",
+  "orange",
+  "gold",
   "green",
+  "teal",
+  "cyan",
+  "blue",
   "indigo",
   "purple",
   "rose",
-  "gold",
 ];
 
 export const ACCENT_KEY = "hoerbar.accent.v1";

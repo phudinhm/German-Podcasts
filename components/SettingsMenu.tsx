@@ -14,39 +14,45 @@ const THEME_OPTIONS: Array<{
   value: Theme;
   label: string;
   swatch: string;
-  glyph: string;
+  accentDot: string;
+  group: "auto" | "light" | "dark";
 }> = [
-  { value: "system", label: "Auto (System)", swatch: "#71717a", glyph: "◐" },
-  { value: "light", label: "Light Paper", swatch: "#fbfaf9", glyph: "☀" },
-  { value: "dark", label: "Dark Slate", swatch: "#17191d", glyph: "☾" },
-  { value: "midnight", label: "Midnight OLED", swatch: "#000000", glyph: "★" },
-  { value: "sepia", label: "Warm Sepia", swatch: "#e6d5b8", glyph: "📖" },
-  { value: "ocean", label: "Nordic Ocean", swatch: "#0ea5e9", glyph: "🌊" },
-  { value: "forest", label: "Emerald Matcha", swatch: "#10b981", glyph: "🌲" },
-  { value: "rose", label: "Sunset Rose", swatch: "#f43f5e", glyph: "🌹" },
+  { value: "system", label: "Auto (System)", swatch: "#71717a", accentDot: "#fbbf24", group: "auto" },
+  // 8 Light Themes
+  { value: "light", label: "Light Paper", swatch: "#fbfaf9", accentDot: "#b45309", group: "light" },
+  { value: "daylight", label: "Pure Daylight", swatch: "#f8fafc", accentDot: "#0284c7", group: "light" },
+  { value: "sepia", label: "Warm Sepia", swatch: "#f5eee2", accentDot: "#d97706", group: "light" },
+  { value: "sakura", label: "Sakura Pink", swatch: "#fff5f7", accentDot: "#e11d48", group: "light" },
+  { value: "matcha", label: "Matcha Mint", swatch: "#f2fbf7", accentDot: "#059669", group: "light" },
+  { value: "lavender", label: "Lavender Mist", swatch: "#f7f5ff", accentDot: "#7c3aed", group: "light" },
+  { value: "sky", label: "Nordic Ice", swatch: "#f0f8ff", accentDot: "#0284c7", group: "light" },
+  { value: "peach", label: "Sunset Peach", swatch: "#fff7ed", accentDot: "#ea580c", group: "light" },
+  // 8 Dark Themes
+  { value: "dark", label: "Amber Dark", swatch: "#17191d", accentDot: "#fbbf24", group: "dark" },
+  { value: "midnight", label: "Midnight OLED", swatch: "#000000", accentDot: "#f59e0b", group: "dark" },
+  { value: "ocean", label: "Nordic Ocean", swatch: "#071321", accentDot: "#38bdf8", group: "dark" },
+  { value: "forest", label: "Emerald Forest", swatch: "#071912", accentDot: "#34d399", group: "dark" },
+  { value: "rose", label: "Sunset Rose", swatch: "#1a0911", accentDot: "#fb7185", group: "dark" },
+  { value: "amethyst", label: "Royal Amethyst", swatch: "#110820", accentDot: "#c084fc", group: "dark" },
+  { value: "espresso", label: "Mocha Espresso", swatch: "#16100c", accentDot: "#f59e0b", group: "dark" },
+  { value: "cyber", label: "Cyber Neon", swatch: "#090b1a", accentDot: "#22d3ee", group: "dark" },
 ];
 
 const ACCENT_OPTIONS: Array<{
   value: AccentColor;
-  key:
-    | "theme.accentAmber"
-    | "theme.accentBlue"
-    | "theme.accentTeal"
-    | "theme.accentGreen"
-    | "theme.accentIndigo"
-    | "theme.accentPurple"
-    | "theme.accentRose"
-    | "theme.accentGold";
+  label: string;
   swatch: string;
 }> = [
-  { value: "amber", key: "theme.accentAmber", swatch: "#e0870f" },
-  { value: "blue", key: "theme.accentBlue", swatch: "#2f83b8" },
-  { value: "teal", key: "theme.accentTeal", swatch: "#1f9188" },
-  { value: "green", key: "theme.accentGreen", swatch: "#5f8f3e" },
-  { value: "indigo", key: "theme.accentIndigo", swatch: "#5c6bc4" },
-  { value: "purple", key: "theme.accentPurple", swatch: "#8659b3" },
-  { value: "rose", key: "theme.accentRose", swatch: "#c1466a" },
-  { value: "gold", key: "theme.accentGold", swatch: "#b6911f" },
+  { value: "amber", label: "Amber", swatch: "#e0870f" },
+  { value: "orange", label: "Orange", swatch: "#ea580c" },
+  { value: "gold", label: "Gold", swatch: "#b6911f" },
+  { value: "green", label: "Green", swatch: "#5f8f3e" },
+  { value: "teal", label: "Teal", swatch: "#1f9188" },
+  { value: "cyan", label: "Cyan", swatch: "#0891b2" },
+  { value: "blue", label: "Blue", swatch: "#2f83b8" },
+  { value: "indigo", label: "Indigo", swatch: "#5c6bc4" },
+  { value: "purple", label: "Purple", swatch: "#8659b3" },
+  { value: "rose", label: "Rose", swatch: "#c1466a" },
 ];
 
 export function SettingsMenu() {
@@ -115,13 +121,17 @@ export function SettingsMenu() {
       {open ? (
         <div
           role="menu"
-          className="card absolute right-0 top-full z-50 mt-2 w-[260px] overflow-hidden p-2.5 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-2xl"
+          className="card absolute right-0 top-full z-50 mt-2 w-[300px] max-h-[82vh] overflow-y-auto p-3 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-2xl"
         >
           <p className="px-1.5 pb-1.5 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
-            🎨 {t("theme.title")} (8 Themes)
+            🎨 {t("theme.title")} (16+ Chủ đề màu)
           </p>
-          <div className="grid grid-cols-2 gap-1">
-            {THEME_OPTIONS.map((option) => {
+
+          <p className="px-1.5 pb-1 pt-0.5 text-[10px] font-semibold text-[var(--ink-soft)]">
+            ☀️ Giao diện Sáng (Light)
+          </p>
+          <div className="grid grid-cols-2 gap-1 mb-2">
+            {THEME_OPTIONS.filter((o) => o.group === "light" || o.group === "auto").map((option) => {
               const active = theme === option.value;
               return (
                 <button
@@ -138,9 +148,49 @@ export function SettingsMenu() {
                 >
                   <span
                     aria-hidden
-                    className="h-3.5 w-3.5 shrink-0 rounded-full border border-[var(--rule)]"
+                    className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-black/20 shadow-2xs"
                     style={{ background: option.swatch }}
-                  />
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ background: option.accentDot }}
+                    />
+                  </span>
+                  <span className="truncate">{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="px-1.5 pb-1 pt-1 text-[10px] font-semibold text-[var(--ink-soft)]">
+            🌙 Giao diện Tối (Dark)
+          </p>
+          <div className="grid grid-cols-2 gap-1">
+            {THEME_OPTIONS.filter((o) => o.group === "dark").map((option) => {
+              const active = theme === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={active}
+                  onClick={() => setTheme(option.value)}
+                  className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-[11.5px] transition ${
+                    active
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] font-semibold text-[var(--accent)]"
+                      : "border-transparent hover:bg-[var(--surface)] text-[var(--ink)]"
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-white/25 shadow-2xs"
+                    style={{ background: option.swatch }}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ background: option.accentDot }}
+                    />
+                  </span>
                   <span className="truncate">{option.label}</span>
                 </button>
               );
@@ -158,8 +208,8 @@ export function SettingsMenu() {
                 role="menuitemradio"
                 aria-checked={accent === option.value}
                 onClick={() => setAccent(option.value)}
-                title={t(option.key)}
-                aria-label={t(option.key)}
+                title={option.label}
+                aria-label={option.label}
                 className={`grid h-6 w-6 place-items-center rounded-full border transition ${
                   accent === option.value
                     ? "border-[var(--ink)]"
