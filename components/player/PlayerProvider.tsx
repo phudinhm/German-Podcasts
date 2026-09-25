@@ -552,7 +552,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const updateRect = () => {
       frame = 0;
       const r = stage.getBoundingClientRect();
-      if (r.width > 20 && r.height > 20 && r.bottom > 40 && r.top < window.innerHeight - 40) {
+      const headerEl = typeof document !== "undefined" ? document.querySelector("header") : null;
+      const headerBottom = !fullscreenOpen && headerEl ? headerEl.getBoundingClientRect().bottom : 0;
+      const minBottom = fullscreenOpen ? 40 : Math.max(84, headerBottom + 36);
+      if (r.width > 20 && r.height > 20 && r.bottom > minBottom && r.top < window.innerHeight - 40) {
         setStageRect((prev) => {
           if (
             prev &&
@@ -584,7 +587,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("resize", scheduleUpdate);
       ro?.disconnect();
     };
-  }, [isVideoTrack, stage]);
+  }, [isVideoTrack, stage, fullscreenOpen]);
 
   const duration = media.state.duration || 0;
 
@@ -676,9 +679,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setVideoMinimized(false)}
-              className={`fixed right-3 sm:right-5 z-[90] flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-zinc-950/90 px-3.5 py-1.5 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md transition hover:bg-zinc-900 ${
+              className={`fixed right-3 sm:right-5 z-[65] flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-zinc-950/90 px-3.5 py-1.5 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md transition hover:bg-zinc-900 ${
                 pipTopCorner
-                  ? "top-[60px] sm:top-16"
+                  ? "top-[calc(88px+env(safe-area-inset-top,0px))] sm:top-16"
                   : "bottom-[142px] sm:bottom-24"
               }`}
               title="Hiện lại cửa sổ video Picture-in-Picture"
@@ -706,10 +709,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             }
             className={
               stageRect
-                ? "fixed z-[85] overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl"
-                : `fixed right-3 sm:right-5 z-[85] overflow-hidden rounded-2xl border border-white/25 bg-black shadow-[0_16px_48px_rgba(0,0,0,0.6)] ring-1 ring-black/50 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                ? `fixed ${fullscreenOpen ? "z-[85]" : "z-30"} overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl`
+                : `fixed right-3 sm:right-5 z-[65] overflow-hidden rounded-2xl border border-white/25 bg-black shadow-[0_16px_48px_rgba(0,0,0,0.6)] ring-1 ring-black/50 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
                     pipTopCorner
-                      ? "top-[60px] sm:top-16"
+                      ? "top-[calc(88px+env(safe-area-inset-top,0px))] sm:top-16"
                       : "bottom-[142px] sm:bottom-24"
                   } ${
                     videoMinimized

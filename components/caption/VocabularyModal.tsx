@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   listVocabulary,
   removeVocabularyWord,
@@ -35,7 +36,7 @@ export function VocabularyModal({
     return () => window.removeEventListener("hoerbar:vocab-changed", refresh);
   }, [open]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const filtered = words.filter((w) => {
     if (!query.trim()) return true;
@@ -60,7 +61,7 @@ export function VocabularyModal({
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 sm:p-6 backdrop-blur-md animate-fade-in"
       onClick={onClose}
@@ -227,6 +228,7 @@ export function VocabularyModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
