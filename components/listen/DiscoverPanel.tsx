@@ -142,20 +142,25 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
               {filtered.length} {filtered.length === 1 ? "show" : "shows"}
             </span>
             <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-              <div className="flex overflow-hidden rounded-full border border-[var(--rule)]">
+              <div className="flex overflow-hidden rounded-full border border-[var(--rule)] bg-[var(--surface)] p-0.5">
                 {([" ", "de", "en"] as const).map((option) => {
                   const value = option.trim() as SourceLang | "";
+                  const isActive = lang === value;
                   return (
                     <button
                       key={option}
                       type="button"
-                      data-active={lang === value}
+                      aria-pressed={isActive}
                       onClick={() => {
                         setLang(value);
                         setTopic("");
                         if (value === "en") setLevel("");
                       }}
-                      className="btn rounded-none border-0 border-r border-[var(--rule)] px-2.5 py-1 text-[12px] last:border-r-0"
+                      className={`rounded-full px-3 py-1 text-[12px] font-semibold transition-all ${
+                        isActive
+                          ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
+                          : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                      }`}
                     >
                       {value === "" ? t("common.all") : value === "de" ? "Deutsch" : "English"}
                     </button>
