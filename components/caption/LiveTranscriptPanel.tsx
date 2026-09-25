@@ -60,6 +60,8 @@ export function LiveTranscriptPanel({
     track,
     duration,
     onGenerateTranscript,
+    onTranscribeCurrentRegion,
+    transcribingRegion,
     generatingTranscript,
     generateTranscriptError,
     transcriptOffsetSec,
@@ -454,6 +456,18 @@ export function LiveTranscriptPanel({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {track?.url ? (
+              <button
+                type="button"
+                onClick={onTranscribeCurrentRegion}
+                disabled={transcribingRegion}
+                className="btn px-2.5 py-1 text-[11px] font-semibold text-[var(--accent)] border-[var(--accent)]/40 bg-[var(--accent-soft)]/50 hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                title="Quét & Transcribe vùng âm thanh đang phát (tự động nhận diện quảng cáo chèn động & đồng bộ lại)"
+              >
+                <span>{transcribingRegion ? "⏳" : "🎯"}</span>
+                <span>{transcribingRegion ? "Đang quét vùng..." : "Quét vùng này"}</span>
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setShowSettings((v) => !v)}

@@ -53,6 +53,8 @@ export function TranscriptReader({
     track,
     duration,
     onGenerateTranscript,
+    onTranscribeCurrentRegion,
+    transcribingRegion,
     generatingTranscript,
     generateTranscriptError,
     transcriptOffsetSec,
@@ -282,19 +284,37 @@ export function TranscriptReader({
         }`}
         style={{ ...captionThemeStyle(theme), scrollbarWidth: "none" }}
       >
-        {/* Subtle sticky top header with overall podcast time & percentage */}
-        <div className="sticky top-0 z-20 mx-auto max-w-xl pt-1.5 pb-1.5 pointer-events-none">
-          <div className="flex items-center justify-between gap-2 rounded-full bg-black/35 px-3 py-1 backdrop-blur-md border border-white/10 text-[10.5px] text-white/65">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-              <span>Bấm vào từ bất kỳ để dịch & lưu từ vựng</span>
+        {/* Subtle sticky top header with overall podcast time, percentage & 1-tap Regional Ad/DAI Transcribe */}
+        <div className="sticky top-0 z-20 mx-auto max-w-xl pt-1.5 pb-1.5">
+          <div className="flex items-center justify-between gap-2 rounded-full bg-black/45 px-3 py-1 backdrop-blur-md border border-white/10 text-[10.5px] text-white/75">
+            <span className="inline-flex items-center gap-1.5 min-w-0 truncate">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400 animate-pulse" />
+              <span className="truncate">
+                {transcribingRegion
+                  ? "Đang tự động quét & transcribe vùng âm thanh hiện tại..."
+                  : "Bấm từ bất kỳ để dịch · Tự động quét quảng cáo/vùng"}
+              </span>
             </span>
-            <span className="font-mono tabular-nums text-amber-300/95">
-              {formatSegTime(currentTime)}
-              {episodeDuration > 0
-                ? ` / ${formatSegTime(episodeDuration)} (${Math.round(episodePct)}%)`
-                : ""}
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {track?.url ? (
+                <button
+                  type="button"
+                  onClick={onTranscribeCurrentRegion}
+                  disabled={transcribingRegion}
+                  className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-400/40 px-2 py-0.5 text-[10px] font-semibold text-amber-300 hover:bg-amber-500/35 active:scale-95 disabled:opacity-60 transition"
+                  title="Quét & Transcribe trực tiếp vùng âm thanh đang phát (khớp quảng cáo chèn động DAI)"
+                >
+                  <span>{transcribingRegion ? "⏳" : "🎯"}</span>
+                  <span>{transcribingRegion ? "Đang quét..." : "Quét vùng này"}</span>
+                </button>
+              ) : null}
+              <span className="font-mono tabular-nums text-amber-300/95">
+                {formatSegTime(currentTime)}
+                {episodeDuration > 0
+                  ? ` / ${formatSegTime(episodeDuration)} (${Math.round(episodePct)}%)`
+                  : ""}
+              </span>
+            </div>
           </div>
         </div>
 

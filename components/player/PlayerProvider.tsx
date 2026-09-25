@@ -16,6 +16,7 @@ import type { SpokenLang } from "@/lib/language";
 import { pickBestTranscript } from "@/lib/server/transcript";
 import { liveCaptionService } from "@/lib/liveCaption";
 import { generateTranscript, loadPublishedTranscript, type GenerateTranscriptError } from "@/lib/transcriptPipeline";
+import { transcribeAndSpliceRegion } from "@/lib/regionalTranscribe";
 import { getTranscriptOffset, setTranscriptOffset } from "@/lib/transcriptSync";
 
 export interface Track {
@@ -93,6 +94,8 @@ interface PlayerContextValue {
    * lib/transcriptPipeline.ts for why this never runs on its own.
    */
   onGenerateTranscript: () => void;
+  onTranscribeCurrentRegion: () => void;
+  transcribingRegion: boolean;
   generatingTranscript: boolean;
   generateTranscriptError: GenerateTranscriptError | null;
   waitingForTranscript: boolean;
@@ -313,12 +316,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [track]);
 
   const [generatingTranscript, setGeneratingTranscript] = useState(false);
+  const [transcribingRegion, setTranscribingRegion] = useState(false);
   const [generateTranscriptError, setGenerateTranscriptError] = useState<GenerateTranscriptError | null>(null);
   const generationRunIdRef = useRef(0);
+  const scannedRegionBucketsRef = useRef<Set<string>>(new Set());
 
   // Automatically load or generate the transcript in parallel while the episode plays
   useEffect(() => {
     liveCaptionService.clearTranscript();
+    scannedRegionBucketsRef.current.clear();
     const runId = ++generationRunIdRef.current;
     setGenerateTranscriptError(null);
     setWaitingForTranscript(false);
@@ -338,6 +344,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (isCancelled()) return;
         if (loaded) {
           setGeneratingTranscript(false);
+          // Automatically scan the opening [0..50s] audio region to detect any dynamically inserted
+          // Pre-Roll Advertisement (DAI), transcribe the ad, and shift the published transcript if offset!
+          if (track.url) {
+            scannedRegionBucketsRef.current.add(`${track.id}:0`);
+            void transcribeAndSpliceRegion({
+              url: track.url,
+              startSec: 0,
+              endSec: 50,
+              totalDurationSec: media.handle.getDuration() || (track.durationSec ?? 0),
+              sourceLang: track.sourceLang ?? "de",
+            }).catch(() => {});
+          }
           return;
         }
       }
@@ -379,6 +397,70 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, [track?.id, track?.url]);
+
+  // Automatic Playhead Regional Monitor:
+  // When playing at `currentTime`, if the playhead enters an untranscribed region/gap (e.g. a Dynamic
+  // Mid-Roll Ad or a region the user sought ahead to before full-file transcription reached it),
+  // automatically fetch & transcribe the [currentTime - 2s, currentTime + 42s] window!
+  useEffect(() => {
+    if (!track?.url) return;
+    const timer = window.setInterval(() => {
+      if (!media.handle.isPlaying() || transcribingRegion) return;
+      const nowSec = media.handle.getTime();
+      const totalDur = media.handle.getDuration() || (track.durationSec ?? 0);
+      if (nowSec < 2 || totalDur <= 15) return;
+
+      const segs = liveCaptionService.getTranscript();
+      const hasCoverage = segs.some(
+        (s) => nowSec >= s.start - 2.0 && nowSec <= s.end + 3.5
+      );
+      if (hasCoverage) return;
+
+      const bucketKey = `${track.id}:${Math.floor(nowSec / 35)}`;
+      if (scannedRegionBucketsRef.current.has(bucketKey)) return;
+      scannedRegionBucketsRef.current.add(bucketKey);
+
+      const regionStart = Math.max(0, Math.floor(nowSec - 2));
+      const regionEnd = Math.min(totalDur, regionStart + 44);
+      setTranscribingRegion(true);
+      void transcribeAndSpliceRegion({
+        url: track.url!,
+        startSec: regionStart,
+        endSec: regionEnd,
+        totalDurationSec: totalDur,
+        sourceLang: track.sourceLang ?? "de",
+      })
+        .catch(() => {})
+        .finally(() => {
+          setTranscribingRegion(false);
+        });
+    }, 2000);
+
+    return () => window.clearInterval(timer);
+  }, [track?.id, track?.url, track?.durationSec, track?.sourceLang, media.handle, transcribingRegion]);
+
+  // Manual 1-Tap Regional Ad / Sync Transcriber for `[currentTime - 3s, currentTime + 45s]`
+  const onTranscribeCurrentRegion = useCallback(() => {
+    if (!track?.url || transcribingRegion) return;
+    const nowSec = media.handle.getTime();
+    const totalDur = media.handle.getDuration() || (track.durationSec ?? 0);
+    const regionStart = Math.max(0, Math.floor(nowSec - 3));
+    const regionEnd = totalDur > 0 ? Math.min(totalDur, regionStart + 45) : regionStart + 45;
+
+    setTranscribingRegion(true);
+    void transcribeAndSpliceRegion({
+      url: track.url,
+      startSec: regionStart,
+      endSec: regionEnd,
+      totalDurationSec: totalDur,
+      sourceLang: track.sourceLang ?? "de",
+      forceReplaceWindow: true,
+    })
+      .catch(() => {})
+      .finally(() => {
+        setTranscribingRegion(false);
+      });
+  }, [track?.url, track?.durationSec, track?.sourceLang, media.handle, transcribingRegion]);
 
   // Explicit generate trigger: ALWAYS works at any playback speed (1.0x, 1.5x, 2.0x)
   // and immediately populates the transcript UI while streaming Whisper audio in the background.
@@ -527,6 +609,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       fullscreenOpen,
       setFullscreenOpen,
       onGenerateTranscript,
+      onTranscribeCurrentRegion,
+      transcribingRegion,
       generatingTranscript,
       generateTranscriptError,
       waitingForTranscript,
@@ -556,6 +640,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       fullscreenOpen,
       setFullscreenOpen,
       onGenerateTranscript,
+      onTranscribeCurrentRegion,
+      transcribingRegion,
       generatingTranscript,
       generateTranscriptError,
       waitingForTranscript,
