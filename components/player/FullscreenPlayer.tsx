@@ -186,6 +186,7 @@ export function FullscreenPlayer() {
     setTranscriptOffsetSec,
     isVideoTrack,
     waitingForTranscript,
+    mediaElement,
     playbackRate: speed,
     setPlaybackRate,
   } = usePlayer();
@@ -405,7 +406,21 @@ export function FullscreenPlayer() {
         >
           <button
             type="button"
-            onClick={() => setFullscreenOpen(false)}
+            onClick={() => {
+              if (isVideoTrack) {
+                const el = mediaElement() as HTMLVideoElement | null;
+                if (
+                  el &&
+                  !el.paused &&
+                  "requestPictureInPicture" in el &&
+                  typeof document !== "undefined" &&
+                  !document.pictureInPictureElement
+                ) {
+                  void el.requestPictureInPicture().catch(() => {});
+                }
+              }
+              setFullscreenOpen(false);
+            }}
             className="icon-btn text-[20px] active:scale-95"
             aria-label={t("player.exitFullscreen")}
             title={t("player.exitFullscreen")}

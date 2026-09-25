@@ -407,8 +407,22 @@ export function ListenClient() {
 
   // ---- playing -----------------------------------------------------------
 
+  // Only show the giant inline player card when the user is viewing the show of the playing episode
+  // (or playing a direct URL stream) AND has not exited into Picture-in-Picture mode.
+  // When the user exits out to search/browse other podcasts (!feed, results, or another show)
+  // or exits FullscreenPlayer (player.videoPipMode), collapse into the Floating PiP Corner Window + MiniPlayer!
+  const isViewingPlayingShow = Boolean(
+    playing &&
+      ((feed &&
+        (!playing.showTitle ||
+          feed.title === playing.showTitle ||
+          show?.title === playing.showTitle)) ||
+        (!playing.showTitle && !feed && !results))
+  );
+  const showInlinePlayer = Boolean(playing && isViewingPlayingShow && !player.videoPipMode);
+
   const inlineVideoStageRef = useVideoStage(
-    Boolean(playing && player.isVideoTrack && !player.fullscreenOpen)
+    Boolean(showInlinePlayer && player.isVideoTrack && !player.fullscreenOpen)
   );
 
   const playEpisode = useCallback(
@@ -518,18 +532,15 @@ export function ListenClient() {
   // Tells the docked player whether the full one is already on screen. An
   // observer rather than a scroll handler: the card's position changes when the
   // description expands or a feed loads above it, not only when you scroll.
-  const { setInlineVisible } = player;
+  const { setInlineVisible, setVideoPipMode } = player;
   useEffect(() => {
     const node = playerRef.current;
-    if (!node) {
+    if (!node || !showInlinePlayer) {
       setInlineVisible(false);
       return;
     }
     const observer = new IntersectionObserver(
       ([entry]) => setInlineVisible(entry.isIntersecting),
-      // A sliver of the card counts as visible, but the last few pixels of its
-      // bottom edge do not: the controls are what matters, and they are gone
-      // well before the card is.
       { rootMargin: "-120px 0px 0px 0px", threshold: 0 },
     );
     observer.observe(node);
@@ -537,7 +548,7 @@ export function ListenClient() {
       observer.disconnect();
       setInlineVisible(false);
     };
-  }, [playing, setInlineVisible]);
+  }, [playing, showInlinePlayer, setInlineVisible]);
 
   /** Clears a shown feed without touching history - used both by the
    * buttons below (which push their own new entry) and by the browser's
@@ -548,7 +559,10 @@ export function ListenClient() {
     setShow(null);
     setVisible(PAGE_SIZE);
     openedFeedRef.current = null;
-  }, []);
+    if (player.isVideoTrack) {
+      setVideoPipMode(true);
+    }
+  }, [player.isVideoTrack, setVideoPipMode]);
 
   /** Returns to browsing without disturbing whatever is playing. */
   const browse = useCallback(() => {
@@ -759,7 +773,7 @@ export function ListenClient() {
       {error ? <p className="mt-3 text-[13px] text-rose-600">{error}</p> : null}
 
       {/* ---------------- player ---------------- */}
-      {playing ? (
+      {showInlinePlayer && playing ? (
         <section
           ref={playerRef}
           className={`card mt-6 overflow-hidden transition-all duration-300 ${

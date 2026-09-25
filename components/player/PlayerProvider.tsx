@@ -58,7 +58,7 @@ interface PlayerContextValue {
    * Registers the element the video should appear over on the current page.
    * Pass null when the page unmounts and the video docks into the mini bar.
    */
-  setStage: (element: HTMLElement | null) => void;
+  setStage: React.Dispatch<React.SetStateAction<HTMLElement | null>>;
   /** The live media element, for anything that needs the real clock. */
   mediaElement: () => HTMLMediaElement | null;
   /**
@@ -97,6 +97,8 @@ interface PlayerContextValue {
   generateTranscriptError: GenerateTranscriptError | null;
   waitingForTranscript: boolean;
   isVideoTrack: boolean;
+  videoPipMode: boolean;
+  setVideoPipMode: React.Dispatch<React.SetStateAction<boolean>>;
   transcriptOffsetSec: number;
   setTranscriptOffsetSec: (offsetSec: number) => void;
   playbackRate: number;
@@ -131,9 +133,32 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [inlineVisible, setInlineVisible] = useState(false);
   const [showTranscript, setShowTranscript] = useState(true);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
-  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [fullscreenOpen, setFullscreenOpenState] = useState(false);
+  const [videoPipMode, setVideoPipMode] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(1);
   const playbackRateRef = useRef(1);
+
+  const setFullscreenOpen = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(
+    (action) => {
+      setFullscreenOpenState((prev) => {
+        const next = typeof action === "function" ? action(prev) : action;
+        if (prev && !next) {
+          // Exiting Fullscreen Media Player -> automatically transition into Picture-in-Picture mode!
+          setVideoPipMode(true);
+          setVideoMinimized(false);
+        } else if (!prev && next) {
+          // Entering Fullscreen Media Player -> exit PiP mode so Fullscreen stage owns the video
+          setVideoPipMode(false);
+          setVideoMinimized(false);
+          if (typeof document !== "undefined" && document.pictureInPictureElement) {
+            void document.exitPictureInPicture().catch(() => {});
+          }
+        }
+        return next;
+      });
+    },
+    []
+  );
 
   const play = useCallback(
     (next: Track) => {
@@ -149,6 +174,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       setShowTranscript(true);
       setWaitingForTranscript(false);
+      setVideoMinimized(false);
+      setVideoPipMode(false);
       pendingSeekRef.current = next.startAt && next.startAt > 0 ? next.startAt : null;
 
       setTrack((current) => {
@@ -274,8 +301,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(timer);
   }, [track, media.state.ready, handle, playbackRate]);
 
-  const setStage = useCallback((element: HTMLElement | null) => {
-    setStageElement(element);
+  const setStage = useCallback<React.Dispatch<React.SetStateAction<HTMLElement | null>>>((action) => {
+    setStageElement(action);
   }, []);
 
   useEffect(() => {
@@ -504,6 +531,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       generateTranscriptError,
       waitingForTranscript,
       isVideoTrack,
+      videoPipMode,
+      setVideoPipMode,
       transcriptOffsetSec,
       setTranscriptOffsetSec,
       playbackRate,
@@ -525,11 +554,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       showTranscript,
       transcriptCollapsed,
       fullscreenOpen,
+      setFullscreenOpen,
       onGenerateTranscript,
       generatingTranscript,
       generateTranscriptError,
       waitingForTranscript,
       isVideoTrack,
+      videoPipMode,
       transcriptOffsetSec,
       setTranscriptOffsetSec,
       playbackRate,
@@ -553,22 +584,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       {track && isVideoTrack ? (
         <>
-          {/* Minimized pill when user hides the video */}
+          {/* Minimized pill when user hides the PiP video */}
           {videoMinimized && !stageRect && (
             <button
               type="button"
               onClick={() => setVideoMinimized(false)}
-              className="fixed top-14 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-zinc-950/90 px-3.5 py-1.5 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md transition hover:bg-zinc-900"
-              title="Hiện lại cửa sổ video"
+              className="fixed bottom-[126px] right-3 sm:bottom-24 sm:right-5 z-[90] flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-zinc-950/90 px-3.5 py-1.5 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md transition hover:bg-zinc-900"
+              title="Hiện lại cửa sổ video Picture-in-Picture"
             >
               <span>🎬</span>
-              <span>Hiện Video</span>
+              <span>Hiện PiP Video</span>
             </button>
           )}
 
           {/* Persistent Video Player:
-              - When inside Media Player (stageRect present), docked at TOP CENTER directly above the Transcript (YouTube layout)
-              - When scrolled away without stage, docked cleanly at Top Center mini bar */}
+              - When inside Media Player (stageRect present), docked over the active stage box
+              - When exited to search/browse other podcasts (!stageRect), floats in iOS Picture-in-Picture corner window */}
           <div
             ref={attachLayer}
             style={
@@ -585,10 +616,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             className={
               stageRect
                 ? "fixed z-[85] overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl"
-                : `fixed top-14 left-1/2 -translate-x-1/2 z-[85] overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl transition-all duration-300 ${
+                : `fixed bottom-[126px] right-3 sm:bottom-24 sm:right-5 z-[85] overflow-hidden rounded-2xl border border-white/25 bg-black shadow-[0_16px_48px_rgba(0,0,0,0.6)] ring-1 ring-black/50 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
                     videoMinimized
-                      ? "pointer-events-none h-0 w-0 opacity-0"
-                      : "w-64 sm:w-80 aspect-video opacity-100"
+                      ? "pointer-events-none h-0 w-0 opacity-0 scale-75"
+                      : "w-56 sm:w-80 aspect-video opacity-100 scale-100"
                   }`
             }
           >
@@ -619,13 +650,34 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
               <div className="
                 absolute inset-x-0 top-0 flex items-center justify-between gap-1
-                bg-gradient-to-b from-black/80 via-black/40 to-transparent px-2.5 py-1.5
-                opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity
+                bg-gradient-to-b from-black/85 via-black/45 to-transparent px-2.5 py-1.5
+                opacity-95 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity
               ">
-                <span className="truncate text-[10px] font-semibold text-amber-300">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVideoPipMode(false);
+                    setFullscreenOpen(true);
+                  }}
+                  className="truncate text-left text-[10.5px] font-semibold text-amber-300 hover:underline"
+                  title="Mở lại trình phát toàn màn hình"
+                >
                   🎬 {track.title}
-                </span>
-                <div className="flex items-center gap-1">
+                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  {!stageRect && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVideoPipMode(false);
+                        setFullscreenOpen(true);
+                      }}
+                      className="rounded bg-amber-500/85 px-1.5 py-0.5 text-[10px] font-bold text-black hover:bg-amber-400"
+                      title="Phóng to lại Media Player"
+                    >
+                      ⤢
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -662,14 +714,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 /**
  * Marks the element the persistent video layer should cover on this page.
  * Returns a ref to spread onto a placeholder box.
+ * Uses owner-safe cleanup so an unmounting FullscreenPlayer never clobbers an active inline stage.
  */
 export function useVideoStage(active: boolean) {
   const { setStage } = usePlayer();
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setStage(active ? ref.current : null);
-    return () => setStage(null);
+    const el = ref.current;
+    if (active && el) {
+      setStage(el);
+      return () => {
+        setStage(( current: HTMLElement | null ) => (current === el ? null : current) as unknown as HTMLElement | null);
+      };
+    }
+    return undefined;
   }, [active, setStage]);
 
   return ref;
