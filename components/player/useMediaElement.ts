@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlayerHandle } from "./types";
-import { upgradeToHttps } from "@/lib/media";
+import { getStreamProxyUrl, unwrapTrackingUrl, upgradeToHttps } from "@/lib/media";
 
 export interface MediaElementState {
   ready: boolean;
@@ -12,6 +12,8 @@ export interface MediaElementState {
   /** True between a seek or src change and the first playable frame. */
   loading: boolean;
   error: string | null;
+  isProxy?: boolean;
+  rawUrl?: string | null;
 }
 
 /**
@@ -27,12 +29,26 @@ export function useMediaElement(rawSrc: string | null): {
   mediaRef: React.RefObject<HTMLMediaElement | null>;
   state: MediaElementState;
   retry: () => void;
-  /** The URL actually handed to the element, after an https upgrade. */
+  playViaProxy: () => void;
+  /** The URL actually handed to the element, after an https upgrade or proxy fallback. */
   src: string | null;
+  rawSrc: string | null;
+  isProxy: boolean;
 } {
-  // Upgrade before the element ever sees it: an http URL on an https page is
-  // blocked outright, and the failure surfaces as an unhelpful "not supported".
-  const src = useMemo(() => (rawSrc ? upgradeToHttps(rawSrc) : null), [rawSrc]);
+  // First attempt: clean known tracking wrappers and upgrade to https
+  const initialSrc = rawSrc ? upgradeToHttps(unwrapTrackingUrl(rawSrc)) : null;
+  const [src, setSrc] = useState<string | null>(initialSrc);
+  const [isProxy, setIsProxy] = useState(false);
+  const fallbackAttemptedRef = useRef(false);
+
+  // Sync when rawSrc changes
+  useEffect(() => {
+    fallbackAttemptedRef.current = false;
+    const next = rawSrc ? upgradeToHttps(unwrapTrackingUrl(rawSrc)) : null;
+    setSrc(next);
+    setIsProxy(false);
+  }, [rawSrc]);
+
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const readyRef = useRef(false);
   const rateRef = useRef(1);
@@ -42,6 +58,8 @@ export function useMediaElement(rawSrc: string | null): {
     buffered: 0,
     loading: Boolean(src),
     error: null,
+    isProxy: false,
+    rawUrl: rawSrc,
   });
 
   useEffect(() => {
@@ -116,6 +134,31 @@ export function useMediaElement(rawSrc: string | null): {
     }
     function onError() {
       const code = media?.error?.code;
+
+      // Automatic Fallback: If direct playback failed with SRC_NOT_SUPPORTED or NETWORK,
+      // and we haven't attempted the streaming proxy yet, switch to /api/stream automatically!
+      if (
+        rawSrc &&
+        !fallbackAttemptedRef.current &&
+        !src?.startsWith("/api/stream") &&
+        (code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED || code === MediaError.MEDIA_ERR_NETWORK)
+      ) {
+        fallbackAttemptedRef.current = true;
+        const proxyUrl = getStreamProxyUrl(rawSrc);
+        console.warn(`[Player] Direct playback failed (code ${code}). Automatically falling back to proxy: ${proxyUrl}`);
+        setSrc(proxyUrl);
+        setIsProxy(true);
+        setState((prev) => ({
+          ...prev,
+          ready: false,
+          loading: true,
+          error: null,
+          isProxy: true,
+          rawUrl: rawSrc,
+        }));
+        return;
+      }
+
       // Name the actual cause. "Not supported" covers four very different
       // problems, and telling them apart is the difference between a user
       // fixing it in one click and giving up.
@@ -127,14 +170,21 @@ export function useMediaElement(rawSrc: string | null): {
       const message = insecure
         ? "This episode is served over plain http, which a browser blocks on a secure page. Open the file directly, or ask the publisher for an https address."
         : code === MediaError.MEDIA_ERR_NETWORK
-          ? "The stream dropped out. Check the connection and try again."
+          ? "The stream dropped out or the host refused the connection. Check your connection or try opening the direct file."
           : code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
             ? "This address could not be played. It may redirect to a web page rather than a media file, the host may refuse requests from a browser, or the format may be one this browser cannot decode."
             : code === MediaError.MEDIA_ERR_DECODE
               ? "The stream is damaged or uses an unsupported codec."
               : "The stream could not be loaded.";
       readyRef.current = false;
-      setState((prev) => ({ ...prev, ready: false, loading: false, error: message }));
+      setState((prev) => ({
+        ...prev,
+        ready: false,
+        loading: false,
+        error: message,
+        isProxy,
+        rawUrl: rawSrc,
+      }));
     }
     function onDurationChange() {
       if (!media) return;
@@ -162,14 +212,31 @@ export function useMediaElement(rawSrc: string | null): {
       media.removeEventListener("canplay", onPlaying);
       media.removeEventListener("error", onError);
     };
-  }, [src]);
+  }, [src, rawSrc, isProxy]);
 
   const retry = useCallback(() => {
     const media = mediaRef.current;
     if (!media) return;
     setState((prev) => ({ ...prev, error: null, loading: true }));
     media.load();
+    media.play().catch(() => {});
   }, []);
+
+  const playViaProxy = useCallback(() => {
+    if (!rawSrc) return;
+    fallbackAttemptedRef.current = true;
+    const proxyUrl = getStreamProxyUrl(rawSrc);
+    setSrc(proxyUrl);
+    setIsProxy(true);
+    setState((prev) => ({
+      ...prev,
+      ready: false,
+      loading: true,
+      error: null,
+      isProxy: true,
+      rawUrl: rawSrc,
+    }));
+  }, [rawSrc]);
 
   const handleRef = useRef<PlayerHandle>({
     play: () => void mediaRef.current?.play().catch(() => undefined),
@@ -201,5 +268,5 @@ export function useMediaElement(rawSrc: string | null): {
     isReady: () => readyRef.current,
   });
 
-  return { handle: handleRef.current, mediaRef, state, retry, src };
+  return { handle: handleRef.current, mediaRef, state, retry, playViaProxy, src, rawSrc, isProxy };
 }

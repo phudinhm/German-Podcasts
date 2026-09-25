@@ -292,6 +292,10 @@ const en = {
   "nav.listenTab": "Listen",
   "nav.libraryTab": "Library",
   "nav.aboutTab": "About",
+  "player.fallbackProxy": "Connecting via fallback proxy…",
+  "player.openDirect": "Open source file",
+  "player.tryProxy": "Play via proxy",
+  "player.errorBlocked": "This address could not be played directly. The host may block browser requests or require proxying.",
 } as const;
 
 export type UiKey = keyof typeof en;
@@ -559,6 +563,10 @@ const de: Record<UiKey, string> = {
   "nav.listenTab": "Hören",
   "nav.libraryTab": "Bibliothek",
   "nav.aboutTab": "Info",
+  "player.fallbackProxy": "Verbinde über Ausweich-Proxy…",
+  "player.openDirect": "Quelldatei öffnen",
+  "player.tryProxy": "Über Proxy abspielen",
+  "player.errorBlocked": "Diese Adresse konnte nicht direkt abgespielt werden. Möglicherweise blockiert der Host Browser-Anfragen.",
 };
 
 const vi: Record<UiKey, string> = {
@@ -824,6 +832,10 @@ const vi: Record<UiKey, string> = {
   "nav.listenTab": "Nghe",
   "nav.libraryTab": "Thư viện",
   "nav.aboutTab": "Giới thiệu",
+  "player.fallbackProxy": "Đang phát qua máy chủ dự phòng…",
+  "player.openDirect": "Mở file gốc",
+  "player.tryProxy": "Phát qua Proxy",
+  "player.errorBlocked": "Không thể phát trực tiếp địa chỉ này. Máy chủ nguồn có thể chặn trình duyệt hoặc luồng cần chuyển qua proxy.",
 };
 
 export const STRINGS: Record<UiLang, Record<UiKey, string>> = { en, de, vi };

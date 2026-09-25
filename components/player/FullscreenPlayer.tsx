@@ -392,7 +392,10 @@ export function FullscreenPlayer() {
   const {
     track,
     handle,
+    mediaState,
     duration,
+    retry,
+    playViaProxy,
     fullscreenOpen,
     setFullscreenOpen,
     transcriptOffsetSec,
@@ -1025,6 +1028,45 @@ export function FullscreenPlayer() {
               : "border-white/15 bg-[var(--surface)]/90"
           }`}
         >
+          {mediaState?.error ? (
+            <div className="mb-2.5 flex flex-col gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/15 p-2.5 text-[12px] text-rose-800 dark:text-rose-200">
+              <div className="flex items-start gap-2">
+                <span className="text-sm shrink-0 leading-none mt-0.5">⚠️</span>
+                <span className="min-w-0 flex-1 leading-snug">{mediaState.error}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                <button
+                  type="button"
+                  className="rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-700 transition active:scale-95"
+                  onClick={retry}
+                >
+                  {t("common.retry")}
+                </button>
+                {!mediaState.isProxy ? (
+                  <button
+                    type="button"
+                    className="rounded-lg border border-amber-500/50 bg-amber-500/20 px-2.5 py-1 text-[11px] font-semibold text-amber-900 dark:text-amber-200 hover:bg-amber-500/30 transition active:scale-95"
+                    onClick={playViaProxy}
+                  >
+                    {t("player.tryProxy") || "Phát qua Proxy"}
+                  </button>
+                ) : null}
+                {mediaState.rawUrl ? (
+                  <a
+                    href={mediaState.rawUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg border border-[var(--rule)] bg-[var(--surface)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-soft)] hover:text-[var(--ink)] transition"
+                    title="Mở file media trong tab mới"
+                  >
+                    <span>{t("player.openDirect") || "Mở file gốc"}</span>
+                    <span className="ml-1 text-[10px]" aria-hidden>↗</span>
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           {/* Row 1: Subtle interactive progress bar with elapsed, percentage & remaining time */}
           <div className="mb-2 flex items-center gap-2.5">
             <span className="w-10 text-right font-mono text-[11px] tabular-nums text-[var(--ink-soft)]">

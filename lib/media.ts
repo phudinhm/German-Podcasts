@@ -92,3 +92,58 @@ export function describeSource(source: MediaSource): string {
       return "noch nicht eingelesen";
   }
 }
+
+/**
+ * Strips known podcast analytics / tracking redirect wrappers if they contain an embedded destination URL.
+ * Examples:
+ *   https://dts.podtrac.com/redirect.mp3/https://example.com/audio.mp3 -> https://example.com/audio.mp3
+ *   https://chrt.fm/track/123/https://example.com/audio.mp3 -> https://example.com/audio.mp3
+ */
+export function unwrapTrackingUrl(rawUrl: string): string {
+  if (!rawUrl) return rawUrl;
+  let current = rawUrl.trim();
+
+  const trackerHosts = [
+    "dts.podtrac.com",
+    "chrt.fm",
+    "pdst.fm",
+    "pscrb.fm",
+    "verifi.podscribe.com",
+    "mgln.ai",
+    "chtbl.com",
+    "claritas.com",
+    "adkv.fm",
+    "op3.dev",
+  ];
+
+  let changed = true;
+  let iterations = 0;
+  while (changed && iterations < 5) {
+    changed = false;
+    iterations++;
+    for (const host of trackerHosts) {
+      if (current.includes(host)) {
+        const idx = current.indexOf(host);
+        const after = current.slice(idx + host.length);
+        const match = after.match(/(https?:\/\/.+)/i) || after.match(/https?:\/\/(.+)/i);
+        if (match) {
+          const candidate = match[0].startsWith("http") ? match[0] : `https://${match[1]}`;
+          try {
+            new URL(candidate);
+            current = candidate;
+            changed = true;
+            break;
+          } catch {}
+        }
+      }
+    }
+  }
+  return current;
+}
+
+/** Formats a media URL for playback via the resilient server-side media proxy. */
+export function getStreamProxyUrl(rawUrl: string): string {
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("/api/stream")) return rawUrl;
+  return `/api/stream?url=${encodeURIComponent(rawUrl)}`;
+}

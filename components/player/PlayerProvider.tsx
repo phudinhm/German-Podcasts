@@ -53,7 +53,10 @@ interface PlayerContextValue {
   mediaState: MediaElementState;
   duration: number;
   retry: () => void;
-  /** URL actually handed to the element, after the https upgrade. */
+  playViaProxy: () => void;
+  isProxy: boolean;
+  rawSrc: string | null;
+  /** URL actually handed to the element, after the https upgrade or proxy fallback. */
   src: string | null;
   /**
    * Registers the element the video should appear over on the current page.
@@ -671,6 +674,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       mediaState: media.state,
       duration,
       retry: media.retry,
+      playViaProxy: media.playViaProxy,
+      isProxy: media.isProxy,
+      rawSrc: media.rawSrc,
       src: media.src,
       setStage,
       mediaElement: () => media.mediaRef.current,
@@ -705,6 +711,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       media.state,
       duration,
       media.retry,
+      media.playViaProxy,
+      media.isProxy,
+      media.rawSrc,
       media.src,
       media.mediaRef,
       setStage,

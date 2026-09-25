@@ -53,7 +53,8 @@ export const SUGGESTIONS: Suggestion[] = [
     topics: ["Easy German", "German Learning", "Culture"],
   },
   {
-    query: "Deutsch-Podcast Deutsch lernen",
+    query: "https://anchor.fm/s/109b8bd98/podcast/rss",
+    feedUrl: "https://anchor.fm/s/109b8bd98/podcast/rss",
     label: "Deutsch-Podcast – Deutsch lernen",
     publisher: "Deutsch-Podcast",
     lang: "de",
@@ -245,15 +246,15 @@ export const SUGGESTIONS: Suggestion[] = [
 export const NEWS_SOURCES: Suggestion[] = [
   { query: "Nachrichtenleicht Deutschlandfunk", label: "Nachrichtenleicht", publisher: "Deutschlandfunk", lang: "de", cefr: "A1", why: "Weekly news in deliberately simple German.", topics: ["News", "Easy German"] },
   { query: "DW Langsam gesprochene Nachrichten", label: "Langsam gesprochene Nachrichten", publisher: "Deutsche Welle", lang: "de", cefr: "A2", why: "The day's bulletin read slowly, then again at normal speed.", topics: ["News"] },
-  { query: "tagesschau in 100 Sekunden", label: "tagesschau in 100 Sekunden", publisher: "ARD", lang: "de", cefr: "B2", why: "The whole news day in a hundred seconds. Very dense, very fast.", topics: ["News"] },
+  { query: "https://www.tagesschau.de/multimedia/sendung/tagesschau_in_100_sekunden/podcast-ts100-audio-100~podcast.xml", feedUrl: "https://www.tagesschau.de/multimedia/sendung/tagesschau_in_100_sekunden/podcast-ts100-audio-100~podcast.xml", label: "tagesschau in 100 Sekunden", publisher: "ARD", lang: "de", cefr: "B2", why: "The whole news day in a hundred seconds. Very dense, very fast.", topics: ["News"] },
   { query: "tagesschau", label: "tagesschau", publisher: "ARD", lang: "de", cefr: "B2", why: "Germany's main evening bulletin, as audio and video.", topics: ["News", "Video"] },
-  { query: "heute journal ZDF", label: "heute journal", publisher: "ZDF", lang: "de", cefr: "C1", why: "Evening news with analysis and interviews.", topics: ["News", "Video"] },
-  { query: "Deutschlandfunk Nachrichten", label: "Deutschlandfunk Nachrichten", publisher: "Deutschlandfunk", lang: "de", cefr: "B2", why: "Hourly public radio bulletins, updated all day.", topics: ["News", "Radio"] },
-  { query: "WDR aktuell", label: "WDR aktuell", publisher: "WDR", lang: "de", cefr: "B2", why: "Regional news from Germany's largest broadcaster.", topics: ["News", "Regional"] },
+  { query: "https://cdn.audiorella.com/podcasts/1477-heute-journal-der-podcast/feed.rss", feedUrl: "https://cdn.audiorella.com/podcasts/1477-heute-journal-der-podcast/feed.rss", label: "heute journal", publisher: "ZDF", lang: "de", cefr: "C1", why: "Evening news with analysis and interviews.", topics: ["News"] },
+  { query: "https://www.deutschlandfunk.de/nachrichten-108.xml", feedUrl: "https://www.deutschlandfunk.de/nachrichten-108.xml", label: "Deutschlandfunk Nachrichten", publisher: "Deutschlandfunk", lang: "de", cefr: "B2", why: "Hourly public radio bulletins, updated all day.", topics: ["News", "Radio"] },
+  { query: "https://www1.wdr.de/mediathek/audio/wdr-aktuell/wdr-aktuell-140.podcast", feedUrl: "https://www1.wdr.de/mediathek/audio/wdr-aktuell/wdr-aktuell-140.podcast", label: "WDR aktuell", publisher: "WDR", lang: "de", cefr: "B2", why: "Regional news from Germany's largest broadcaster.", topics: ["News", "Regional"] },
   { query: "SWR Aktuell", label: "SWR Aktuell", publisher: "SWR", lang: "de", cefr: "B2", why: "Southwest regional news, with a noticeably softer accent.", topics: ["News", "Regional"] },
-  { query: "BR24", label: "BR24", publisher: "Bayerischer Rundfunk", lang: "de", cefr: "B2", why: "Bavarian news. Good exposure to southern pronunciation.", topics: ["News", "Regional"] },
+  { query: "https://feeds.br.de/br24-thema-des-tages/feed.xml", feedUrl: "https://feeds.br.de/br24-thema-des-tages/feed.xml", label: "BR24", publisher: "Bayerischer Rundfunk", lang: "de", cefr: "B2", why: "Bavarian news. Good exposure to southern pronunciation.", topics: ["News", "Regional"] },
   { query: "NDR Info", label: "NDR Info", publisher: "NDR", lang: "de", cefr: "B2", why: "Northern news and background, famously clear diction.", topics: ["News", "Regional"] },
-  { query: "ZDF heute Nachrichten", label: "ZDF heute", publisher: "ZDF", lang: "de", cefr: "B1", why: "Mainstream evening news, shorter sentences than heute journal.", topics: ["News", "Video"] },
+  { query: "https://cdn.audiorella.com/podcasts/1477-heute-journal-der-podcast/feed.rss", feedUrl: "https://cdn.audiorella.com/podcasts/1477-heute-journal-der-podcast/feed.rss", label: "ZDF heute", publisher: "ZDF", lang: "de", cefr: "B1", why: "Mainstream evening news, shorter sentences than heute journal.", topics: ["News"] },
   { query: "Deutsche Welle Nachrichten", label: "DW Nachrichten", publisher: "Deutsche Welle", lang: "de", cefr: "B1", why: "International news written for a global audience, so unusually plain.", topics: ["News"] },
   { query: "Terra X", label: "Terra X", publisher: "ZDF", lang: "de", cefr: "B2", why: "Documentary narration: measured pace, rich vocabulary.", topics: ["Documentary", "Science"] },
   { query: "Quarks", label: "Quarks", publisher: "WDR", lang: "de", cefr: "B2", why: "Science explained for a general audience.", topics: ["Science"] },
@@ -271,7 +272,7 @@ export const NEWS_SOURCES: Suggestion[] = [
  * grading does.
  */
 export const NATIVE_SOURCES: Suggestion[] = [
-  { query: "11KM der tagesschau Podcast", label: "11KM", publisher: "ARD", lang: "de", cefr: "B2", why: "One story a day, explained in eleven minutes by the reporter who covered it.", topics: ["News", "Analysis"] },
+  { query: "https://www.tagesschau.de/multimedia/podcasts/11km/index~podcast.xml", feedUrl: "https://www.tagesschau.de/multimedia/podcasts/11km/index~podcast.xml", label: "11KM", publisher: "ARD", lang: "de", cefr: "B2", why: "One story a day, explained in eleven minutes by the reporter who covered it.", topics: ["News", "Analysis"] },
   { query: "Was jetzt ZEIT ONLINE", label: "Was jetzt?", publisher: "ZEIT ONLINE", lang: "de", cefr: "B2", why: "Twice-daily news briefing, clearly structured and easy to follow.", topics: ["News"] },
   { query: "Deutschlandfunk Nova Update", label: "Nova Update", publisher: "Deutschlandfunk Nova", lang: "de", cefr: "B1", why: "News for a young audience: plainer wording, faster delivery.", topics: ["News"] },
   { query: "Steingarts Morning Briefing", label: "Morning Briefing", publisher: "Pioneer", lang: "de", cefr: "C1", why: "Business and politics with strong opinions and a dense register.", topics: ["Business", "Politics"] },

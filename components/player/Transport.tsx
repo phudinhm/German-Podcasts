@@ -45,11 +45,13 @@ export function Transport({
   handle,
   state,
   onRetry,
+  onPlayProxy,
   compact = false,
 }: {
   handle: PlayerHandle;
   state: MediaElementState;
   onRetry?: () => void;
+  onPlayProxy?: () => void;
   compact?: boolean;
 }) {
   const fillRef = useRef<HTMLDivElement | null>(null);
@@ -225,13 +227,43 @@ export function Transport({
   return (
     <div className={compact ? "" : "card p-3"}>
       {state.error ? (
-        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-[12px] text-rose-700 dark:text-rose-300">
-          <span className="min-w-0 flex-1">{state.error}</span>
-          {onRetry ? (
-            <button type="button" className="btn px-2 py-0.5 text-[11px]" onClick={onRetry}>
-              {t("common.retry")}
-            </button>
-          ) : null}
+        <div className="mb-2.5 flex flex-col gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-[12px] text-rose-800 dark:text-rose-200">
+          <div className="flex items-start gap-2">
+            <span className="text-sm shrink-0 leading-none mt-0.5">⚠️</span>
+            <span className="min-w-0 flex-1 leading-snug">{state.error}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+            {onRetry ? (
+              <button
+                type="button"
+                className="btn px-2.5 py-1 text-[11px] font-semibold bg-rose-600 text-white hover:bg-rose-700 border-none transition active:scale-95"
+                onClick={onRetry}
+              >
+                {t("common.retry")}
+              </button>
+            ) : null}
+            {!state.isProxy && onPlayProxy ? (
+              <button
+                type="button"
+                className="btn px-2.5 py-1 text-[11px] font-semibold border border-amber-500/50 bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 transition active:scale-95"
+                onClick={onPlayProxy}
+              >
+                {t("player.tryProxy") || "Phát qua Proxy"}
+              </button>
+            ) : null}
+            {state.rawUrl ? (
+              <a
+                href={state.rawUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn px-2.5 py-1 text-[11px] font-medium border border-[var(--rule)] hover:bg-[var(--surface)] text-[var(--ink-soft)] transition"
+                title="Mở file media trong tab mới"
+              >
+                <span>{t("player.openDirect") || "Mở file gốc"}</span>
+                <span className="ml-1 text-[10px]" aria-hidden>↗</span>
+              </a>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -241,8 +273,13 @@ export function Transport({
       </div>
 
       {state.loading && !state.error ? (
-        <p className="mt-1.5 text-center text-[10px] uppercase tracking-wider text-[var(--ink-faint)] sm:text-left">
-          {t("player.buffering")}
+        <p className="mt-1.5 flex items-center justify-center gap-1.5 text-center text-[10px] uppercase tracking-wider text-[var(--ink-faint)] sm:justify-start">
+          <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
+          <span>
+            {state.isProxy
+              ? t("player.fallbackProxy") || "Đang phát qua máy chủ dự phòng..."
+              : t("player.buffering")}
+          </span>
         </p>
       ) : null}
     </div>

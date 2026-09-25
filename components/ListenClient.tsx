@@ -976,7 +976,13 @@ export function ListenClient() {
             ) : null}
 
             <div className="mt-3">
-              <Transport handle={player.handle} state={player.mediaState} onRetry={player.retry} compact />
+              <Transport
+                handle={player.handle}
+                state={player.mediaState}
+                onRetry={player.retry}
+                onPlayProxy={player.playViaProxy}
+                compact
+              />
             </div>
 
             {playing.description ? (
