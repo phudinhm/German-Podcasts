@@ -82,7 +82,99 @@ function alignMp3Slice(buf: Uint8Array): { aligned: Uint8Array; detectedBitrateK
   return { aligned: buf, detectedBitrateKbps: 128 };
 }
 
-async function probeStreamHeader(url: string): Promise<{ id3Bytes: number; totalBytes: number; bitrateKbps: number }> {
+function parseXingOrFirstFrame(buf: Uint8Array): {
+  bitrateKbps: number;
+  xingDurationSec: number;
+  xingTotalBytes: number;
+  xingToc: Uint8Array | null;
+} {
+  const limit = Math.min(buf.length - 4, 16384);
+  for (let i = 0; i < limit; i++) {
+    if (buf[i] === 0xff && (buf[i + 1] & 0xe0) === 0xe0) {
+      const b1 = buf[i + 1];
+      const b2 = buf[i + 2];
+      const info = getMp3FrameInfo(b1, b2);
+      if (!info) continue;
+
+      const versionBits = (b1 >> 3) & 0x03;
+      const sampleRateIdx = (b2 >> 2) & 0x03;
+      const isV1 = versionBits === 0x03;
+      const sampleRatesV1 = [44100, 48000, 32000];
+      const sampleRatesV2 = [22050, 24000, 16000];
+      const sampleRatesV25 = [11025, 12000, 8000];
+      const sampleRate = isV1
+        ? sampleRatesV1[sampleRateIdx]
+        : versionBits === 0x02
+          ? sampleRatesV2[sampleRateIdx]
+          : sampleRatesV25[sampleRateIdx];
+      const samplesPerFrame = isV1 ? 1152 : 576;
+
+      // Search inside first frame (up to i + 200) for "Xing" or "Info" VBR/CBR header
+      let xingDurationSec = 0;
+      let xingTotalBytes = 0;
+      let xingToc: Uint8Array | null = null;
+      const searchEnd = Math.min(buf.length - 120, i + 200);
+      for (let j = i + 4; j < searchEnd; j++) {
+        const isXing =
+          buf[j] === 0x58 && buf[j + 1] === 0x69 && buf[j + 2] === 0x6e && buf[j + 3] === 0x67;
+        const isInfo =
+          buf[j] === 0x49 && buf[j + 1] === 0x6e && buf[j + 2] === 0x66 && buf[j + 3] === 0x6f;
+        if (isXing || isInfo) {
+          const flags =
+            ((buf[j + 4] << 24) >>> 0) |
+            (buf[j + 5] << 16) |
+            (buf[j + 6] << 8) |
+            buf[j + 7];
+          let cursor = j + 8;
+          if (flags & 0x01) {
+            const totalFrames =
+              ((buf[cursor] << 24) >>> 0) |
+              (buf[cursor + 1] << 16) |
+              (buf[cursor + 2] << 8) |
+              buf[cursor + 3];
+            cursor += 4;
+            if (totalFrames > 0 && sampleRate > 0) {
+              xingDurationSec = (totalFrames * samplesPerFrame) / sampleRate;
+            }
+          }
+          if (flags & 0x02) {
+            xingTotalBytes =
+              ((buf[cursor] << 24) >>> 0) |
+              (buf[cursor + 1] << 16) |
+              (buf[cursor + 2] << 8) |
+              buf[cursor + 3];
+            cursor += 4;
+          }
+          if (flags & 0x04 && cursor + 100 <= buf.length) {
+            xingToc = buf.slice(cursor, cursor + 100);
+          }
+          break;
+        }
+      }
+
+      if (i + info.frameLength + 2 < buf.length) {
+        if (buf[i + info.frameLength] === 0xff && (buf[i + info.frameLength + 1] & 0xe0) === 0xe0) {
+          return {
+            bitrateKbps: info.bitrateKbps,
+            xingDurationSec,
+            xingTotalBytes,
+            xingToc,
+          };
+        }
+      }
+    }
+  }
+  return { bitrateKbps: 128, xingDurationSec: 0, xingTotalBytes: 0, xingToc: null };
+}
+
+async function probeStreamHeader(url: string): Promise<{
+  id3Bytes: number;
+  totalBytes: number;
+  bitrateKbps: number;
+  xingDurationSec: number;
+  xingTotalBytes: number;
+  xingToc: Uint8Array | null;
+}> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -113,10 +205,47 @@ async function probeStreamHeader(url: string): Promise<{ id3Bytes: number; total
       id3Bytes = 10 + id3Size;
     }
 
-    const { detectedBitrateKbps } = alignMp3Slice(probe);
-    return { id3Bytes, totalBytes, bitrateKbps: detectedBitrateKbps || 128 };
+    // If ID3v2 tag (e.g. embedded podcast artwork JPEG) is larger than 16 KB,
+    // probe 16 KB right at `id3Bytes` so we inspect the true first MP3 audio frame & Xing VBR TOC!
+    let audioHeaderBuf = id3Bytes < probe.length - 2048 ? probe.subarray(id3Bytes) : null;
+    if (!audioHeaderBuf && id3Bytes > 0) {
+      try {
+        const frameProbeRes = await fetch(url, {
+          headers: {
+            Range: `bytes=${id3Bytes}-${id3Bytes + 16383}`,
+            "User-Agent": "Mozilla/5.0 (compatible; HoerbarRegionalTranscriber/1.0)",
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!totalBytes) {
+          const cr2 = frameProbeRes.headers.get("content-range") ?? "";
+          const m2 = /\/(\d+)$/.exec(cr2);
+          if (m2) totalBytes = Number(m2[1]);
+        }
+        if (frameProbeRes.ok || frameProbeRes.status === 206) {
+          audioHeaderBuf = new Uint8Array(await frameProbeRes.arrayBuffer());
+        }
+      } catch {}
+    }
+
+    const parsed = parseXingOrFirstFrame(audioHeaderBuf ?? probe);
+    return {
+      id3Bytes,
+      totalBytes,
+      bitrateKbps: parsed.bitrateKbps || 128,
+      xingDurationSec: parsed.xingDurationSec,
+      xingTotalBytes: parsed.xingTotalBytes,
+      xingToc: parsed.xingToc,
+    };
   } catch {
-    return { id3Bytes: 0, totalBytes: 0, bitrateKbps: 128 };
+    return {
+      id3Bytes: 0,
+      totalBytes: 0,
+      bitrateKbps: 128,
+      xingDurationSec: 0,
+      xingTotalBytes: 0,
+      xingToc: null,
+    };
   }
 }
 
@@ -295,19 +424,43 @@ export async function POST(req: NextRequest) {
     const totalDurationSec = Number(body.totalDurationSec ?? 0);
     const sourceLang = body.sourceLang === "en" ? "en" : "de";
 
-    const { id3Bytes, totalBytes, bitrateKbps } = await probeStreamHeader(url);
+    const { id3Bytes, totalBytes, bitrateKbps, xingDurationSec, xingTotalBytes, xingToc } =
+      await probeStreamHeader(url);
 
-    // Compute exact byte rate from totalBytes/totalDurationSec when both are known, otherwise from MP3 frame header bitrate
-    const audioPayloadBytes = Math.max(0, totalBytes - id3Bytes);
+    // Determine effective duration & audio payload size matching browser <audio> seek logic
+    const effectiveDurationSec =
+      xingDurationSec > 10
+        ? xingDurationSec
+        : totalDurationSec > 10
+          ? totalDurationSec
+          : 0;
+    const audioPayloadBytes =
+      xingTotalBytes > 65536
+        ? xingTotalBytes
+        : totalBytes > id3Bytes + 65536
+          ? totalBytes - id3Bytes
+          : 0;
+
     const bytesPerSec =
-      audioPayloadBytes > 65536 && totalDurationSec > 10
-        ? audioPayloadBytes / totalDurationSec
+      audioPayloadBytes > 65536 && effectiveDurationSec > 10
+        ? audioPayloadBytes / effectiveDurationSec
         : (bitrateKbps * 1000) / 8;
 
-    const startByte = id3Bytes + Math.max(0, Math.floor(startSec * bytesPerSec));
+    let startByte = id3Bytes + Math.max(0, Math.floor(startSec * bytesPerSec));
+    if (xingToc && xingToc.length === 100 && audioPayloadBytes > 65536 && effectiveDurationSec > 10) {
+      // Exact VBR Xing TOC interpolation (identical to FFmpeg / CoreAudio / Chrome <audio> seeking!)
+      const pct = Math.max(0, Math.min(100, (startSec / effectiveDurationSec) * 100));
+      const idx = Math.min(99, Math.floor(pct));
+      const frac = pct - idx;
+      const fa = xingToc[idx];
+      const fb = idx < 99 ? xingToc[idx + 1] : 256;
+      const fx = fa + (fb - fa) * frac;
+      startByte = id3Bytes + Math.floor((fx / 256) * audioPayloadBytes);
+    }
+
     const byteLength = Math.max(
       98304,
-      Math.min(1048576, Math.ceil((endSec - startSec) * bytesPerSec * 1.08))
+      Math.min(1048576, Math.ceil((endSec - startSec) * bytesPerSec * 1.1))
     );
     const endByte = startByte + byteLength - 1;
 

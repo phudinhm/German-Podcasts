@@ -118,12 +118,52 @@ class LiveCaptionService {
    * `isCapturing`, since nothing is actually being listened to right now.
    */
   public loadTranscript(segments: CaptionSegment[]) {
-    this.currentTranscript = segments;
+    const incomingIsFallback = segments.length > 0 && segments.every((s) => s.id.startsWith("fallback-"));
+    const existingReg = this.currentTranscript.filter((s) => s.id.startsWith("dai-reg-"));
+
+    if (incomingIsFallback && existingReg.length > 0) {
+      // Keep verified regional jump segments and only fill uncovered time ranges
+      const nonOverlappingFallback = segments.filter((fb) => {
+        const mid = (fb.start + fb.end) / 2;
+        return !existingReg.some((reg) => mid >= reg.start - 0.5 && mid <= reg.end + 0.5);
+      });
+      this.currentTranscript = [...existingReg, ...nonOverlappingFallback].sort(
+        (a, b) => a.start - b.start
+      );
+      this.notifyTranscript();
+      return;
+    }
+
+    const incomingHasItsOwnReg = segments.some((s) => s.id.startsWith("dai-reg-"));
+    if (!incomingHasItsOwnReg && existingReg.length > 0) {
+      // E.g. Chunk 0 of full-file transcription arrived after user already jumped to 12:00 and transcribed `dai-reg-*`
+      const filteredIncoming = segments.filter((inc) => {
+        if (inc.id.startsWith("fallback-")) return false;
+        const mid = (inc.start + inc.end) / 2;
+        return !existingReg.some((reg) => mid >= reg.start - 0.4 && mid <= reg.end + 0.4);
+      });
+      this.currentTranscript = [...existingReg, ...filteredIncoming].sort(
+        (a, b) => a.start - b.start
+      );
+      this.notifyTranscript();
+      return;
+    }
+
+    this.currentTranscript = [...segments].sort((a, b) => a.start - b.start);
     this.notifyTranscript();
   }
 
   public appendTranscript(segments: CaptionSegment[]) {
-    this.currentTranscript = [...this.currentTranscript, ...segments];
+    const cleanedExisting = this.currentTranscript.filter((s) => !s.id.startsWith("fallback-"));
+    const existingReg = cleanedExisting.filter((s) => s.id.startsWith("dai-reg-"));
+    const filteredIncoming = segments.filter((inc) => {
+      if (inc.id.startsWith("fallback-")) return false;
+      const mid = (inc.start + inc.end) / 2;
+      return !existingReg.some((reg) => mid >= reg.start - 0.4 && mid <= reg.end + 0.4);
+    });
+    this.currentTranscript = [...cleanedExisting, ...filteredIncoming].sort(
+      (a, b) => a.start - b.start
+    );
     this.notifyTranscript();
   }
 
@@ -194,6 +234,46 @@ class LiveCaptionService {
 
   private notifyUnexpectedEnd() {
     for (const listener of this.endListeners) listener();
+  }
+
+  private lastSyncedSegmentId: string | null = null;
+
+  public syncCaptionAtTime(contentTimeSec: number) {
+    if (this.isCapturing || this.currentTranscript.length === 0) return;
+    let active: CaptionSegment | undefined;
+    for (let i = 0; i < this.currentTranscript.length; i++) {
+      const s = this.currentTranscript[i];
+      const next = this.currentTranscript[i + 1];
+      if (contentTimeSec >= s.start - 0.3) {
+        if (contentTimeSec <= s.end + 0.5) {
+          active = s;
+          break;
+        }
+        if (next && contentTimeSec < next.start && contentTimeSec <= s.end + 6.0) {
+          active = s;
+          break;
+        }
+        if (!next && contentTimeSec <= s.end + 6.0) {
+          active = s;
+          break;
+        }
+      }
+    }
+    if (active) {
+      const transText =
+        active.translations?.[this.targetLang] ??
+        active.translation ??
+        active.translations?.vi ??
+        active.translations?.en;
+      const cacheKey = `${active.id}:${transText ?? ""}`;
+      if (this.lastSyncedSegmentId !== cacheKey) {
+        this.lastSyncedSegmentId = cacheKey;
+        this.notifyCaption({
+          ...active,
+          translation: transText,
+        });
+      }
+    }
   }
 
   private notifyCaption(seg: CaptionSegment) {

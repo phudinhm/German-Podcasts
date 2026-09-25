@@ -398,69 +398,134 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [track?.id, track?.url]);
 
-  // Automatic Playhead Regional Monitor:
-  // When playing at `currentTime`, if the playhead enters an untranscribed region/gap (e.g. a Dynamic
-  // Mid-Roll Ad or a region the user sought ahead to before full-file transcription reached it),
-  // automatically fetch & transcribe the [currentTime - 2s, currentTime + 42s] window!
+  const [transcriptOffsetSec, setTranscriptOffsetSecState] = useState(0);
   useEffect(() => {
-    if (!track?.url) return;
-    const timer = window.setInterval(() => {
-      if (!media.handle.isPlaying() || transcribingRegion) return;
-      const nowSec = media.handle.getTime();
+    setTranscriptOffsetSecState(track ? getTranscriptOffset(track.id) : 0);
+  }, [track?.id]);
+  const setTranscriptOffsetSec = useCallback(
+    (offsetSec: number) => {
+      setTranscriptOffsetSecState(offsetSec);
+      if (track) setTranscriptOffset(track.id, offsetSec);
+    },
+    [track],
+  );
+
+  const regionAbortRef = useRef<AbortController | null>(null);
+
+  const triggerRegionalSyncAt = useCallback(
+    (nowSec: number, isSeekJump: boolean) => {
+      if (!track?.url) return;
       const totalDur = media.handle.getDuration() || (track.durationSec ?? 0);
-      if (nowSec < 2 || totalDur <= 15) return;
+      if (nowSec < 1.5 && !isSeekJump) return;
 
       const segs = liveCaptionService.getTranscript();
-      const hasCoverage = segs.some(
-        (s) => nowSec >= s.start - 2.0 && nowSec <= s.end + 3.5
+      // Only count verified regional segments (`dai-reg-*`) as already-calibrated on a seek jump,
+      // and never count `fallback-*` show-notes placeholders as real coverage!
+      const hasVerifiedRegional = segs.some(
+        (s) =>
+          s.id.startsWith("dai-reg-") &&
+          nowSec >= s.start - 1.5 &&
+          nowSec <= s.end + 2.5
       );
-      if (hasCoverage) return;
+      if (hasVerifiedRegional) return;
 
-      const bucketKey = `${track.id}:${Math.floor(nowSec / 35)}`;
-      if (scannedRegionBucketsRef.current.has(bucketKey)) return;
+      if (!isSeekJump) {
+        const hasRealCoverage = segs.some(
+          (s) =>
+            !s.id.startsWith("fallback-") &&
+            nowSec >= s.start - 2.0 &&
+            nowSec <= s.end + 3.5
+        );
+        if (hasRealCoverage) return;
+      }
+
+      const bucketKey = `${track.id}:${Math.floor(nowSec / 32)}`;
+      if (!isSeekJump && scannedRegionBucketsRef.current.has(bucketKey)) return;
       scannedRegionBucketsRef.current.add(bucketKey);
 
-      const regionStart = Math.max(0, Math.floor(nowSec - 2));
-      const regionEnd = Math.min(totalDur, regionStart + 44);
+      // If the user jumped to a new position, abort any stale regional request from the old timestamp!
+      if (isSeekJump && regionAbortRef.current) {
+        regionAbortRef.current.abort();
+      } else if (transcribingRegion) {
+        return;
+      }
+
+      const ac = new AbortController();
+      regionAbortRef.current = ac;
+      const regionStart = Math.max(0, Math.floor(nowSec - 1));
+      const regionEnd = totalDur > 15 ? Math.min(totalDur, regionStart + 42) : regionStart + 42;
+
       setTranscribingRegion(true);
       void transcribeAndSpliceRegion({
-        url: track.url!,
+        url: track.url,
         startSec: regionStart,
         endSec: regionEnd,
         totalDurationSec: totalDur,
         sourceLang: track.sourceLang ?? "de",
+        forceReplaceWindow: isSeekJump,
+        signal: ac.signal,
       })
         .catch(() => {})
         .finally(() => {
-          setTranscribingRegion(false);
+          if (regionAbortRef.current === ac) {
+            setTranscribingRegion(false);
+          }
         });
+    },
+    [track?.id, track?.url, track?.durationSec, track?.sourceLang, media.handle, transcribingRegion]
+  );
+
+  // Instant `seeked` & `timeupdate` synchronization on the media element:
+  // When jumping to any arbitrary position in a podcast, immediately sync captions and trigger regional transcription/alignment!
+  useEffect(() => {
+    const el = media.mediaRef.current;
+    if (!el || !track) return;
+
+    const onTimeOrSeek = () => {
+      const nowSec = el.currentTime || 0;
+      liveCaptionService.syncCaptionAtTime(nowSec - transcriptOffsetSec);
+    };
+
+    const onSeeked = () => {
+      const nowSec = el.currentTime || 0;
+      liveCaptionService.syncCaptionAtTime(nowSec - transcriptOffsetSec);
+      if (nowSec >= 2) {
+        triggerRegionalSyncAt(nowSec, true);
+      }
+    };
+
+    el.addEventListener("timeupdate", onTimeOrSeek);
+    el.addEventListener("seeked", onSeeked);
+    const unsubTranscript = liveCaptionService.onTranscript(() => {
+      liveCaptionService.syncCaptionAtTime((el.currentTime || 0) - transcriptOffsetSec);
+    });
+
+    return () => {
+      el.removeEventListener("timeupdate", onTimeOrSeek);
+      el.removeEventListener("seeked", onSeeked);
+      unsubTranscript();
+    };
+  }, [media.mediaRef, track, transcriptOffsetSec, triggerRegionalSyncAt]);
+
+  // Automatic Playhead Regional Monitor (every 2s while playing):
+  useEffect(() => {
+    if (!track?.url) return;
+    const timer = window.setInterval(() => {
+      if (!media.handle.isPlaying()) return;
+      const nowSec = media.handle.getTime();
+      liveCaptionService.syncCaptionAtTime(nowSec - transcriptOffsetSec);
+      triggerRegionalSyncAt(nowSec, false);
     }, 2000);
 
     return () => window.clearInterval(timer);
-  }, [track?.id, track?.url, track?.durationSec, track?.sourceLang, media.handle, transcribingRegion]);
+  }, [track?.url, media.handle, transcriptOffsetSec, triggerRegionalSyncAt]);
 
-  // Manual 1-Tap Regional Ad / Sync Transcriber for `[currentTime - 3s, currentTime + 45s]`
+  // Manual 1-Tap Regional Ad / Sync Transcriber for `[currentTime - 2s, currentTime + 45s]`
   const onTranscribeCurrentRegion = useCallback(() => {
-    if (!track?.url || transcribingRegion) return;
+    if (!track?.url) return;
     const nowSec = media.handle.getTime();
-    const totalDur = media.handle.getDuration() || (track.durationSec ?? 0);
-    const regionStart = Math.max(0, Math.floor(nowSec - 3));
-    const regionEnd = totalDur > 0 ? Math.min(totalDur, regionStart + 45) : regionStart + 45;
-
-    setTranscribingRegion(true);
-    void transcribeAndSpliceRegion({
-      url: track.url,
-      startSec: regionStart,
-      endSec: regionEnd,
-      totalDurationSec: totalDur,
-      sourceLang: track.sourceLang ?? "de",
-      forceReplaceWindow: true,
-    })
-      .catch(() => {})
-      .finally(() => {
-        setTranscribingRegion(false);
-      });
-  }, [track?.url, track?.durationSec, track?.sourceLang, media.handle, transcribingRegion]);
+    triggerRegionalSyncAt(nowSec, true);
+  }, [track?.url, media.handle, triggerRegionalSyncAt]);
 
   // Explicit generate trigger: ALWAYS works at any playback speed (1.0x, 1.5x, 2.0x)
   // and immediately populates the transcript UI while streaming Whisper audio in the background.
@@ -512,18 +577,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [media.handle, track?.url, generatingTranscript, onGenerateTranscript],
-  );
-
-  const [transcriptOffsetSec, setTranscriptOffsetSecState] = useState(0);
-  useEffect(() => {
-    setTranscriptOffsetSecState(track ? getTranscriptOffset(track.id) : 0);
-  }, [track?.id]);
-  const setTranscriptOffsetSec = useCallback(
-    (offsetSec: number) => {
-      setTranscriptOffsetSecState(offsetSec);
-      if (track) setTranscriptOffset(track.id, offsetSec);
-    },
-    [track],
   );
 
   const [videoMinimized, setVideoMinimized] = useState(false);

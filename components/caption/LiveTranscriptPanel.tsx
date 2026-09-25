@@ -133,27 +133,36 @@ export function LiveTranscriptPanel({
     return unsub;
   }, []);
 
+  const prevTimeRef = useRef(currentTime);
+  useEffect(() => {
+    if (Math.abs(currentTime - prevTimeRef.current) > 3.0) {
+      // User sought/jumped to a new position -> re-engage auto-scroll immediately!
+      setUserScrolledUp(false);
+    }
+    prevTimeRef.current = currentTime;
+  }, [currentTime]);
+
   // Determine active segment based on current playback time, corrected for
   // any ad breaks pushing real audio out of step.
-  // In Apple Music / Podcasts: During inter-sentence pauses, the currently spoken
-  // sentence remains highlighted until the next one actually begins!
+  // Only keep the previous sentence highlighted during a natural inter-sentence pause (<= 6.5s),
+  // NEVER across a large untranscribed gap when the user jumps far ahead!
   const contentTime = currentTime - transcriptOffsetSec;
   let activeSegmentId: string | undefined = undefined;
 
   for (let i = 0; i < segments.length; i++) {
     const s = segments[i];
     const next = segments[i + 1];
-    if (contentTime >= s.start - 0.3) {
-      if (contentTime <= s.end + 0.4) {
+    if (contentTime >= s.start - 0.35) {
+      if (contentTime <= s.end + 0.5) {
         activeSegmentId = s.id;
         break;
       }
-      // If we are in a pause before the next sentence, keep current sentence active
-      if (next && contentTime < next.start) {
+      // Natural pause before next sentence (up to 6.5s max)
+      if (next && contentTime < next.start && contentTime <= s.end + 6.5) {
         activeSegmentId = s.id;
         break;
       }
-      if (!next) {
+      if (!next && contentTime <= s.end + 6.5) {
         activeSegmentId = s.id;
         break;
       }
@@ -175,7 +184,7 @@ export function LiveTranscriptPanel({
       top: targetTop,
       behavior: "smooth",
     });
-  }, [activeSegmentId, autoScroll, userScrolledUp]);
+  }, [activeSegmentId, autoScroll, userScrolledUp, segments.length]);
 
   // When new segments arrive while NOT playing audio (or if user just started), scroll to end
   useEffect(() => {
