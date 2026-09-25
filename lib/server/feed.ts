@@ -210,14 +210,14 @@ export function parseFeed(xml: string, fallbackTitle: string): FeedResult {
     const itemPageUrl = tag(item, "link") ?? undefined;
     const itemTranscripts = extractTranscripts(item);
 
-    // Automatically attach official DW LearnGerman / Nicos Weg transcript reference
+    // Automatically attach official DW LearnGerman / Nicos Weg / Langsam gesprochene Nachrichten transcript reference
     if (
       itemTranscripts.length === 0 &&
       (/dw\.com|akamaihd\.net|nicosweg/i.test(safeUrl) ||
         (itemPageUrl && /learngerman\.dw\.com/i.test(itemPageUrl)))
     ) {
       const dwMatch =
-        itemPageUrl?.match(/\/l-(\d{6,9})(?:[/?#]|$)/i) ??
+        itemPageUrl?.match(/\/[al]-(\d{6,9})(?:[/?#]|$)/i) ??
         (/^\d{6,9}$/.test(itemGuid.trim()) ? [null, itemGuid.trim()] : null);
       if (dwMatch?.[1]) {
         itemTranscripts.push({

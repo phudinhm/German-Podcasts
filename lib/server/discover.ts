@@ -64,12 +64,20 @@ export function classifyInput(raw: string): InputKind {
   if (!value) return { kind: "search", term: "" };
 
   let url: URL | null = null;
-  try {
-    url = new URL(value.startsWith("http") ? value : `https://${value}`);
-    // Something like "easy german" parses as a hostname without a dot.
-    if (!url.hostname.includes(".")) url = null;
-  } catch {
-    url = null;
+  // Only treat raw input as a URL if it contains no whitespace and either starts with http(s)://
+  // or looks like a real domain with a valid 2-12 letter TLD (never a title ending with a period like "RONZHEIMER." or "F.A.Z.")
+  if (!/\s/.test(value) && !/\.$/.test(value)) {
+    try {
+      const hasScheme = /^https?:\/\//i.test(value);
+      const candidate = new URL(hasScheme ? value : `https://${value}`);
+      const host = candidate.hostname.toLowerCase();
+      const hasValidTld = /\.[a-z]{2,12}$/i.test(host);
+      if (hasValidTld && (hasScheme || candidate.pathname !== "/" || host.startsWith("rss.") || host.includes("apple.com") || host.includes("spotify.com"))) {
+        url = candidate;
+      }
+    } catch {
+      url = null;
+    }
   }
   if (!url || (url.protocol !== "http:" && url.protocol !== "https:")) {
     return { kind: "search", term: value };

@@ -188,66 +188,6 @@ export async function generateTranscript(
 
   let totalSegments = 0;
 
-  const applyClientFallback = () => {
-    if (isCancelled() || totalSegments > 0) return { ok: true as const };
-    const rawText = [meta?.title, meta?.description?.replace(/<[^>]+>/g, " ")]
-      .filter(Boolean)
-      .join(". ")
-      .replace(/\s+/g, " ")
-      .trim();
-    const rawSentences = (rawText || "Herzlich willkommen zu dieser Podcast-Folge.")
-      .split(/(?<=[.!?…])\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 2)
-      .slice(0, 65);
-
-    // Split any overly long sentence (>135 chars) into readable phrase segments
-    const fallbackSentences: string[] = [];
-    for (const s of rawSentences) {
-      if (s.length <= 135) {
-        fallbackSentences.push(s);
-      } else {
-        const parts = s
-          .split(/(?<=[,;–—:])\s+/)
-          .map((p) => p.trim())
-          .filter(Boolean);
-        fallbackSentences.push(...(parts.length > 1 ? parts : [s]));
-      }
-    }
-
-    const totalDur = meta?.durationSec && meta.durationSec > 15 ? meta.durationSec : 120;
-    const totalChars = fallbackSentences.reduce((sum, s) => sum + s.length, 0) || 1;
-    let cursor = 0;
-    const segs = fallbackSentences.map((text, idx) => {
-      const dur = Math.max(2.5, (text.length / totalChars) * totalDur);
-      const start = Math.round(cursor * 10) / 10;
-      const end = Math.round(Math.min(totalDur, cursor + dur) * 10) / 10;
-      cursor = end;
-      return {
-        id: `fallback-${idx}`,
-        start,
-        end: Math.max(start + 2, end),
-        text,
-        isFinal: true,
-      };
-    });
-    liveCaptionService.loadTranscript(segs);
-    void autoTranslateSegments(segs, sourceLang, isCancelled);
-    notifyReady();
-    return { ok: true as const };
-  };
-
-  // If explicitly clicked ("⚡ Generate transcript with AI"), show preview immediately (<0.1s),
-  // otherwise guarantee transcript renders within 1.5s while Whisper streams in the background!
-  if (meta?.immediatePreview) {
-    applyClientFallback();
-  }
-  const fastTimer = setTimeout(() => {
-    if (totalSegments === 0 && !isCancelled()) {
-      applyClientFallback();
-    }
-  }, 1500);
-
   const res = await fetch("/api/transcribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -264,8 +204,7 @@ export async function generateTranscript(
   }).catch(() => null);
 
   if (!res || !res.ok || !res.body) {
-    clearTimeout(fastTimer);
-    return applyClientFallback();
+    return { ok: false, error: "transcription-failed" };
   }
 
   const reader = res.body.getReader();
@@ -273,9 +212,11 @@ export async function generateTranscript(
   let buffer = "";
 
   const pushRealSegments = (incoming: FetchedSegment[]) => {
-    clearTimeout(fastTimer);
     const mapped = incoming.map((s) => ({ ...s, isFinal: true }));
-    if (totalSegments === 0) {
+    const hasVerifiedRegional = liveCaptionService
+      .getTranscript()
+      .some((s) => s.id.startsWith("dai-reg-"));
+    if (totalSegments === 0 && !hasVerifiedRegional) {
       liveCaptionService.loadTranscript(mapped);
     } else {
       liveCaptionService.appendTranscript(mapped);
@@ -291,7 +232,7 @@ export async function generateTranscript(
       return await Promise.race([
         reader.read(),
         new Promise<{ done: true; value: undefined }>((resolve) => {
-          timeoutId = setTimeout(() => resolve({ done: true, value: undefined }), 20_000);
+          timeoutId = setTimeout(() => resolve({ done: true, value: undefined }), 25_000);
         }),
       ]);
     } finally {
@@ -302,7 +243,6 @@ export async function generateTranscript(
   try {
     while (true) {
       if (isCancelled()) {
-        clearTimeout(fastTimer);
         reader.cancel();
         return totalSegments > 0 ? { ok: true } : { ok: false, error: "transcription-failed" };
       }
@@ -322,7 +262,7 @@ export async function generateTranscript(
               notifyReady();
               return { ok: true };
             }
-            return applyClientFallback();
+            return { ok: false, error: "transcription-failed" };
           }
           if (data.segments && data.segments.length > 0) {
             pushRealSegments(data.segments);
@@ -345,17 +285,14 @@ export async function generateTranscript(
     }
   } catch {
     if (totalSegments > 0) {
-      clearTimeout(fastTimer);
       notifyReady();
       return { ok: true };
     }
-  } finally {
-    clearTimeout(fastTimer);
   }
 
   if (isCancelled()) return { ok: false, error: "transcription-failed" };
   if (totalSegments === 0) {
-    return applyClientFallback();
+    return { ok: false, error: "transcription-failed" };
   }
   notifyReady();
   return { ok: true };

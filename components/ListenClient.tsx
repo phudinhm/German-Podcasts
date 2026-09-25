@@ -446,7 +446,6 @@ export function ListenClient() {
         transcripts: episode.transcripts,
         sourceLang: detectSpokenLang(feed?.language, `${episode.title} ${episode.description}`),
       };
-      setShowTranscript(true);
       player.play(track);
       noteplayed({
         id,
@@ -946,12 +945,14 @@ export function ListenClient() {
                 </button>
                 <button
                   type="button"
-                  className="icon-btn text-[15px] text-[var(--ink-faint)]"
-                  aria-label={t("player.fullscreen")}
-                  title={t("player.fullscreen")}
                   onClick={() => player.setFullscreenOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition-all hover:opacity-95 hover:scale-[1.02] active:scale-95"
+                  aria-label={t("player.openFullPlayer")}
+                  title={t("player.openFullPlayer")}
                 >
-                  ⛶
+                  <span aria-hidden className="text-[13px] leading-none">🎧</span>
+                  <span>Media Player</span>
+                  <span aria-hidden className="text-[11px] opacity-90">⤢</span>
                 </button>
                 <button
                   type="button"

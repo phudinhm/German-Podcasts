@@ -98,16 +98,6 @@ export async function POST(request: Request) {
         }
       } catch (err) {
         console.error("[transcribe] stream error", err);
-        if (globalIndex === 0) {
-          const fallback = buildFallbackSegmentsFromContext(meta, sourceLang).map((seg) => ({
-            id: `gen-${globalIndex++}`,
-            start: seg.start,
-            end: seg.end,
-            text: seg.text,
-            isFinal: true,
-          }));
-          controller.enqueue(encoder.encode(JSON.stringify({ segments: fallback }) + "\n"));
-        }
       } finally {
         controller.close();
       }

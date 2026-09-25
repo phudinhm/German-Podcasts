@@ -57,10 +57,18 @@ export async function POST(request: Request) {
   try {
     switch (input.kind) {
       case "apple-podcast":
-        return json(await fromApplePodcast(input.id));
+        try {
+          return json(await fromApplePodcast(input.id));
+        } catch {
+          return json(await fromSearch(query, country));
+        }
       case "spotify-show":
       case "spotify-episode":
-        return json(await fromSpotify(input.id, country));
+        try {
+          return json(await fromSpotify(input.id, country));
+        } catch {
+          return json(await fromSearch(query, country));
+        }
       case "feed":
         return json([
           {
@@ -75,7 +83,19 @@ export async function POST(request: Request) {
           },
         ]);
       case "webpage":
-        return json(await fromWebpage(input.url));
+        try {
+          return json(await fromWebpage(input.url));
+        } catch {
+          // If the webpage returned 404/403 or had no feed, extract readable search keywords from the URL and search Apple Podcasts
+          const fallbackTerm = decodeURIComponent(
+            new URL(input.url).pathname.split("/").filter(Boolean).pop() ||
+              new URL(input.url).hostname.replace(/^www\./, "").split(".")[0] ||
+              query
+          ).replace(/[-_.]+/g, " ");
+          const fallbackResults = await fromSearch(fallbackTerm, country);
+          if (fallbackResults.length > 0) return json(fallbackResults);
+          throw new Error("Die Quelle antwortete mit 404.");
+        }
       case "search":
       default:
         return json(await fromSearch(input.kind === "search" ? input.term : query, country));

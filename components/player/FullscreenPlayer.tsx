@@ -21,6 +21,8 @@ const AUTO_HIDE_DELAY_MS = 4500;
 const PLAYER_THEME_KEY = "hoerbar.playerTheme.v1";
 
 export type PlayerThemeId =
+  | "light"
+  | "daylight"
   | "amber"
   | "oled"
   | "ocean"
@@ -34,10 +36,47 @@ export const PLAYER_THEMES: Record<
   {
     name: string;
     swatch: string;
+    isLight?: boolean;
     overlayClass: string;
     vars: CSSProperties;
   }
 > = {
+  light: {
+    name: "Light Paper (Sáng ấm)",
+    swatch: "#faf7f2",
+    isLight: true,
+    overlayClass: "bg-[#faf7f2]/88",
+    vars: {
+      ["--paper" as string]: "#faf7f2",
+      ["--paper-raised" as string]: "#ffffff",
+      ["--ink" as string]: "#161514",
+      ["--ink-soft" as string]: "#3f3c38",
+      ["--ink-faint" as string]: "#706b63",
+      ["--rule" as string]: "#e2dcd1",
+      ["--surface" as string]: "#f3efe7",
+      ["--accent" as string]: "#b45309",
+      ["--accent-ring" as string]: "#d97706",
+      ["--accent-soft" as string]: "#fef3c7",
+    },
+  },
+  daylight: {
+    name: "Pure Daylight (Trắng sáng)",
+    swatch: "#ffffff",
+    isLight: true,
+    overlayClass: "bg-slate-50/90",
+    vars: {
+      ["--paper" as string]: "#f8fafc",
+      ["--paper-raised" as string]: "#ffffff",
+      ["--ink" as string]: "#0f172a",
+      ["--ink-soft" as string]: "#334155",
+      ["--ink-faint" as string]: "#64748b",
+      ["--rule" as string]: "#e2e8f0",
+      ["--surface" as string]: "#f1f5f9",
+      ["--accent" as string]: "#0284c7",
+      ["--accent-ring" as string]: "#0ea5e9",
+      ["--accent-soft" as string]: "#e0f2fe",
+    },
+  },
   amber: {
     name: "Amber Classic",
     swatch: "#f59e0b",
@@ -199,7 +238,7 @@ export function FullscreenPlayer() {
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showVocabModal, setShowVocabModal] = useState(false);
   const [vocabCount, setVocabCount] = useState(0);
-  const [playerTheme, setPlayerTheme] = useState<PlayerThemeId>("amber");
+  const [playerTheme, setPlayerTheme] = useState<PlayerThemeId>("light");
   const [docked, setDocked] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -210,14 +249,33 @@ export function FullscreenPlayer() {
 
   useEffect(() => {
     setSettings(loadCaptionSettings());
-    try {
-      const savedTheme = localStorage.getItem(PLAYER_THEME_KEY) as PlayerThemeId | null;
-      if (savedTheme && PLAYER_THEMES[savedTheme]) {
-        setPlayerTheme(savedTheme);
-      }
-    } catch {
-      // ignore
+    const syncWithSiteTheme = () => {
+      try {
+        const savedTheme = localStorage.getItem(PLAYER_THEME_KEY) as PlayerThemeId | null;
+        if (savedTheme && PLAYER_THEMES[savedTheme]) {
+          setPlayerTheme(savedTheme);
+          return;
+        }
+      } catch {}
+      const isSiteDark =
+        typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+      setPlayerTheme(isSiteDark ? "amber" : "light");
+    };
+    syncWithSiteTheme();
+
+    if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
+      const obs = new MutationObserver(() => {
+        const isSiteDark = document.documentElement.classList.contains("dark");
+        setPlayerTheme((prev) => {
+          if (isSiteDark && (prev === "light" || prev === "daylight")) return "amber";
+          if (!isSiteDark && prev !== "light" && prev !== "daylight") return "light";
+          return prev;
+        });
+      });
+      obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+      return () => obs.disconnect();
     }
+    return undefined;
   }, []);
 
   useEffect(() => {
@@ -339,7 +397,8 @@ export function FullscreenPlayer() {
   };
 
   const translationLang = resolveTranslationLang(track.sourceLang ?? "de", settings.translationLang);
-  const activeThemeConfig = PLAYER_THEMES[playerTheme] ?? PLAYER_THEMES.amber;
+  const activeThemeConfig = PLAYER_THEMES[playerTheme] ?? PLAYER_THEMES.light;
+  const isLight = Boolean(activeThemeConfig.isLight);
 
   const effectiveDuration = duration > 0 ? duration : Math.max(currentTime + 1, 1);
   const progressPct =
@@ -350,7 +409,7 @@ export function FullscreenPlayer() {
   const sheetScale = Math.max(0.92, 1 - dragY / 2800);
 
   return (
-    <div className="fixed inset-0 z-[80] overflow-hidden animate-ios-sheet" style={activeThemeConfig.vars}>
+    <div className="fixed inset-0 z-[80] overflow-hidden animate-ios-sheet text-[var(--ink)]" style={activeThemeConfig.vars}>
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 bg-[var(--paper)] transition-colors duration-500"
@@ -358,10 +417,10 @@ export function FullscreenPlayer() {
       />
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-0 bg-cover bg-center opacity-75 blur-3xl saturate-150 transition-all duration-700"
+        className="pointer-events-none fixed inset-0 bg-cover bg-center blur-3xl saturate-150 transition-all duration-700"
         style={{
           ...(track.artwork ? { backgroundImage: `url(${track.artwork})` } : {}),
-          opacity: sheetOpacity * 0.75,
+          opacity: sheetOpacity * (isLight ? 0.22 : 0.75),
         }}
       />
       <div
@@ -396,7 +455,11 @@ export function FullscreenPlayer() {
           {...topSwipe}
           className="flex flex-col items-center pt-1 pb-0.5 cursor-grab active:cursor-grabbing select-none"
         >
-          <span className="h-1.5 w-11 rounded-full bg-white/30 transition-colors hover:bg-white/45" />
+          <span
+            className={`h-1.5 w-11 rounded-full transition-colors ${
+              isLight ? "bg-black/20 hover:bg-black/35" : "bg-white/30 hover:bg-white/45"
+            }`}
+          />
         </div>
 
         {/* Top bar */}
@@ -421,14 +484,14 @@ export function FullscreenPlayer() {
               }
               setFullscreenOpen(false);
             }}
-            className="icon-btn text-[20px] active:scale-95"
+            className="icon-btn text-[20px] text-[var(--ink)] active:scale-95"
             aria-label={t("player.exitFullscreen")}
             title={t("player.exitFullscreen")}
           >
             ⌄
           </button>
 
-          <p className="max-w-[35%] sm:max-w-[45%] truncate text-[11.5px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
+          <p className="max-w-[30%] sm:max-w-[40%] truncate text-[11.5px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
             {track.showTitle}
           </p>
 
@@ -437,14 +500,37 @@ export function FullscreenPlayer() {
             <button
               type="button"
               onClick={() => setShowVocabModal(true)}
-              className="inline-flex items-center gap-1 rounded-full border border-amber-400/35 bg-amber-400/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-200 transition hover:bg-amber-400/25 active:scale-95"
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition active:scale-95 ${
+                isLight
+                  ? "border-amber-600/30 bg-amber-500/15 text-amber-900 hover:bg-amber-500/25"
+                  : "border-amber-400/35 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25"
+              }`}
               title="Sổ từ vựng đã lưu"
             >
               <span>⭐</span>
               <span className="hidden sm:inline">Từ vựng</span>
-              <span className="rounded-full bg-amber-400/25 px-1.5 text-[10px] text-amber-100">
+              <span
+                className={`rounded-full px-1.5 text-[10px] ${
+                  isLight ? "bg-amber-600/20 text-amber-950" : "bg-amber-400/25 text-amber-100"
+                }`}
+              >
                 {vocabCount}
               </span>
+            </button>
+
+            {/* 1-Tap Light / Dark Quick Switch */}
+            <button
+              type="button"
+              onClick={() => handleSelectPlayerTheme(isLight ? "amber" : "light")}
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition active:scale-95 ${
+                isLight
+                  ? "border-[var(--rule)] bg-[var(--paper-raised)] text-[var(--ink)] shadow-2xs hover:bg-[var(--surface)]"
+                  : "border-white/20 bg-white/10 text-white hover:bg-white/20"
+              }`}
+              title={isLight ? "Chuyển sang giao diện Tối (Dark Theme)" : "Chuyển sang giao diện Sáng (Light Theme)"}
+            >
+              <span>{isLight ? "☀️" : "🌙"}</span>
+              <span className="hidden sm:inline">{isLight ? "Light" : "Dark"}</span>
             </button>
 
             {/* Theme Picker button */}
@@ -456,14 +542,18 @@ export function FullscreenPlayer() {
                 setShowSettings(false);
               }}
               className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition active:scale-95 ${
-                showThemePicker
-                  ? "border-white/40 bg-white/20 text-white"
-                  : "border-white/20 bg-white/10 text-white hover:bg-white/20"
+                isLight
+                  ? showThemePicker
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)]"
+                    : "border-[var(--rule)] bg-[var(--paper-raised)] text-[var(--ink)] hover:bg-[var(--surface)]"
+                  : showThemePicker
+                    ? "border-white/40 bg-white/20 text-white"
+                    : "border-white/20 bg-white/10 text-white hover:bg-white/20"
               }`}
               title="Đổi giao diện màu (Theme)"
             >
               <span
-                className="h-2.5 w-2.5 rounded-full border border-white/40"
+                className="h-2.5 w-2.5 rounded-full border border-black/25 dark:border-white/40"
                 style={{ backgroundColor: activeThemeConfig.swatch }}
               />
               <span className="hidden sm:inline">Theme</span>
@@ -473,7 +563,11 @@ export function FullscreenPlayer() {
             <button
               type="button"
               onClick={toggleLanguage}
-              className="px-2 py-0.5 text-[11px] font-semibold rounded-full border border-white/20 bg-white/10 hover:bg-white/20 text-amber-200 transition active:scale-95"
+              className={`px-2 py-0.5 text-[11px] font-semibold rounded-full border transition active:scale-95 ${
+                isLight
+                  ? "border-[var(--rule)] bg-[var(--paper-raised)] text-[var(--accent)] hover:bg-[var(--surface)]"
+                  : "border-white/20 bg-white/10 hover:bg-white/20 text-amber-200"
+              }`}
               title="Đổi ngôn ngữ dịch (VI / EN)"
             >
               {translationLang.toUpperCase()}
@@ -488,8 +582,8 @@ export function FullscreenPlayer() {
                 setShowSpeedPicker(false);
                 resetAutoHide();
               }}
-              className={`icon-btn text-[13px] font-semibold transition ${
-                showSettings ? "bg-white/20 text-white" : ""
+              className={`icon-btn text-[13px] font-semibold text-[var(--ink)] transition ${
+                showSettings ? "bg-[var(--accent-soft)] text-[var(--accent)]" : ""
               }`}
               aria-expanded={showSettings}
               title={t("caption.textSize")}
@@ -501,15 +595,15 @@ export function FullscreenPlayer() {
 
         {/* Theme Picker Popover */}
         {showThemePicker && (
-          <div className="absolute left-3 right-3 sm:left-auto sm:right-6 sm:w-80 top-14 z-30 rounded-2xl bg-[var(--surface)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute left-3 right-3 sm:left-auto sm:right-6 sm:w-80 top-14 z-30 rounded-2xl bg-[var(--paper-raised)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
             <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[var(--rule)]">
               <span className="text-xs font-bold text-[var(--ink)]">
-                🎨 Chọn chủ đề giao diện (Theme)
+                🎨 Chọn chủ đề giao diện (Light / Dark)
               </span>
               <button
                 type="button"
                 onClick={() => setShowThemePicker(false)}
-                className="icon-btn text-sm"
+                className="icon-btn text-sm text-[var(--ink)]"
               >
                 ✕
               </button>
@@ -525,12 +619,12 @@ export function FullscreenPlayer() {
                     onClick={() => handleSelectPlayerTheme(id)}
                     className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-xs font-medium transition ${
                       active
-                        ? "border-amber-400 bg-amber-400/15 text-white shadow-sm"
-                        : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10"
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)] font-semibold shadow-sm"
+                        : "border-[var(--rule)] bg-[var(--surface)]/60 text-[var(--ink-soft)] hover:bg-[var(--surface)]"
                     }`}
                   >
                     <span
-                      className="h-4 w-4 shrink-0 rounded-full border border-white/30 shadow-inner"
+                      className="h-4 w-4 shrink-0 rounded-full border border-black/20 shadow-inner"
                       style={{ backgroundColor: item.swatch }}
                     />
                     <span className="truncate">{item.name}</span>
@@ -543,7 +637,7 @@ export function FullscreenPlayer() {
 
         {/* Caption & Reader Settings Popover */}
         {showSettings ? (
-          <div className="absolute left-4 right-4 top-14 z-30 rounded-2xl bg-[var(--surface)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute left-4 right-4 top-14 z-30 rounded-2xl bg-[var(--paper-raised)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--rule)]">
               <span className="text-[13px] font-semibold text-[var(--ink)]">
                 {t("common.settings")}
@@ -551,7 +645,7 @@ export function FullscreenPlayer() {
               <button
                 type="button"
                 onClick={() => setShowSettings(false)}
-                className="icon-btn text-[16px]"
+                className="icon-btn text-[16px] text-[var(--ink)]"
                 aria-label={t("common.close")}
               >
                 ×
@@ -573,7 +667,7 @@ export function FullscreenPlayer() {
           <div {...topSwipe} className="mt-1 mb-2 flex flex-col items-center shrink-0 select-none">
             <div
               ref={videoStageRef}
-              className="mx-auto w-full max-w-xl aspect-video max-h-[28vh] sm:max-h-[34vh] rounded-2xl overflow-hidden bg-black border border-white/20 shadow-2xl"
+              className="mx-auto w-full max-w-xl aspect-video max-h-[28vh] sm:max-h-[34vh] rounded-2xl overflow-hidden bg-black border border-[var(--rule)] shadow-2xl"
             />
             <p className="mt-1.5 max-w-xl truncate text-center text-xs font-semibold text-[var(--ink-soft)]">
               {track.title}
@@ -582,7 +676,11 @@ export function FullscreenPlayer() {
         ) : !docked ? (
           <div
             {...topSwipe}
-            className="mt-1 mb-1 flex shrink-0 items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 backdrop-blur-md select-none"
+            className={`mt-1 mb-1 flex shrink-0 items-center gap-3.5 rounded-2xl border px-3.5 py-2.5 backdrop-blur-md select-none ${
+              isLight
+                ? "border-[var(--rule)] bg-[var(--paper-raised)]/90 shadow-xs"
+                : "border-white/10 bg-white/[0.04]"
+            }`}
           >
             <Art src={track.artwork} alt="" size={52} seed={track.showTitle || track.title} />
             <div className="min-w-0 flex-1">
@@ -596,7 +694,11 @@ export function FullscreenPlayer() {
             <button
               type="button"
               onClick={() => setDocked(true)}
-              className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/60 hover:bg-white/10 hover:text-white"
+              className={`rounded-xl border px-2.5 py-1 text-[11px] transition ${
+                isLight
+                  ? "border-[var(--rule)] bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                  : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+              }`}
               title="Thu gọn tiêu đề để mở rộng khung đọc transcript"
             >
               Thu gọn
@@ -616,38 +718,39 @@ export function FullscreenPlayer() {
             fontFamily={settings.fontFamily}
             theme={settings.captionTheme}
             translationVisibility={settings.translationVisibility}
+            isLightTheme={isLight}
           />
         </div>
 
         {/* Multi-level Speed Picker Popover (anchored above the bottom media bar) */}
         {showSpeedPicker && (
-          <div className="mt-2 rounded-2xl border border-white/15 bg-zinc-900/95 p-3 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <div className="mt-2 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)] p-3 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-150">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-bold text-white">
+              <span className="text-xs font-bold text-[var(--ink)]">
                 ⚡ Tốc độ phát đa mức (Playback Speed)
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => applySpeed(speed - 0.05)}
-                  className="rounded-lg border border-white/15 bg-white/10 px-2 py-0.5 font-mono text-xs font-bold text-white hover:bg-white/20"
+                  className="rounded-lg border border-[var(--rule)] bg-[var(--surface)] px-2 py-0.5 font-mono text-xs font-bold text-[var(--ink)] hover:opacity-85"
                 >
                   −0.05×
                 </button>
-                <span className="min-w-[48px] text-center font-mono text-xs font-bold text-amber-300">
+                <span className="min-w-[48px] text-center font-mono text-xs font-bold text-[var(--accent)]">
                   {speed.toFixed(2).replace(/\.00$/, ".0")}×
                 </span>
                 <button
                   type="button"
                   onClick={() => applySpeed(speed + 0.05)}
-                  className="rounded-lg border border-white/15 bg-white/10 px-2 py-0.5 font-mono text-xs font-bold text-white hover:bg-white/20"
+                  className="rounded-lg border border-[var(--rule)] bg-[var(--surface)] px-2 py-0.5 font-mono text-xs font-bold text-[var(--ink)] hover:opacity-85"
                 >
                   +0.05×
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowSpeedPicker(false)}
-                  className="ml-1 rounded-lg p-1 text-xs text-white/60 hover:text-white"
+                  className="ml-1 rounded-lg p-1 text-xs text-[var(--ink-faint)] hover:text-[var(--ink)]"
                 >
                   ✕
                 </button>
@@ -663,8 +766,8 @@ export function FullscreenPlayer() {
                     onClick={() => applySpeed(lvl)}
                     className={`rounded-xl py-1.5 font-mono text-[11.5px] font-semibold transition ${
                       isSelected
-                        ? "bg-amber-400 text-zinc-950 font-bold shadow-sm"
-                        : "bg-white/5 text-white/80 hover:bg-white/15"
+                        ? "bg-[var(--accent)] text-white font-bold shadow-sm"
+                        : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
                     }`}
                   >
                     {lvl}×
@@ -679,7 +782,11 @@ export function FullscreenPlayer() {
             Always displays subtle listening progress bar + timestamps + multi-level speed + transport controls */}
         <div
           onPointerDown={resetAutoHide}
-          className="mt-2 shrink-0 rounded-2xl border border-white/15 bg-[var(--surface)]/90 px-3.5 py-2.5 shadow-2xl backdrop-blur-xl transition"
+          className={`mt-2 shrink-0 rounded-2xl border px-3.5 py-2.5 shadow-2xl backdrop-blur-xl transition ${
+            isLight
+              ? "border-[var(--rule)] bg-[var(--paper-raised)]/95"
+              : "border-white/15 bg-[var(--surface)]/90"
+          }`}
         >
           {/* Row 1: Subtle interactive progress bar with elapsed, percentage & remaining time */}
           <div className="mb-2 flex items-center gap-2.5">
@@ -688,9 +795,9 @@ export function FullscreenPlayer() {
             </span>
 
             <div className="relative flex-1 flex items-center">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
+              <div className={`h-1.5 w-full overflow-hidden rounded-full ${isLight ? "bg-black/10" : "bg-white/15"}`}>
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-300 to-amber-200 transition-all duration-150"
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-400 to-amber-400 transition-all duration-150"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
@@ -706,7 +813,11 @@ export function FullscreenPlayer() {
               />
             </div>
 
-            <span className="hidden sm:inline-block rounded-full bg-amber-400/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-300 tabular-nums">
+            <span
+              className={`hidden sm:inline-block rounded-full px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums ${
+                isLight ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-amber-400/15 text-amber-300"
+              }`}
+            >
               {Math.round(progressPct)}%
             </span>
 
@@ -740,11 +851,15 @@ export function FullscreenPlayer() {
             </div>
 
             {/* Multi-level Speed stepper & menu button */}
-            <div className="flex items-center rounded-full border border-white/15 bg-black/30 p-0.5">
+            <div
+              className={`flex items-center rounded-full border p-0.5 ${
+                isLight ? "border-[var(--rule)] bg-[var(--surface)]" : "border-white/15 bg-black/30"
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => applySpeed(speed - 0.1)}
-                className="flex h-7 w-6 items-center justify-center rounded-full text-xs font-bold text-white/75 hover:bg-white/15 hover:text-white"
+                className="flex h-7 w-6 items-center justify-center rounded-full text-xs font-bold text-[var(--ink-soft)] hover:bg-black/10 dark:hover:bg-white/15 hover:text-[var(--ink)]"
                 title="Giảm tốc độ 0.1×"
               >
                 −
@@ -752,7 +867,7 @@ export function FullscreenPlayer() {
               <button
                 type="button"
                 onClick={() => setShowSpeedPicker((v) => !v)}
-                className="px-1.5 font-mono text-[11.5px] font-bold text-amber-300 hover:text-amber-200"
+                className="px-1.5 font-mono text-[11.5px] font-bold text-[var(--accent)]"
                 title="Chọn tốc độ phát nhiều mức (0.5× - 2.0×)"
               >
                 {speed}×
@@ -760,7 +875,7 @@ export function FullscreenPlayer() {
               <button
                 type="button"
                 onClick={() => applySpeed(speed + 0.1)}
-                className="flex h-7 w-6 items-center justify-center rounded-full text-xs font-bold text-white/75 hover:bg-white/15 hover:text-white"
+                className="flex h-7 w-6 items-center justify-center rounded-full text-xs font-bold text-[var(--ink-soft)] hover:bg-black/10 dark:hover:bg-white/15 hover:text-[var(--ink)]"
                 title="Tăng tốc độ 0.1×"
               >
                 +
@@ -772,7 +887,11 @@ export function FullscreenPlayer() {
               <button
                 type="button"
                 onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 font-mono text-[11px] font-semibold text-white transition hover:bg-white/20 active:scale-95"
+                className={`flex h-9 w-9 items-center justify-center rounded-full border font-mono text-[11px] font-semibold transition active:scale-95 ${
+                  isLight
+                    ? "border-[var(--rule)] bg-[var(--surface)] text-[var(--ink)] hover:bg-black/10"
+                    : "border-white/15 bg-white/10 text-white hover:bg-white/20"
+                }`}
                 title="Tua lùi 10 giây"
               >
                 -10s
@@ -785,7 +904,7 @@ export function FullscreenPlayer() {
                   else handle.play();
                 }}
                 aria-label={handle.isPlaying() ? t("common.pause") : t("common.play")}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400 text-zinc-950 font-bold shadow-lg transition hover:bg-amber-300 active:scale-95"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white font-bold shadow-lg transition hover:opacity-95 active:scale-95"
               >
                 {handle.isPlaying() ? "❚❚" : "▶"}
               </button>
@@ -793,7 +912,11 @@ export function FullscreenPlayer() {
               <button
                 type="button"
                 onClick={() => handle.seekTo(handle.getTime() + 15, true)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 font-mono text-[11px] font-semibold text-white transition hover:bg-white/20 active:scale-95"
+                className={`flex h-9 w-9 items-center justify-center rounded-full border font-mono text-[11px] font-semibold transition active:scale-95 ${
+                  isLight
+                    ? "border-[var(--rule)] bg-[var(--surface)] text-[var(--ink)] hover:bg-black/10"
+                    : "border-white/15 bg-white/10 text-white hover:bg-white/20"
+                }`}
                 title="Tua tới 15 giây"
               >
                 +15s

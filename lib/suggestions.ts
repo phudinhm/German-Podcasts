@@ -33,8 +33,8 @@ export interface Suggestion {
 
 export const SUGGESTIONS: Suggestion[] = [
   {
-    query: "https://feeds.transistor.fm/easy-german-podcast",
-    feedUrl: "https://feeds.transistor.fm/easy-german-podcast",
+    query: "https://proxyfeed.svmaudio.com/feeds/easygerman/feed.xml",
+    feedUrl: "https://proxyfeed.svmaudio.com/feeds/easygerman/feed.xml",
     label: "Easy German",
     publisher: "Easy Languages",
     lang: "de",
@@ -105,8 +105,8 @@ export const SUGGESTIONS: Suggestion[] = [
     video: true,
   },
   {
-    query: "https://feeds.acast.com/public/shows/coffee-break-german",
-    feedUrl: "https://feeds.acast.com/public/shows/coffee-break-german",
+    query: "https://feeds.acast.com/public/shows/0c3c53a1-180f-435a-9453-cec3883b4ada",
+    feedUrl: "https://feeds.acast.com/public/shows/0c3c53a1-180f-435a-9453-cec3883b4ada",
     label: "Coffee Break German",
     publisher: "Coffee Break Languages",
     lang: "de",

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveCompanionAudioUrl } from "@/lib/server/transcribe";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -259,9 +260,13 @@ async function transcribeSliceWithGroq(
     .filter(Boolean);
   if (keys.length === 0) return null;
 
-  const models = ["whisper-large-v3-turbo", "whisper-large-v3"];
+  const models = ["whisper-large-v3-turbo", "whisper-large-v3", "whisper-large-v3-turbo"];
   for (const key of keys) {
-    for (const model of models) {
+    for (let i = 0; i < models.length; i++) {
+      const model = models[i];
+      if (i > 0) {
+        await new Promise((resolve) => setTimeout(resolve, i * 850));
+      }
       try {
         const form = new FormData();
         form.append(
@@ -281,7 +286,12 @@ async function transcribeSliceWithGroq(
           body: form,
           signal: AbortSignal.timeout(16000),
         });
-        if (!res.ok) continue;
+        if (!res.ok) {
+          if (res.status === 429) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+          continue;
+        }
 
         const data = (await res.json()) as {
           segments?: Array<{ start?: number; end?: number; text?: string }>;
@@ -414,15 +424,29 @@ export async function POST(req: NextRequest) {
       sourceLang?: string;
     };
 
-    const url = (body.url ?? "").trim();
-    if (!url || !/^https?:\/\//i.test(url)) {
+    const rawUrl = (body.url ?? "").trim();
+    if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
       return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
     }
+
+    const url = await resolveCompanionAudioUrl(rawUrl);
+    const isMp4Container = /\.(mp4|m4a|mov|webm)(\?|$)/i.test(url);
 
     const startSec = Math.max(0, Number(body.startSec ?? 0));
     const endSec = Math.max(startSec + 8, Math.min(startSec + 75, Number(body.endSec ?? startSec + 45)));
     const totalDurationSec = Number(body.totalDurationSec ?? 0);
     const sourceLang = body.sourceLang === "en" ? "en" : "de";
+
+    // Raw MP4/M4A containers without an MP3 companion cannot be byte-sliced via HTTP Range mid-file
+    // (because the ftyp + moov header atoms live at byte 0). Return cleanly so full-stream transcription handles it.
+    if (isMp4Container) {
+      return NextResponse.json({
+        segments: [],
+        startSec,
+        endSec,
+        bytesPerSec: 0,
+      });
+    }
 
     const { id3Bytes, totalBytes, bitrateKbps, xingDurationSec, xingTotalBytes, xingToc } =
       await probeStreamHeader(url);

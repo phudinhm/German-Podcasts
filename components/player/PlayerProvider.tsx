@@ -134,7 +134,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const [inlineVisible, setInlineVisible] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(true);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(false);
   const [fullscreenOpen, setFullscreenOpenState] = useState(false);
   const [videoPipMode, setVideoPipMode] = useState(false);
@@ -175,7 +175,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
 
-      setShowTranscript(true);
       setWaitingForTranscript(false);
       setVideoMinimized(false);
       setVideoPipMode(false);
@@ -362,6 +361,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       if (track.url) {
         setGeneratingTranscript(true);
+        const startPos = track.startAt && track.startAt > 2 ? Math.floor(track.startAt) : 0;
+        scannedRegionBucketsRef.current.add(`${track.id}:0`);
+        scannedRegionBucketsRef.current.add(`${track.id}:${Math.floor(startPos / 32)}`);
+
+        // If resuming mid-episode (startPos > 15s), immediately fetch & transcribe the active window at `startPos`
+        // via HTTP Range before starting the full sequential stream from 0:00!
+        if (startPos > 15) {
+          await transcribeAndSpliceRegion({
+            url: track.url,
+            startSec: startPos,
+            endSec: startPos + 42,
+            totalDurationSec: media.handle.getDuration() || (track.durationSec ?? 0),
+            sourceLang: track.sourceLang ?? "de",
+            forceReplaceWindow: true,
+          }).catch(() => {});
+        }
+
+        if (isCancelled()) return;
+
         await generateTranscript(
           track.url,
           track.sourceLang ?? "de",

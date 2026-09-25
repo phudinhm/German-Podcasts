@@ -19,11 +19,17 @@ export function GlobalFloatingTranscript() {
   const { track, handle, showTranscript, setShowTranscript, transcriptCollapsed, setTranscriptCollapsed, inlineVisible } = usePlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const [settings, setSettings] = useState<CaptionSettingsState>(DEFAULT_CAPTION_SETTINGS);
+  const [explicitlyOpened, setExplicitlyOpened] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
     setSettings(loadCaptionSettings());
   }, []);
+
+  // Reset floating popup to closed whenever the episode changes so it NEVER auto-opens
+  useEffect(() => {
+    setExplicitlyOpened(false);
+  }, [track?.id]);
 
   const handleUpdateSettings = (next: CaptionSettingsState) => {
     setSettings(next);
@@ -44,7 +50,7 @@ export function GlobalFloatingTranscript() {
   }, [handle]);
 
   const shouldFloat = pathname !== "/" || !inlineVisible;
-  if (!track || !showTranscript || !shouldFloat) return null;
+  if (!track || !shouldFloat) return null;
 
   const onSeekWithPlay = (seconds: number) => {
     handle.seekTo(seconds, true);
@@ -52,6 +58,33 @@ export function GlobalFloatingTranscript() {
       handle.play();
     }
   };
+
+  // Never auto-open the floating Running Transcript popup!
+  // Only render the expanded popup if the user explicitly clicked the compact pill to open it.
+  if (!explicitlyOpened || !showTranscript) {
+    return (
+      <div
+        className="hidden sm:block fixed z-40 pointer-events-auto sm:left-6"
+        style={{
+          bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setShowTranscript(true);
+            setTranscriptCollapsed(false);
+            setExplicitlyOpened(true);
+          }}
+          className="inline-flex items-center gap-2 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 px-3.5 py-1.5 text-[12px] font-semibold text-[var(--ink)] shadow-lg backdrop-blur-md transition hover:border-[var(--accent)] hover:text-[var(--accent)] active:scale-95"
+          title="Mở cửa sổ Running Transcript"
+        >
+          <span>📝</span>
+          <span>Transcript</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <aside
@@ -65,7 +98,10 @@ export function GlobalFloatingTranscript() {
       <LiveTranscriptPanel
         currentTime={currentTime}
         onSeek={onSeekWithPlay}
-        onClose={() => setShowTranscript(false)}
+        onClose={() => {
+          setExplicitlyOpened(false);
+          setShowTranscript(false);
+        }}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
         isCollapsed={transcriptCollapsed}

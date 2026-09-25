@@ -51,8 +51,8 @@ export function extractDwLessonIdSync(input: {
     if (compositeMatch) {
       return Number(compositeMatch[1]);
     }
-    // 3. DW LearnGerman lesson URL: "https://learngerman.dw.com/de/.../l-40324275" or "dw-transcript/l-40324275"
-    const lessonUrlMatch = raw.match(/\/l-(\d{6,9})(?:[/?#]|$)/i);
+    // 3. DW LearnGerman lesson or article URL: "https://learngerman.dw.com/de/.../l-40324275", "/a-79425547", or "dw-transcript/l-40324275"
+    const lessonUrlMatch = raw.match(/\/[al]-(\d{6,9})(?:[/?#]|$)/i);
     if (lessonUrlMatch) {
       return Number(lessonUrlMatch[1]);
     }
@@ -270,6 +270,11 @@ export async function fetchDwOfficialTranscript(
             }
           }
         }
+        ... on Article {
+          id
+          title
+          text
+        }
       }
     }`;
 
@@ -291,6 +296,7 @@ export async function fetchDwOfficialTranscript(
           id?: number;
           title?: string;
           manuscript?: string | null;
+          text?: string | null;
           videos?: Array<{
             id?: number;
             duration?: number | null;
@@ -308,7 +314,10 @@ export async function fetchDwOfficialTranscript(
     const content = json.data?.content;
     if (!content) return null;
 
-    const manuscriptTurns = content.manuscript ? parseDwManuscript(content.manuscript) : [];
+    const rawManuscriptHtml = (content.manuscript || content.text || "")
+      .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
+      .replace(/<h[1-6][^>]*>[\s\S]*?<\/h[1-6]>/gi, " ");
+    const manuscriptTurns = rawManuscriptHtml ? parseDwManuscript(rawManuscriptHtml) : [];
 
     // 1. Prefer official millisecond-timed WebVTT subtitle file from `videos[].subtitles`
     const videos = content.videos ?? [];

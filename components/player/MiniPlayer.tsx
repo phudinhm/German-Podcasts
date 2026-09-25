@@ -433,8 +433,9 @@ export function MiniPlayer() {
           {/* COLLAPSED PILL STATE */}
           {!isExpandedDesktop ? (
             <div
-              className="group flex items-center gap-2.5 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)]/95 text-[var(--ink)] px-3.5 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.14)] backdrop-blur-3xl transition-all duration-300 hover:scale-[1.02] cursor-pointer max-w-[420px]"
-              title={t("player.hoverExpand")}
+              onClick={() => setFullscreenOpen(true)}
+              className="group flex items-center gap-2.5 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)]/95 text-[var(--ink)] px-3.5 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.14)] backdrop-blur-3xl transition-all duration-300 hover:scale-[1.02] cursor-pointer max-w-[460px]"
+              title={t("player.openFullPlayer")}
             >
               <Art src={track.artwork} alt="" size={32} seed={track.showTitle || track.title} />
               <div className="min-w-0 flex-1">
@@ -447,6 +448,11 @@ export function MiniPlayer() {
                   </div>
                 ) : null}
               </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs shrink-0">
+                <span>🎧</span>
+                <span>Player</span>
+                <span className="text-[10px]">⤢</span>
+              </span>
               <AudioVisualizer isPlaying={playing} barCount={5} />
               <button
                 type="button"
@@ -462,7 +468,7 @@ export function MiniPlayer() {
             </div>
           ) : (
             /* FULL EXPANDED CARD STATE */
-            <div className="group card relative flex w-full max-w-[420px] flex-col gap-2 p-3 shadow-[var(--shadow-pop)] border border-[var(--rule)]">
+            <div className="group card relative flex w-full max-w-[440px] flex-col gap-2 p-3 shadow-[var(--shadow-pop)] border border-[var(--rule)]">
               {/* Height adjustment controls */}
               <div className="pointer-events-none absolute -left-1 top-1/2 hidden -translate-x-full -translate-y-1/2 flex-col gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 sm:flex">
                 <button
@@ -492,7 +498,11 @@ export function MiniPlayer() {
                   <Art src={track.artwork} alt="" size={44} seed={track.showTitle || track.title} />
                 )}
 
-                <div className="min-w-0 flex-1">
+                <div
+                  onClick={() => setFullscreenOpen(true)}
+                  className="min-w-0 flex-1 cursor-pointer hover:opacity-85"
+                  title={t("player.openFullPlayer")}
+                >
                   <p className="truncate text-[13.5px] font-medium leading-tight">{track.title}</p>
                   <p className="truncate text-[11.5px] text-[var(--ink-faint)]">
                     {mediaState.loading ? t("player.buffering") : track.showTitle}
@@ -523,17 +533,6 @@ export function MiniPlayer() {
                     title={pinned ? t("player.unpinExpanded") : t("player.pinExpanded")}
                   >
                     &#128204;
-                  </button>
-
-                  {/* Full-screen now-playing button */}
-                  <button
-                    type="button"
-                    onClick={() => setFullscreenOpen(true)}
-                    className="icon-btn h-7 w-7 text-[13px]"
-                    title={t("player.fullscreen")}
-                    aria-label={t("player.fullscreen")}
-                  >
-                    ⛶
                   </button>
 
                   {/* Popout PiP button */}
@@ -572,7 +571,10 @@ export function MiniPlayer() {
               </div>
 
               {activeDockSeg?.text ? (
-                <div className="rounded-xl bg-[var(--surface)]/80 border border-[var(--rule)] px-2.5 py-1.5 text-[11.5px]">
+                <div
+                  onClick={() => setFullscreenOpen(true)}
+                  className="cursor-pointer rounded-xl bg-[var(--surface)]/80 border border-[var(--rule)] px-2.5 py-1.5 text-[11.5px] transition hover:border-[var(--accent)]/50"
+                >
                   <p className="font-semibold text-[var(--ink)] line-clamp-2">{activeDockSeg.text}</p>
                   {activeDockTrans ? (
                     <p className="mt-0.5 italic text-[var(--accent)] line-clamp-2">{activeDockTrans}</p>
@@ -580,8 +582,19 @@ export function MiniPlayer() {
                 </div>
               ) : null}
 
-              <div className="flex items-center pt-1 border-t border-[var(--rule)]">
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-[var(--rule)]">
                 <div className="flex items-center gap-2">{transport}</div>
+                <button
+                  type="button"
+                  onClick={() => setFullscreenOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-sm transition-all hover:opacity-95 hover:scale-[1.02] active:scale-95"
+                  title={t("player.openFullPlayer")}
+                  aria-label={t("player.openFullPlayer")}
+                >
+                  <span>🎧</span>
+                  <span>Media Player</span>
+                  <span className="text-[11px]">⤢</span>
+                </button>
               </div>
             </div>
           )}
