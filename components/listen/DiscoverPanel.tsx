@@ -105,18 +105,22 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
           </div>
           <ul className="scroll-row -mx-4 gap-3 px-4 pb-2 sm:mx-0 sm:px-0">
             {charts.map((entry, index) => (
-              <li key={entry.appleId} className="w-[128px] shrink-0 sm:w-[132px]">
+              <li key={entry.appleId} className="w-[132px] shrink-0 sm:w-[140px]">
                 <button
                   type="button"
-                  className="w-full text-left"
+                  className="group w-full text-left transition-transform duration-200 hover:-translate-y-0.5 active:scale-95"
                   onClick={() =>
                     onPick(entry.pageUrl ?? `https://podcasts.apple.com/de/podcast/id${entry.appleId}`)
                   }
                 >
-                  <Art src={entry.artwork} alt="" size={132} seed={entry.title} />
-                  <span className="mt-1.5 flex items-baseline gap-1">
-                    <span className="text-[11px] text-[var(--ink-faint)]">{index + 1}</span>
-                    <span className="line-clamp-2 text-[12.5px] font-medium leading-snug">{entry.title}</span>
+                  <div className="relative overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+                    <Art src={entry.artwork} alt="" size={140} seed={entry.title} />
+                    <span className="absolute left-2 top-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-black/70 px-1.5 font-mono text-[11px] font-bold text-white backdrop-blur-md">
+                      #{index + 1}
+                    </span>
+                  </div>
+                  <span className="mt-2 block line-clamp-2 text-[12.5px] font-semibold leading-snug text-[var(--ink)] group-hover:text-[var(--accent)] transition-colors">
+                    {entry.title}
                   </span>
                   <span className="mt-0.5 block truncate text-[11px] text-[var(--ink-faint)]">
                     {entry.publisher}
@@ -280,12 +284,12 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
           </div>
         </div>
 
-        <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sortedCatalog.map((item: Suggestion) => (
-            <li key={`${item.label}|${item.lang}`} className="min-w-0">
+            <li key={`${item.label}|${item.lang}`} className="min-w-0 cv-item">
               <button
                 type="button"
-                className="group relative flex h-full w-full flex-col justify-between rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-3.5 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/50 hover:shadow-md active:scale-[0.99]"
+                className="group relative flex h-full w-full flex-col justify-between rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-4 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/50 hover:shadow-md active:scale-[0.985]"
                 onClick={() => onPick(item.feedUrl ?? item.query)}
               >
                 <div>

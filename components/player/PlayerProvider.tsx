@@ -440,6 +440,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
     let frame = 0;
     const updateRect = () => {
+      frame = 0;
       const r = stage.getBoundingClientRect();
       if (r.width > 20 && r.height > 20 && r.bottom > 40 && r.top < window.innerHeight - 40) {
         setStageRect((prev) => {
@@ -457,10 +458,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       } else {
         setStageRect(null);
       }
-      frame = requestAnimationFrame(updateRect);
     };
-    frame = requestAnimationFrame(updateRect);
-    return () => cancelAnimationFrame(frame);
+    const scheduleUpdate = () => {
+      if (!frame) frame = requestAnimationFrame(updateRect);
+    };
+    updateRect();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true, capture: true });
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(scheduleUpdate) : null;
+    ro?.observe(stage);
+    ro?.observe(document.body);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scheduleUpdate, { capture: true });
+      window.removeEventListener("resize", scheduleUpdate);
+      ro?.disconnect();
+    };
   }, [isVideoTrack, stage]);
 
   const duration = media.state.duration || 0;

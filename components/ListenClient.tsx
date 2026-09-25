@@ -459,10 +459,20 @@ export function ListenClient() {
       }
 
       setExpandedDescription(false);
-      window.setTimeout(() => playerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
+      window.setTimeout(() => {
+        if (!playerRef.current) return;
+        const top = Math.max(0, playerRef.current.getBoundingClientRect().top + window.scrollY - 68);
+        window.scrollTo({ top, behavior: "smooth" });
+      }, 90);
     },
     [feed, show, player],
   );
+
+  const scrollToPlayer = useCallback(() => {
+    if (!playerRef.current) return;
+    const top = Math.max(0, playerRef.current.getBoundingClientRect().top + window.scrollY - 68);
+    window.scrollTo({ top, behavior: "smooth" });
+  }, []);
 
   /** Plays something remembered, without needing its feed open. */
   const playRecent = useCallback(
@@ -489,9 +499,9 @@ export function ListenClient() {
           lastEpisodeTitle: entry.title,
         });
       }
-      window.setTimeout(() => playerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
+      window.setTimeout(() => scrollToPlayer(), 90);
     },
-    [player],
+    [player, scrollToPlayer],
   );
 
   // Remember the position while playing. Writing is throttled inside the
@@ -544,12 +554,14 @@ export function ListenClient() {
     closeFeedView();
     setResults(null);
     setError(null);
-    // Drop ?feed= as well, otherwise the URL still claims a show is open and
-    // picking that same show from the library again would be a dead click.
-    // A push, not a replace: closing a show is itself something worth
-    // retracing, the same as opening one.
     if (params.get("feed")) router.push("/", { scroll: false });
   }, [closeFeedView, params, router]);
+
+  useEffect(() => {
+    const onNavHome = () => browse();
+    window.addEventListener("hoerbar:navigate-home", onNavHome);
+    return () => window.removeEventListener("hoerbar:navigate-home", onNavHome);
+  }, [browse]);
 
   /** Returns to search results if they exist, otherwise returns to full browse. */
   const backToResultsOrBrowse = useCallback(() => {
@@ -1065,16 +1077,37 @@ export function ListenClient() {
 
       {/* ---------------- episodes ---------------- */}
       {feed ? (
-        <section className="mt-4 relative">
-          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 flex items-center justify-between gap-2 bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs">
+        <section className="mt-4 relative animate-panel-in">
+          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[52px] z-20 -mx-2 mb-3 flex items-center justify-between gap-2 rounded-2xl glass-panel px-3 py-2 shadow-sm">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2.5 py-1 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60"
+              className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-3 py-1.5 rounded-full bg-[var(--surface)] shadow-2xs border border-[var(--rule)]/70 active:scale-95"
               onClick={backToResultsOrBrowse}
             >
               <span aria-hidden>←</span>
               <span>{results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}</span>
             </button>
+
+            <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-1">
+              <div className="hidden shrink-0 overflow-hidden rounded-lg min-[380px]:block">
+                <Art src={show?.artwork ?? feed.image} alt="" size={24} seed={feed.title} />
+              </div>
+              <span className="truncate text-[13px] font-semibold text-[var(--ink)]">
+                {feed.title}
+              </span>
+            </div>
+
+            {playing ? (
+              <button
+                type="button"
+                onClick={scrollToPlayer}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] border border-[var(--accent-ring)]/40 px-2.5 py-1 text-[12px] font-semibold text-[var(--accent)] transition active:scale-95"
+                title={t("player.nowPlaying")}
+              >
+                <span aria-hidden>🎧</span>
+                <span className="hidden sm:inline">{t("player.nowPlaying")}</span>
+              </button>
+            ) : null}
           </div>
           <div className="card p-4">
             {/* Two rows on a phone. Squeezed onto one, the show title got about
@@ -1386,41 +1419,51 @@ export function ListenClient() {
       {(scrolledDown || feed || (results && results.length > 0)) && (
         <aside
           aria-label="Quick navigation"
-          className="fixed right-4 z-40 flex items-center justify-center rounded-full border border-[var(--rule)] bg-[var(--paper-raised)] p-0.5 shadow-[0_8px_32px_rgba(0,0,0,0.16)] backdrop-blur-2xl transition-all duration-300 sm:left-6 sm:right-auto sm:gap-1.5 sm:px-2 sm:py-1 sm:!bottom-6"
+          className="animate-dock-in fixed right-3.5 z-40 flex items-center justify-center gap-1 rounded-full glass-panel p-1 shadow-[0_10px_32px_rgba(0,0,0,0.18)] transition-all duration-300 sm:left-6 sm:right-auto sm:gap-1.5 sm:px-2 sm:py-1 sm:!bottom-6"
           style={{
             bottom: playing
-              ? "calc(124px + env(safe-area-inset-bottom, 14px))"
-              : "calc(68px + env(safe-area-inset-bottom, 14px))",
+              ? "calc(132px + env(safe-area-inset-bottom, 12px))"
+              : "calc(68px + env(safe-area-inset-bottom, 12px))",
           }}
         >
-          <span className="hidden sm:inline-flex">
-            {feed ? (
-              <button
-                type="button"
-                onClick={backToResultsOrBrowse}
-                className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
-                title={results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
-              >
-                <span aria-hidden>←</span>
-                <span>{t("common.back")}</span>
-              </button>
-            ) : results && results.length > 0 ? (
-              <button
-                type="button"
-                onClick={browse}
-                className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
-                title={t("listen.backToBrowse")}
-              >
-                <span aria-hidden>←</span>
-                <span>{t("common.back")}</span>
-              </button>
-            ) : null}
-          </span>
+          {feed ? (
+            <button
+              type="button"
+              onClick={backToResultsOrBrowse}
+              className="flex h-9 items-center gap-1 rounded-full px-3 text-[12px] font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
+              title={results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
+            >
+              <span aria-hidden>←</span>
+              <span>{t("common.back")}</span>
+            </button>
+          ) : results && results.length > 0 ? (
+            <button
+              type="button"
+              onClick={browse}
+              className="flex h-9 items-center gap-1 rounded-full px-3 text-[12px] font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
+              title={t("listen.backToBrowse")}
+            >
+              <span aria-hidden>←</span>
+              <span>{t("common.back")}</span>
+            </button>
+          ) : null}
+
+          {playing && !player.inlineVisible ? (
+            <button
+              type="button"
+              onClick={scrollToPlayer}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[13px] font-semibold text-[var(--accent)] hover:opacity-90 transition active:scale-95"
+              title={t("player.nowPlaying")}
+              aria-label={t("player.nowPlaying")}
+            >
+              <span aria-hidden>🎧</span>
+            </button>
+          ) : null}
 
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-[14px] font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95 sm:h-auto sm:w-auto sm:gap-1 sm:px-2.5 sm:py-1 sm:text-[12px]"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[14px] font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95 sm:w-auto sm:gap-1 sm:px-2.5 sm:text-[12px]"
             title={t("common.scrollToTop")}
             aria-label={t("common.scrollToTop")}
           >

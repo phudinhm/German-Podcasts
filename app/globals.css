@@ -57,9 +57,11 @@
      different strengths: a tint that reads as a gentle highlight on paper is a
      muddy brown behind grey text on a dark ground. */
   --row-active: #fdf1de;
-  --shadow-card: 0 1px 2px rgb(20 20 15 / 0.05), 0 8px 24px -14px rgb(20 20 15 / 0.22);
-  --shadow-pop: 0 2px 6px rgb(20 20 15 / 0.08), 0 16px 40px -18px rgb(20 20 15 / 0.34);
-  --radius: 14px;
+  --shadow-card: 0 1px 2px rgb(20 20 15 / 0.04), 0 10px 28px -12px rgb(20 20 15 / 0.14), inset 0 1px 0 rgb(255 255 255 / 0.7);
+  --shadow-pop: 0 4px 12px rgb(20 20 15 / 0.08), 0 20px 48px -16px rgb(20 20 15 / 0.28), inset 0 1px 0 rgb(255 255 255 / 0.8);
+  --radius: 16px;
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -361,7 +363,13 @@ html {
 }
 
 body {
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image: radial-gradient(
+    ellipse 90% 420px at 50% -120px,
+    color-mix(in oklab, var(--accent) 10%, transparent),
+    transparent 70%
+  );
+  background-repeat: no-repeat;
   color: var(--ink);
   font-family: var(--font-body);
   font-synthesis-weight: none;
@@ -416,10 +424,11 @@ h3 {
    * elements that carry both classes.
    */
   .glass-panel {
-    background: color-mix(in oklab, var(--paper-raised) 92%, transparent);
-    backdrop-filter: blur(24px) saturate(160%);
-    border: 1px solid color-mix(in oklab, var(--rule) 70%, transparent);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    background: color-mix(in oklab, var(--paper-raised) 88%, transparent);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid color-mix(in oklab, var(--rule) 75%, transparent);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.08);
   }
 
   /* A flat, borderless surface, the way modern video interfaces group content. */
@@ -458,7 +467,11 @@ h3 {
     background: var(--paper-raised);
     color: var(--ink);
     cursor: pointer;
-    transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+    transition:
+      border-color 180ms var(--ease-spring),
+      background-color 180ms var(--ease-spring),
+      box-shadow 180ms var(--ease-spring),
+      transform 180ms var(--ease-spring);
   }
 
   .btn:hover:not(:disabled) {
@@ -467,7 +480,7 @@ h3 {
   }
 
   .btn:active:not(:disabled) {
-    transform: scale(0.98);
+    transform: scale(0.96);
   }
 
   .btn:disabled {
@@ -726,12 +739,12 @@ h3 {
     background: color-mix(in oklab, var(--ink-faint) 50%, transparent);
   }
 
-  /* --- stagger animation for list items ----------------------------------- */
+  /* --- stagger & spring animations for panels, docks, and list items ------ */
 
   @keyframes fadeInUp {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
@@ -739,8 +752,44 @@ h3 {
     }
   }
 
+  @keyframes panelSpringIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes dockSpringUp {
+    from {
+      opacity: 0;
+      transform: translateY(18px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
   .stagger-in {
-    animation: fadeInUp 250ms ease both;
+    animation: fadeInUp 280ms var(--ease-spring) both;
+  }
+
+  .animate-panel-in {
+    animation: panelSpringIn 300ms var(--ease-spring) both;
+  }
+
+  .animate-dock-in {
+    animation: dockSpringUp 340ms var(--ease-spring) both;
+  }
+
+  /* Performance: skip layout/paint for offscreen rows in large lists */
+  .cv-item {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 76px;
   }
 }
 

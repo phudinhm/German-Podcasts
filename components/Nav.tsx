@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUi, type UiKey } from "@/lib/i18n";
+import { useTheme } from "@/lib/theme";
 import { SettingsMenu } from "./SettingsMenu";
 import { Logo } from "./Logo";
 
@@ -29,18 +30,24 @@ const ITEMS: Array<{ href: string; key: UiKey; short?: UiKey; wideOnly?: boolean
 export function Nav() {
   const { t } = useUi();
   const pathname = usePathname();
+  const { resolved, setTheme } = useTheme();
+
+  const handleHomeClick = () => {
+    window.dispatchEvent(new CustomEvent("hoerbar:navigate-home"));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
-    // One row at every width. The wordmark shrinks and the tagline goes rather
-    // than the nav wrapping to a second line, which cost forty pixels of every
-    // phone screen for no information at all.
-    <div className="mx-auto flex max-w-6xl items-center gap-x-3 px-4 py-2 sm:gap-x-5 sm:px-5">
-      <Link href="/" className="mr-auto flex shrink-0 items-center gap-2">
-        <Logo size={26} />
-        {/* Below 360px the mark carries the brand on its own: at that width the
-            word and the nav cannot both fit, and a clipped nav item reads as a
-            bug where a bare mark reads as a logo. */}
-        <span className="hidden text-[18px] font-semibold tracking-[-0.03em] min-[360px]:inline sm:text-[20px]">
+    <div className="mx-auto flex max-w-6xl items-center gap-x-3 px-4 py-2.5 sm:gap-x-5 sm:px-5">
+      <Link
+        href="/"
+        onClick={handleHomeClick}
+        className="group mr-auto flex shrink-0 items-center gap-2.5 rounded-full pr-2 transition-transform active:scale-95"
+      >
+        <span className="transition-transform duration-300 group-hover:scale-105">
+          <Logo size={28} />
+        </span>
+        <span className="text-[18px] font-bold tracking-[-0.03em] text-[var(--ink)] sm:text-[20px]">
           Hörbar
         </span>
         <span className="hidden truncate text-[12px] text-[var(--ink-faint)] lg:inline">
@@ -48,27 +55,21 @@ export function Nav() {
         </span>
       </Link>
 
-      {/*
-        The links scroll rather than push the page wide. Short labels keep them
-        on one screen in English, but "Direkt hören" and "Wie es funktioniert"
-        are half again as long, and no amount of padding tuning survives a
-        translation. Settings sits outside the scroller so it stays reachable
-        whatever the labels do.
-      */}
-      <nav className="hidden sm:flex min-w-0 items-center gap-0.5 overflow-x-auto text-[13.5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-1 sm:text-[14px]">
+      <nav className="hidden sm:flex min-w-0 items-center gap-1 overflow-x-auto rounded-full border border-[var(--rule)]/70 bg-[var(--surface)]/60 p-1 text-[13.5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:text-[14px]">
         {ITEMS.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              onClick={item.href === "/" ? handleHomeClick : undefined}
               aria-current={active ? "page" : undefined}
-              className={`shrink-0 rounded-full px-2.5 py-1.5 transition-colors sm:px-3 ${
+              className={`shrink-0 rounded-full px-3.5 py-1.5 transition-all duration-200 ${
                 item.wideOnly ? "hidden sm:inline-flex " : ""
               }${
                 active
-                  ? "bg-[var(--surface)] font-medium text-[var(--ink)]"
-                  : "text-[var(--ink-soft)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"
+                  ? "bg-[var(--paper-raised)] font-semibold text-[var(--ink)] shadow-xs"
+                  : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
               }`}
             >
               {item.short ? (
@@ -84,9 +85,18 @@ export function Nav() {
         })}
       </nav>
 
-      <span className="shrink-0">
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setTheme(resolved === "dark" ? "light" : "dark")}
+          className="btn h-9 w-9 rounded-full p-0 text-[15px] shadow-2xs"
+          title={resolved === "dark" ? "Light mode" : "Dark mode"}
+          aria-label={resolved === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          <span aria-hidden>{resolved === "dark" ? "☀️" : "🌙"}</span>
+        </button>
         <SettingsMenu />
-      </span>
+      </div>
     </div>
   );
 }

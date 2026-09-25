@@ -189,16 +189,53 @@ export function MiniPlayer() {
   };
 
   const mobileTabBar = (
-    <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-[var(--paper-raised)]/95 backdrop-blur-2xl border-t border-[var(--rule)] pb-[env(safe-area-inset-bottom,14px)] pt-1.5 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
-      <Link href="/" className={`flex flex-col items-center gap-0.5 w-20 transition-colors ${pathname === "/" ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
-        <span className="text-[22px] leading-none">🎧</span>
-        <span className="text-[10px] font-medium">{t("nav.listenTab")}</span>
+    <nav
+      aria-label="Mobile navigation"
+      className="fixed bottom-0 inset-x-0 z-40 sm:hidden glass-panel border-x-0 border-b-0 pb-[calc(6px+env(safe-area-inset-bottom,10px))] pt-1.5 px-4 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.1)]"
+    >
+      <Link
+        href="/"
+        onClick={() => {
+          window.dispatchEvent(new CustomEvent("hoerbar:navigate-home"));
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+        className={`flex flex-col items-center justify-center gap-0.5 min-w-[72px] py-1 rounded-2xl transition-all active:scale-95 ${
+          pathname === "/"
+            ? "text-[var(--accent)] font-semibold bg-[var(--accent-soft)]/70"
+            : "text-[var(--ink-faint)]"
+        }`}
+      >
+        <span className="text-[20px] leading-none">🎧</span>
+        <span className="text-[10.5px] leading-tight">{t("nav.listenTab")}</span>
       </Link>
-      <Link href="/library" className={`flex flex-col items-center gap-0.5 w-20 transition-colors ${pathname.startsWith("/library") ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}>
-        <span className="text-[22px] leading-none">📚</span>
-        <span className="text-[10px] font-medium">{t("nav.libraryTab")}</span>
+
+      {track ? (
+        <button
+          type="button"
+          onClick={() => setFullscreenOpen(true)}
+          className="flex flex-col items-center justify-center gap-0.5 min-w-[76px] py-1 rounded-2xl text-[var(--ink)] transition-all active:scale-95 hover:text-[var(--accent)]"
+        >
+          <span className="inline-flex h-5 items-center justify-center">
+            <AudioVisualizer isPlaying={playing} barCount={4} />
+          </span>
+          <span className="text-[10.5px] font-semibold leading-tight text-[var(--accent)]">
+            {t("player.nowPlaying")}
+          </span>
+        </button>
+      ) : null}
+
+      <Link
+        href="/library"
+        className={`flex flex-col items-center justify-center gap-0.5 min-w-[72px] py-1 rounded-2xl transition-all active:scale-95 ${
+          pathname.startsWith("/library")
+            ? "text-[var(--accent)] font-semibold bg-[var(--accent-soft)]/70"
+            : "text-[var(--ink-faint)]"
+        }`}
+      >
+        <span className="text-[20px] leading-none">📚</span>
+        <span className="text-[10.5px] leading-tight">{t("nav.libraryTab")}</span>
       </Link>
-    </div>
+    </nav>
   );
 
   if (!track) {
@@ -547,25 +584,29 @@ export function MiniPlayer() {
       {mobileTabBar}
       <div
         data-dock="mobile-iphone"
-        className="fixed inset-x-2.5 z-[45] sm:hidden rounded-2xl bg-[var(--paper-raised)] dark:bg-zinc-900 text-[var(--ink)] dark:text-white border border-[var(--rule)] dark:border-white/15 p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.2)] transition-all overflow-hidden"
-        style={{ bottom: "calc(54px + env(safe-area-inset-bottom, 14px))" }}
+        className="animate-dock-in fixed inset-x-2.5 z-[45] sm:hidden rounded-2xl glass-panel text-[var(--ink)] p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.24)] transition-all overflow-hidden"
+        style={{ bottom: "calc(58px + env(safe-area-inset-bottom, 10px))" }}
       >
         {/* Module D: Thin progress bar on dock */}
-        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-[var(--rule)]/60 dark:bg-white/10">
-          <div ref={mobileFillRef} className="h-full bg-[var(--accent)]" style={{ width: 0 }} />
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-[var(--rule)]/60">
+          <div
+            ref={mobileFillRef}
+            className="h-full bg-[var(--accent)] transition-[width] duration-150 ease-linear"
+            style={{ width: 0 }}
+          />
         </div>
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2">
           {/* Tapping track info opens the full "now playing" screen */}
           <div
             onClick={() => setFullscreenOpen(true)}
-            className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+            className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer active:opacity-80"
           >
-            <div className="shrink-0 overflow-hidden rounded-xl">
-              <Art src={track.artwork} alt="" size={40} seed={track.showTitle || track.title} />
+            <div className="shrink-0 overflow-hidden rounded-xl shadow-xs">
+              <Art src={track.artwork} alt="" size={42} seed={track.showTitle || track.title} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)] dark:text-zinc-50">
+              <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)]">
                 {activeDockSeg?.text || track.title}
               </p>
               {activeDockTrans ? (
@@ -574,7 +615,7 @@ export function MiniPlayer() {
                 </p>
               ) : (
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <p className="truncate text-[11.5px] text-[var(--ink-faint)] dark:text-zinc-400">{track.showTitle}</p>
+                  <p className="truncate text-[11.5px] text-[var(--ink-faint)]">{track.showTitle}</p>
                   <AudioVisualizer isPlaying={playing} barCount={4} />
                 </div>
               )}
@@ -584,11 +625,38 @@ export function MiniPlayer() {
           <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
+              onClick={() => handle.seekTo(Math.max(0, handle.getTime() - 10), true)}
+              className="btn h-8 w-8 rounded-full p-0 text-[10.5px] font-semibold"
+              aria-label={t("player.back10")}
+              title={t("player.back10")}
+            >
+              -10
+            </button>
+            <button
+              type="button"
               onClick={() => (handle.isPlaying() ? handle.pause() : handle.play())}
               className="btn btn-primary h-10 w-10 rounded-full p-0 text-[14px] shadow-md"
               aria-label={playing ? t("common.pause") : t("common.play")}
             >
               {playing ? "❚❚" : "▶"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handle.seekTo(handle.getTime() + 30, true)}
+              className="btn h-8 w-8 rounded-full p-0 text-[10.5px] font-semibold"
+              aria-label={t("player.forward30")}
+              title={t("player.forward30")}
+            >
+              +30
+            </button>
+            <button
+              type="button"
+              onClick={stop}
+              className="icon-btn h-7 w-7 text-[15px] text-[var(--ink-faint)]"
+              aria-label={t("player.miniClose")}
+              title={t("player.miniClose")}
+            >
+              &times;
             </button>
           </div>
         </div>
