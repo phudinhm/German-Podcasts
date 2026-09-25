@@ -718,46 +718,132 @@ export function ListenClient() {
 
       <form
         role="search"
-        className="flex gap-2"
+        className="flex items-center gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           void search(query);
         }}
       >
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          enterKeyHint="search"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          aria-label={t("listen.title")}
-          placeholder={t("listen.placeholder")}
-          className="field min-w-0 flex-1"
-        />
-        {/* Not disabled on an empty box: a greyed-out primary button beside an
-            empty field is the first thing on the page and reads as broken.
-            search() ignores an empty term anyway. */}
-        <button type="submit" className="btn btn-primary shrink-0" disabled={searching}>
+        <div className="relative min-w-0 flex-1">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[var(--ink-faint)]"
+          >
+            🔍
+          </span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            aria-label={t("listen.title")}
+            placeholder={t("listen.placeholder")}
+            className="field min-w-0 w-full pl-9 pr-9 shadow-2xs"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ink-faint)]/25 text-[12px] font-bold text-[var(--ink-soft)] hover:bg-[var(--ink-faint)]/40"
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
+        <button type="submit" className="btn btn-primary shrink-0 px-4" disabled={searching}>
           {searching ? t("common.searching") : t("common.search")}
         </button>
       </form>
 
-      {/* Screen readers otherwise get no word about a search that found nothing
-          or is still running, because both only change things further down. */}
+      {/* iOS Quick Breadcrumb & Active View Navigation Strip */}
+      {(feed || (results && results.length > 0)) && (
+        <nav
+          aria-label="Breadcrumb"
+          className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[12px] animate-panel-in"
+        >
+          <button
+            type="button"
+            onClick={browse}
+            className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] border border-[var(--rule)]/70 px-2.5 py-1 font-medium text-[var(--ink-soft)] hover:text-[var(--accent)] active:scale-95 transition"
+          >
+            <span>‹</span>
+            <span>🏠 Khám phá</span>
+          </button>
+          {results && results.length > 0 && feed ? (
+            <button
+              type="button"
+              onClick={() => {
+                closeFeedView();
+                if (params.get("feed")) router.push("/", { scroll: false });
+              }}
+              className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] border border-[var(--rule)]/70 px-2.5 py-1 font-medium text-[var(--ink-soft)] hover:text-[var(--accent)] active:scale-95 transition"
+            >
+              <span>‹</span>
+              <span>🔎 Kết quả ({results.length})</span>
+            </button>
+          ) : null}
+          {feed ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)]/70 border border-[var(--accent)]/30 px-2.5 py-1 font-semibold text-[var(--accent)] max-w-[220px] sm:max-w-[320px] truncate">
+              <span>🎙️</span>
+              <span className="truncate">{feed.title}</span>
+            </span>
+          ) : null}
+        </nav>
+      )}
+
+      {/* Live Activity Banner when an episode is playing in PiP / background while browsing other podcasts */}
+      {playing && !showInlinePlayer && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl glass-panel px-3.5 py-2.5 shadow-sm animate-panel-in">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white text-xs font-bold shadow-xs">
+              {player.isVideoTrack ? "🎬" : "🎧"}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12.5px] font-semibold text-[var(--ink)]">
+                {playing.title}
+              </p>
+              <p className="truncate text-[11px] text-[var(--ink-faint)]">
+                {playing.showTitle || "Đang phát trong Picture-in-Picture / MiniPlayer"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isViewingPlayingShow && player.videoPipMode ? (
+              <button
+                type="button"
+                onClick={() => player.setVideoPipMode(false)}
+                className="btn px-2.5 py-1 text-[11.5px] font-semibold text-[var(--accent)] border-[var(--accent)]/40"
+              >
+                📺 Hiện tại đây
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => player.setFullscreenOpen(true)}
+              className="btn btn-primary px-3 py-1 text-[11.5px] font-semibold"
+            >
+              ⛶ Mở Media Player
+            </button>
+          </div>
+        </div>
+      )}
+
       <p aria-live="polite" className="sr-only">
         {searching ? t("common.searching") : results ? t("listen.results", { count: results.length }) : ""}
       </p>
 
       {searches.length > 0 ? (
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--ink-faint)]">
-          <span>{t("listen.recent")}</span>
+        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-1 text-[12px] text-[var(--ink-faint)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span className="shrink-0 font-medium">{t("listen.recent")}</span>
           {searches.map((item) => (
             <button
               key={item.q}
               type="button"
-              className="max-w-[220px] truncate hover:text-[var(--accent)]"
+              className="shrink-0 max-w-[200px] truncate rounded-full bg-[var(--surface)] border border-[var(--rule)]/60 px-2.5 py-0.5 text-[11.5px] text-[var(--ink-soft)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] active:scale-95 transition"
               title={item.q}
               onClick={() => {
                 setQuery(item.q);

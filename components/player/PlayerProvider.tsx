@@ -527,6 +527,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const [videoMinimized, setVideoMinimized] = useState(false);
+  const [pipTopCorner, setPipTopCorner] = useState(false);
 
   const isVideoTrack = Boolean(
     track &&
@@ -675,7 +676,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setVideoMinimized(false)}
-              className="fixed bottom-[126px] right-3 sm:bottom-24 sm:right-5 z-[90] flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-zinc-950/90 px-3.5 py-1.5 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md transition hover:bg-zinc-900"
+              className={`fixed right-3 sm:right-5 z-[90] flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-zinc-950/90 px-3.5 py-1.5 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md transition hover:bg-zinc-900 ${
+                pipTopCorner
+                  ? "top-[60px] sm:top-16"
+                  : "bottom-[142px] sm:bottom-24"
+              }`}
               title="Hiện lại cửa sổ video Picture-in-Picture"
             >
               <span>🎬</span>
@@ -702,7 +707,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             className={
               stageRect
                 ? "fixed z-[85] overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl"
-                : `fixed bottom-[126px] right-3 sm:bottom-24 sm:right-5 z-[85] overflow-hidden rounded-2xl border border-white/25 bg-black shadow-[0_16px_48px_rgba(0,0,0,0.6)] ring-1 ring-black/50 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                : `fixed right-3 sm:right-5 z-[85] overflow-hidden rounded-2xl border border-white/25 bg-black shadow-[0_16px_48px_rgba(0,0,0,0.6)] ring-1 ring-black/50 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                    pipTopCorner
+                      ? "top-[60px] sm:top-16"
+                      : "bottom-[142px] sm:bottom-24"
+                  } ${
                     videoMinimized
                       ? "pointer-events-none h-0 w-0 opacity-0 scale-75"
                       : "w-56 sm:w-80 aspect-video opacity-100 scale-100"
@@ -752,17 +761,27 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
                 </button>
                 <div className="flex items-center gap-1 shrink-0">
                   {!stageRect && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setVideoPipMode(false);
-                        setFullscreenOpen(true);
-                      }}
-                      className="rounded bg-amber-500/85 px-1.5 py-0.5 text-[10px] font-bold text-black hover:bg-amber-400"
-                      title="Phóng to lại Media Player"
-                    >
-                      ⤢
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setPipTopCorner((v) => !v)}
+                        className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-white/30"
+                        title="Đổi vị trí góc trên / góc dưới"
+                      >
+                        ⇅
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVideoPipMode(false);
+                          setFullscreenOpen(true);
+                        }}
+                        className="rounded bg-amber-500/85 px-1.5 py-0.5 text-[10px] font-bold text-black hover:bg-amber-400"
+                        title="Phóng to lại Media Player"
+                      >
+                        ⤢
+                      </button>
+                    </>
                   )}
                   <button
                     type="button"

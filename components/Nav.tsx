@@ -4,23 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUi, type UiKey } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
+import { usePlayer } from "./player/PlayerProvider";
+import { AudioVisualizer } from "./caption/AudioVisualizer";
 import { SettingsMenu } from "./SettingsMenu";
 import { Logo } from "./Logo";
 
-/**
- * `short` is the label used below the sm breakpoint. At 390px the full set plus
- * the wordmark and the language button came to more than the screen, and the
- * nav simply sat on top of "Hörbar".
- */
-/**
- * `short` is the label used below the sm breakpoint.
- *
- * `wideOnly` items are dropped from the header on a phone and offered in the
- * settings menu instead. Only "How it works" qualifies: it is read once, where
- * Listen and Library are the whole app. Keeping all three cut the last one in
- * half at 360px in every language, and a sliced nav item reads as a bug rather
- * than as something you can scroll to.
- */
 const ITEMS: Array<{ href: string; key: UiKey; short?: UiKey; wideOnly?: boolean }> = [
   { href: "/", key: "nav.listen", short: "nav.listenShort" },
   { href: "/library", key: "nav.library" },
@@ -31,6 +19,7 @@ export function Nav() {
   const { t } = useUi();
   const pathname = usePathname();
   const { resolved, setTheme } = useTheme();
+  const { track, handle, setFullscreenOpen } = usePlayer();
 
   const handleHomeClick = () => {
     window.dispatchEvent(new CustomEvent("hoerbar:navigate-home"));
@@ -38,22 +27,37 @@ export function Nav() {
   };
 
   return (
-    <div className="mx-auto flex max-w-6xl items-center gap-x-3 px-4 py-2.5 sm:gap-x-5 sm:px-5">
+    <div className="mx-auto flex max-w-6xl items-center gap-x-2.5 px-3.5 py-2 sm:gap-x-4 sm:px-5 sm:py-2.5">
       <Link
         href="/"
         onClick={handleHomeClick}
-        className="group mr-auto flex shrink-0 items-center gap-2.5 rounded-full pr-2 transition-transform active:scale-95"
+        className="group mr-auto flex shrink-0 items-center gap-2 rounded-full pr-1.5 transition-transform active:scale-95"
       >
         <span className="transition-transform duration-300 group-hover:scale-105">
-          <Logo size={28} />
+          <Logo size={27} />
         </span>
-        <span className="text-[18px] font-bold tracking-[-0.03em] text-[var(--ink)] sm:text-[20px]">
+        <span className="text-[17.5px] font-bold tracking-[-0.03em] text-[var(--ink)] sm:text-[20px]">
           Hörbar
         </span>
         <span className="hidden truncate text-[12px] text-[var(--ink-faint)] lg:inline">
           {t("nav.tagline")}
         </span>
       </Link>
+
+      {/* iOS Dynamic Island Live Now-Playing Pill in Header */}
+      {track ? (
+        <button
+          type="button"
+          onClick={() => setFullscreenOpen(true)}
+          className="flex items-center gap-1.5 max-w-[165px] sm:max-w-[240px] rounded-full bg-zinc-950/90 dark:bg-white/10 border border-[var(--accent)]/40 px-2.5 py-1 text-white shadow-md backdrop-blur-xl transition-all hover:scale-[1.02] active:scale-95"
+          title={`${t("player.openFullPlayer")}: ${track.title}`}
+        >
+          <AudioVisualizer isPlaying={handle.isPlaying()} barCount={4} />
+          <span className="truncate text-[11.5px] font-semibold text-amber-200">
+            {track.title}
+          </span>
+        </button>
+      ) : null}
 
       <nav className="hidden sm:flex min-w-0 items-center gap-1 overflow-x-auto rounded-full border border-[var(--rule)]/70 bg-[var(--surface)]/60 p-1 text-[13.5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:text-[14px]">
         {ITEMS.map((item) => {
