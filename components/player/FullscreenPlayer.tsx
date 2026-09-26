@@ -429,6 +429,16 @@ export function FullscreenPlayer() {
   const [dismissedNextId, setDismissedNextId] = useState<string | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  const totalDuration = duration > 0 ? duration : (track?.durationSec ?? 0);
+  const isNearEnd = Boolean(
+    nextTrack &&
+    totalDuration > 15 &&
+    currentTime > 0 &&
+    currentTime >= totalDuration - 10
+  );
+  const shouldShowNextToast = Boolean(isNearEnd && nextTrack && dismissedNextId !== nextTrack.id);
+  const nextToastStage = useTransitionStage(shouldShowNextToast, "--toast-close", 250);
+
   const applySpeed = (nextSpeed: number) => {
     const clamped = Math.round(Math.max(0.4, Math.min(2.5, nextSpeed)) * 100) / 100;
     setPlaybackRate(clamped);
@@ -623,13 +633,6 @@ export function FullscreenPlayer() {
   const activeThemeConfig = PLAYER_THEMES[playerTheme] ?? PLAYER_THEMES.light;
   const isLight = Boolean(activeThemeConfig.isLight);
 
-  const totalDuration = duration > 0 ? duration : (track?.durationSec ?? 0);
-  const isNearEnd = Boolean(
-    nextTrack &&
-    totalDuration > 15 &&
-    currentTime > 0 &&
-    currentTime >= totalDuration - 10
-  );
   const effectiveDuration = totalDuration > 0 ? totalDuration : Math.max(currentTime + 1, 1);
   const progressPct =
     duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
@@ -1147,8 +1150,12 @@ export function FullscreenPlayer() {
         )}
 
         {/* Next Episode Floating Recommendation: ONLY suggest in last 10s or when completed */}
-        {isNearEnd && nextTrack && dismissedNextId !== nextTrack.id && (
-          <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/40 bg-[var(--paper-raised)]/95 p-3 shadow-xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {nextToastStage.mounted && nextTrack && (
+          <div
+            className={`t-toast mt-2 flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/40 bg-[var(--paper-raised)]/95 p-3 shadow-xl backdrop-blur-xl ${
+              nextToastStage.entered ? "is-open" : ""
+            }`}
+          >
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-black/5 dark:ring-white/10">
                 <Art src={nextTrack.artwork} alt="" size={38} seed={nextTrack.showTitle || nextTrack.title} />
