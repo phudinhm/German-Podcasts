@@ -64,6 +64,15 @@ export function TranscriptReader({
     nextTrack,
     playNext,
   } = usePlayer();
+
+  const totalDuration = duration > 0 ? duration : (track?.durationSec ?? 0);
+  const isNearEnd = Boolean(
+    nextTrack &&
+    totalDuration > 15 &&
+    currentTime > 0 &&
+    currentTime >= totalDuration - 10
+  );
+
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
   const [savedWords, setSavedWords] = useState<Record<string, SavedWord>>({});
   const [selectedWord, setSelectedWord] = useState<{
@@ -516,8 +525,8 @@ export function TranscriptReader({
             );
           })}
 
-          {/* Next Episode Suggestion Card: only visible when track is finished / completed 100% */}
-          {nextTrack && duration > 30 && currentTime > 0 && (currentTime >= duration - 2 || (currentTime / duration) >= 0.995) && (
+          {/* Next Episode Suggestion Card: visible in last 10s or when completed */}
+          {isNearEnd && nextTrack && (
             <div
               className={`mt-10 rounded-2xl border p-4 sm:p-5 backdrop-blur-md transition-all shadow-lg ${
                 isLightTheme
@@ -528,7 +537,7 @@ export function TranscriptReader({
               <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-inherit/20">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold tracking-wider uppercase text-[var(--accent)]">
                   <span>✨</span>
-                  <span>Tập tiếp theo · Next Episode</span>
+                  <span>{currentTime >= totalDuration - 2 ? "Tập tiếp theo · Next Episode" : "10s cuối · Tập tiếp theo"}</span>
                 </span>
                 {nextTrack.durationSec ? (
                   <span className="font-mono text-[11px] opacity-70 tabular-nums">

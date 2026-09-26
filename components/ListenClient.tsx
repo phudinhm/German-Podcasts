@@ -163,6 +163,36 @@ export function ListenClient() {
     return () => cancelAnimationFrame(frame);
   }, [player.handle]);
 
+  const [isNearEnd, setIsNearEnd] = useState(false);
+
+  useEffect(() => {
+    const el = player.mediaElement();
+    if (!el || !player.track) {
+      setIsNearEnd(false);
+      return;
+    }
+    const checkNearEnd = () => {
+      const cur = el.currentTime;
+      const dur = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : (player.track?.durationSec ?? 0);
+      const near = dur > 15 && cur > 0 && cur >= dur - 10;
+      setIsNearEnd((prev) => (prev !== near ? near : prev));
+    };
+    const onEnd = () => {
+      setIsNearEnd(true);
+      setCurrentTime(el.duration || el.currentTime);
+    };
+
+    checkNearEnd();
+    el.addEventListener("timeupdate", checkNearEnd);
+    el.addEventListener("ended", onEnd);
+    el.addEventListener("seeked", checkNearEnd);
+    return () => {
+      el.removeEventListener("timeupdate", checkNearEnd);
+      el.removeEventListener("ended", onEnd);
+      el.removeEventListener("seeked", checkNearEnd);
+    };
+  }, [player.track?.id, player.track?.durationSec, player.mediaElement]);
+
   // Tracks whichever source is actually feeding the recognizer, so the
   // toolbar can always say "tab audio" or "microphone" rather than a label
   // that was only ever true for one of the two paths.
@@ -1598,17 +1628,20 @@ export function ListenClient() {
               epRec?.finished ||
               (epDur && epRec && epDur > 30 && (epRec.position >= epDur - 3 || (epRec.position / epDur) >= 0.995))
             );
-            const showNextSuggestion = isEpFinished && nextEp;
+            const isPlayingThis = Boolean(playing && (playing.id === epId || playing.id.includes(epId) || (playing.url && playing.url === ep.url)));
+            const showNextSuggestion = (isEpFinished || (isPlayingThis && isNearEnd)) && nextEp;
 
             return (
               <div className="mb-4 overflow-hidden rounded-2xl border border-[var(--accent)]/35 bg-gradient-to-r from-[var(--accent-soft)]/50 via-[var(--paper-raised)] to-[var(--paper-raised)] p-3.5 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent)]">
-                      <span>{isEpFinished ? "✓" : "🎧"}</span>
+                      <span>{isEpFinished ? "✓" : isNearEnd && isPlayingThis ? "✨" : "🎧"}</span>
                       <span>
                         {isEpFinished
                           ? `Đã hoàn tất tập #${epIdx + 1}`
+                          : isNearEnd && isPlayingThis
+                          ? `10s cuối tập #${epIdx + 1} · Gợi ý tiếp theo:`
                           : `${t("feed.playingEp", { n: epIdx + 1 })}:`}
                       </span>
                     </div>
@@ -1618,7 +1651,7 @@ export function ListenClient() {
                     {showNextSuggestion ? (
                       <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--ink-soft)]">
                         <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                          👉 {t("feed.nextEpisode")}:
+                          {isEpFinished ? "👉 Tiếp theo:" : "✨ 10s cuối · Tập tiếp theo:"}
                         </span>
                         <span className="truncate font-medium text-[var(--ink)]">
                           #{nextEpIdx + 1} {nextEp.title}
@@ -1907,15 +1940,17 @@ export function ListenClient() {
                     {isFav ? "❤️" : "🤍"}
                   </button>
 
-                  {/* Next Episode Suggestion banner: ONLY show when this episode is 100% completed! */}
-                  {isFinished && actualIndex + 1 < episodes.length && (
+                  {/* Next Episode Suggestion banner: ONLY show when completed 100% or in last 10s of playback */}
+                  {(isFinished || (current && isNearEnd)) && actualIndex + 1 < episodes.length && (
                     <div className="mx-3 mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-[12px] shadow-2xs backdrop-blur-xs animate-fade-in">
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white shrink-0">
-                          ✓
+                          {isFinished ? "✓" : "✨"}
                         </span>
                         <span className="text-[12px] font-medium text-[var(--ink)] truncate">
-                          <span className="font-semibold text-emerald-700 dark:text-emerald-300">Đã xong tập #{actualIndex + 1} · Tiếp theo:</span>{" "}
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                            {isFinished ? `Đã xong tập #${actualIndex + 1}` : `10s cuối cùng`} · Tiếp theo:
+                          </span>{" "}
                           <span className="font-semibold text-[var(--ink)]">#{actualIndex + 2}</span> {episodes[actualIndex + 1].title}
                         </span>
                       </div>

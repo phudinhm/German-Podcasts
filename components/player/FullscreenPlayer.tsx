@@ -532,16 +532,20 @@ export function FullscreenPlayer() {
     if (!el) return;
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
+    const onEnded = () => {
+      setPlaying(false);
+      setCurrentTime(el.duration || handle.getTime());
+    };
     setPlaying(!el.paused);
     el.addEventListener("play", onPlay);
     el.addEventListener("pause", onPause);
-    el.addEventListener("ended", onPause);
+    el.addEventListener("ended", onEnded);
     return () => {
       el.removeEventListener("play", onPlay);
       el.removeEventListener("pause", onPause);
-      el.removeEventListener("ended", onPause);
+      el.removeEventListener("ended", onEnded);
     };
-  }, [mediaElement, track]);
+  }, [mediaElement, track, handle]);
 
   useEffect(() => {
     if (!fullscreenOpen) return;
@@ -615,7 +619,14 @@ export function FullscreenPlayer() {
   const activeThemeConfig = PLAYER_THEMES[playerTheme] ?? PLAYER_THEMES.light;
   const isLight = Boolean(activeThemeConfig.isLight);
 
-  const effectiveDuration = duration > 0 ? duration : Math.max(currentTime + 1, 1);
+  const totalDuration = duration > 0 ? duration : (track?.durationSec ?? 0);
+  const isNearEnd = Boolean(
+    nextTrack &&
+    totalDuration > 15 &&
+    currentTime > 0 &&
+    currentTime >= totalDuration - 10
+  );
+  const effectiveDuration = totalDuration > 0 ? totalDuration : Math.max(currentTime + 1, 1);
   const progressPct =
     duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
   const remainingSec = duration > 0 ? Math.max(0, duration - currentTime) : 0;
@@ -1113,8 +1124,8 @@ export function FullscreenPlayer() {
           </div>
         )}
 
-        {/* Next Episode Floating Recommendation: ONLY suggest when completed 100% */}
-        {nextTrack && duration > 30 && currentTime > 0 && (currentTime >= duration - 2 || (currentTime / duration) >= 0.995) && dismissedNextId !== nextTrack.id && (
+        {/* Next Episode Floating Recommendation: ONLY suggest in last 10s or when completed */}
+        {isNearEnd && nextTrack && dismissedNextId !== nextTrack.id && (
           <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/40 bg-[var(--paper-raised)]/95 p-3 shadow-xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-black/5 dark:ring-white/10">
@@ -1122,7 +1133,7 @@ export function FullscreenPlayer() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
-                  ✨ Tập tiếp theo · Next
+                  ✨ {currentTime >= totalDuration - 2 ? "Tập tiếp theo · Next" : "10s cuối · Tập tiếp theo"}
                 </p>
                 <p className="truncate text-[12.5px] font-semibold text-[var(--ink)]">
                   {nextTrack.title}
