@@ -67,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
         <UiLangProvider>
           <PlayerProvider>
-          <header className="sticky top-0 z-[70] w-full glass-panel border-x-0 border-t-0 pt-[env(safe-area-inset-top,0px)]">
+          <header className="sticky top-0 z-[70] w-full macos-header pt-[env(safe-area-inset-top,0px)]">
             <Nav />
           </header>
 

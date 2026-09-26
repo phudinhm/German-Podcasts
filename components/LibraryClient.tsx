@@ -77,7 +77,7 @@ export function LibraryClient() {
         </div>
       ) : null}
 
-      <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 bg-[var(--paper)]/95 px-3 py-2 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs flex items-center justify-between gap-2.5">
+      <div className="sticky top-[calc(50px+env(safe-area-inset-top,0px))] sm:top-[62px] z-20 -mx-2 mb-3 bg-[var(--paper-raised)] px-3 py-2 backdrop-blur-2xl border-b border-[var(--rule)] shadow-xs flex items-center justify-between gap-2.5 rounded-xl">
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-[13px] sm:text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2.5 sm:px-3 py-1.5 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60 shrink-0"

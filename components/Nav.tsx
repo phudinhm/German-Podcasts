@@ -27,9 +27,9 @@ export function Nav() {
   };
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col px-2.5 py-1.5 sm:px-5 sm:py-2.5">
-      <div className="flex w-full items-center justify-between gap-x-1.5 sm:gap-x-4">
-        <div className="flex items-center gap-2.5 sm:gap-3.5">
+    <div className="mx-auto flex max-w-6xl flex-col px-2.5 py-1.5 sm:px-5 sm:py-2">
+      <div className="flex w-full items-center justify-between gap-x-1.5 sm:gap-x-3.5">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
           {/* macOS Traffic Lights on Desktop */}
           <div
             className="hidden md:flex items-center gap-2 py-1 pr-1 group/traffic select-none"
@@ -76,9 +76,11 @@ export function Nav() {
             <span className="text-[16px] font-bold tracking-[-0.03em] text-[var(--ink)] sm:text-[19px]">
               Hörbar
             </span>
-            <span className="hidden truncate text-[11.5px] text-[var(--ink-faint)] xl:inline font-normal">
-              {t("nav.tagline")}
-            </span>
+            {!track ? (
+              <span className="hidden truncate text-[11.5px] text-[var(--ink-faint)] 2xl:inline font-normal">
+                {t("nav.tagline")}
+              </span>
+            ) : null}
           </Link>
         </div>
 
@@ -87,7 +89,7 @@ export function Nav() {
           <button
             type="button"
             onClick={() => setFullscreenOpen(true)}
-            className="hidden lg:flex items-center gap-2 max-w-[260px] rounded-full border border-[var(--rule)]/70 bg-[var(--surface)]/90 px-3 py-1 text-[var(--ink)] shadow-2xs backdrop-blur-md transition-all hover:scale-[1.02] hover:border-[var(--accent)]/50 active:scale-95 group/nowplaying"
+            className="hidden lg:flex items-center gap-2 shrink min-w-0 max-w-[190px] xl:max-w-[260px] rounded-full border border-[var(--rule)]/70 bg-[var(--surface)]/90 px-3 py-1 text-[var(--ink)] shadow-2xs backdrop-blur-md transition-all hover:scale-[1.02] hover:border-[var(--accent)]/50 active:scale-95 group/nowplaying"
             title={`${t("player.openFullPlayer")}: ${track.title}`}
           >
             <AudioVisualizer isPlaying={handle.isPlaying()} barCount={4} />

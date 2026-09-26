@@ -1040,7 +1040,7 @@ export function ListenClient() {
           ref={playerRef}
           className={`card mt-6 overflow-hidden transition-all duration-300 ${
             freezePane
-              ? "sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[52px] z-30 bg-[var(--paper-raised)] shadow-2xl border-[var(--accent)]/60 ring-1 ring-[var(--accent)]/30"
+              ? "sticky top-[calc(50px+env(safe-area-inset-top,0px))] sm:top-[62px] z-30 bg-[var(--paper-raised)] shadow-2xl border-[var(--accent)]/60 ring-1 ring-[var(--accent)]/30"
               : ""
           }`}
         >
@@ -1323,7 +1323,7 @@ export function ListenClient() {
       {/* ---------------- results ---------------- */}
       {results && results.length > 0 && !feed ? (
         <section className="mt-6 relative">
-          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs">
+          <div className="sticky top-[calc(50px+env(safe-area-inset-top,0px))] sm:top-[62px] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--paper-raised)] px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)] shadow-xs rounded-xl">
             <button
               type="button"
               className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-3 py-1 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60 active:scale-95"
@@ -1423,7 +1423,7 @@ export function ListenClient() {
       {/* ---------------- episodes ---------------- */}
       {feed ? (
         <section className="mt-4 relative animate-panel-in">
-          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[52px] z-20 -mx-2 mb-3 flex items-center justify-between gap-2 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)]/95 backdrop-blur-2xl px-3.5 py-2 shadow-sm">
+          <div className={`${!freezePane ? "sticky top-[calc(50px+env(safe-area-inset-top,0px))] sm:top-[62px] z-20" : "relative z-10"} -mx-2 mb-3 flex items-center justify-between gap-2 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)] px-3.5 py-2 shadow-sm`}>
             <button
               type="button"
               className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-3 py-1.5 rounded-full bg-[var(--surface)] shadow-2xs border border-[var(--rule)]/70 active:scale-95"
