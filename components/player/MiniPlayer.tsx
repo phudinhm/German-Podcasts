@@ -174,6 +174,15 @@ export function MiniPlayer() {
     return () => cancelAnimationFrame(frame);
   }, [handle]);
 
+  useEffect(() => {
+    const onMinimize = () => {
+      setIsHovered(false);
+      setPinned(false);
+    };
+    window.addEventListener("hoerbar:minimize-player", onMinimize);
+    return () => window.removeEventListener("hoerbar:minimize-player", onMinimize);
+  }, []);
+
   // Hover expansion handlers with smooth leave delay
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
@@ -436,15 +445,6 @@ export function MiniPlayer() {
     activeDockSeg?.translations?.en ??
     activeDockSeg?.translation ??
     null;
-
-  useEffect(() => {
-    const onMinimize = () => {
-      setIsHovered(false);
-      setPinned(false);
-    };
-    window.addEventListener("hoerbar:minimize-player", onMinimize);
-    return () => window.removeEventListener("hoerbar:minimize-player", onMinimize);
-  }, []);
 
   return (
     <>
