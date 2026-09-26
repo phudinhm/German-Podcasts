@@ -431,6 +431,42 @@ export function ListenClient() {
       const isVideoUrl =
         episode.type.startsWith("video/") ||
         /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(episode.url || "");
+
+      let nextTrack: Track | null = null;
+      if (feed?.episodes && feed.episodes.length > 1) {
+        const epIdx = feed.episodes.findIndex(
+          (e) => (e.guid || e.url) === (episode.guid || episode.url)
+        );
+        const nextCandidate =
+          epIdx > 0
+            ? feed.episodes[epIdx - 1]
+            : epIdx + 1 < feed.episodes.length
+            ? feed.episodes[epIdx + 1]
+            : null;
+
+        if (nextCandidate) {
+          const nextId = `${showPrefix}::${nextCandidate.guid || nextCandidate.url}::${nextCandidate.url}`;
+          const isNextVideo =
+            nextCandidate.type.startsWith("video/") ||
+            /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(nextCandidate.url || "");
+          nextTrack = {
+            id: nextId,
+            title: nextCandidate.title,
+            showTitle: feed?.title ?? show?.title ?? "",
+            artwork: nextCandidate.image ?? show?.artwork ?? feed?.image ?? null,
+            description: nextCandidate.description,
+            kind: isNextVideo ? "video" : "audio",
+            url: nextCandidate.url || undefined,
+            pageUrl: nextCandidate.pageUrl,
+            durationSec: nextCandidate.durationSec,
+            publishedAt: nextCandidate.publishedAt,
+            startAt: 0,
+            transcripts: nextCandidate.transcripts,
+            sourceLang: detectSpokenLang(feed?.language, `${nextCandidate.title} ${nextCandidate.description}`),
+          };
+        }
+      }
+
       const track: Track = {
         id,
         title: episode.title,
@@ -445,6 +481,7 @@ export function ListenClient() {
         startAt: from ?? resumeAt(id),
         transcripts: episode.transcripts,
         sourceLang: detectSpokenLang(feed?.language, `${episode.title} ${episode.description}`),
+        nextTrack,
       };
       player.play(track);
       noteplayed({
@@ -1163,10 +1200,12 @@ export function ListenClient() {
           <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2.5 py-1 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60"
+              className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-3 py-1 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60 active:scale-95"
               onClick={browse}
             >
-              <span aria-hidden>←</span>
+              <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
               <span>{t("listen.backToBrowse")}</span>
             </button>
             <div className="flex items-center gap-2">
@@ -1234,7 +1273,9 @@ export function ListenClient() {
               className="btn text-[12.5px] flex items-center gap-1.5"
               onClick={browse}
             >
-              <span aria-hidden>←</span>
+              <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
               <span>{t("listen.backToBrowse")}</span>
             </button>
             <button
@@ -1242,7 +1283,9 @@ export function ListenClient() {
               className="btn text-[12.5px] flex items-center gap-1"
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             >
-              <span aria-hidden>↑</span>
+              <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
               <span>{t("common.scrollToTop")}</span>
             </button>
           </div>
@@ -1254,13 +1297,15 @@ export function ListenClient() {
       {/* ---------------- episodes ---------------- */}
       {feed ? (
         <section className="mt-4 relative animate-panel-in">
-          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[52px] z-20 -mx-2 mb-3 flex items-center justify-between gap-2 rounded-2xl glass-panel px-3 py-2 shadow-sm">
+          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[52px] z-20 -mx-2 mb-3 flex items-center justify-between gap-2 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)]/95 backdrop-blur-2xl px-3.5 py-2 shadow-sm">
             <button
               type="button"
               className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-3 py-1.5 rounded-full bg-[var(--surface)] shadow-2xs border border-[var(--rule)]/70 active:scale-95"
               onClick={backToResultsOrBrowse}
             >
-              <span aria-hidden>←</span>
+              <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
               <span>{results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}</span>
             </button>
 
@@ -1412,9 +1457,11 @@ export function ListenClient() {
                     <div className="relative shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-black/5 dark:ring-white/10">
                       <Art src={episode.image ?? show?.artwork ?? feed.image} alt="" size={58} seed={feed.title} />
                       {isFinished ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-bold text-white shadow-xs">
-                            ✓
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1.5px]">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
+                            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-none stroke-current" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M20 6 9 17l-5-5"/>
+                            </svg>
                           </span>
                         </div>
                       ) : progress > 0 ? (
@@ -1458,7 +1505,12 @@ export function ListenClient() {
                         {isFinished ? (
                           <>
                             <span aria-hidden>·</span>
-                            <span className="font-medium text-emerald-600 dark:text-emerald-400">✓ {t("library.finished")}</span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/35 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 shadow-2xs">
+                              <svg viewBox="0 0 24 24" className="w-3 h-3 fill-none stroke-current shrink-0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M20 6 9 17l-5-5"/>
+                              </svg>
+                              <span>Completed</span>
+                            </span>
                           </>
                         ) : progress > 0 ? (
                           <>
@@ -1525,7 +1577,9 @@ export function ListenClient() {
               className="btn text-[12.5px] flex items-center gap-1.5"
               onClick={backToResultsOrBrowse}
             >
-              <span aria-hidden>←</span>
+              <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
               <span>{results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}</span>
             </button>
             <button
@@ -1533,7 +1587,9 @@ export function ListenClient() {
               className="btn text-[12.5px] flex items-center gap-1"
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             >
-              <span aria-hidden>↑</span>
+              <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
               <span>{t("common.scrollToTop")}</span>
             </button>
           </div>
@@ -1607,7 +1663,7 @@ export function ListenClient() {
       {(scrolledDown || feed || (results && results.length > 0)) && (
         <aside
           aria-label="Quick navigation"
-          className="animate-dock-in fixed right-3.5 z-40 flex items-center justify-center gap-1 rounded-full glass-panel p-1 shadow-[0_10px_32px_rgba(0,0,0,0.18)] transition-all duration-300 sm:left-6 sm:right-auto sm:gap-1.5 sm:px-2 sm:py-1 sm:!bottom-6"
+          className="animate-dock-in fixed right-3.5 z-40 flex items-center justify-center gap-1.5 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 backdrop-blur-2xl p-1 shadow-[0_10px_32px_rgba(0,0,0,0.18)] transition-all duration-300 sm:left-6 sm:right-auto sm:px-2 sm:py-1 sm:!bottom-6"
           style={{
             bottom: playing
               ? "calc(132px + env(safe-area-inset-bottom, 12px))"
@@ -1618,20 +1674,24 @@ export function ListenClient() {
             <button
               type="button"
               onClick={backToResultsOrBrowse}
-              className="flex h-9 items-center gap-1 rounded-full px-3 text-[12px] font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
+              className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
               title={results && results.length > 1 ? t("listen.backToResults") : t("listen.backToBrowse")}
             >
-              <span aria-hidden>←</span>
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
               <span>{t("common.back")}</span>
             </button>
           ) : results && results.length > 0 ? (
             <button
               type="button"
               onClick={browse}
-              className="flex h-9 items-center gap-1 rounded-full px-3 text-[12px] font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
+              className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95"
               title={t("listen.backToBrowse")}
             >
-              <span aria-hidden>←</span>
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
               <span>{t("common.back")}</span>
             </button>
           ) : null}
@@ -1651,11 +1711,13 @@ export function ListenClient() {
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[14px] font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95 sm:w-auto sm:gap-1 sm:px-2.5 sm:text-[12px]"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[14px] font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition active:scale-95 sm:w-auto sm:gap-1.5 sm:px-2.5 sm:text-[12px]"
             title={t("common.scrollToTop")}
             aria-label={t("common.scrollToTop")}
           >
-            <span aria-hidden>↑</span>
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
             <span className="hidden sm:inline">{t("common.scrollToTop")}</span>
           </button>
         </aside>

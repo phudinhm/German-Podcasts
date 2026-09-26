@@ -157,13 +157,17 @@ export function LibraryPanel({
           <button
             type="button"
             onClick={() => setActiveTab("finished")}
-            className={`rounded-full px-3 py-1 font-medium transition shrink-0 ${
+            className={`rounded-full px-3 py-1 font-medium transition shrink-0 flex items-center gap-1.5 ${
               activeTab === "finished"
-                ? "bg-[var(--ink)] text-[var(--paper)] shadow-xs"
+                ? "bg-emerald-600 text-white shadow-xs"
                 : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
             }`}
           >
-            {t("library.finished")} ({finished.length})
+            <span>✓</span>
+            <span>{t("library.finished")}</span>
+            <span className="rounded-full bg-black/10 px-1.5 py-0.2 text-[10.5px]">
+              {finished.length}
+            </span>
           </button>
         )}
       </div>
@@ -452,9 +456,19 @@ export function LibraryPanel({
       {/* ========================================================================= */}
       {(activeTab === "all" || activeTab === "finished") && finished.length > 0 && (
         <div>
-          <h2 className="mb-2 text-[15px] font-semibold text-[var(--ink)]">
-            {t("library.recent")}
-          </h2>
+          <div className="mb-2.5 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--ink)]">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-none stroke-current" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20 6 9 17l-5-5"/>
+                </svg>
+              </span>
+              <span>{t("library.finished")}</span>
+            </h2>
+            <span className="text-[12px] text-[var(--ink-faint)]">
+              {finished.length} tập
+            </span>
+          </div>
           <ul className="divide-y divide-[var(--rule)]">
             {finished.slice(0, activeTab === "finished" ? undefined : 8).map((entry) => (
               <li key={entry.id} className="flex min-w-0 items-center gap-3 py-1">
@@ -463,9 +477,16 @@ export function LibraryPanel({
                   className="row-hover min-w-0 flex-1 px-1 py-1.5 text-left"
                   onClick={() => onPlayRecent(entry)}
                 >
-                  <span className="block truncate text-[13.5px]">{entry.title}</span>
-                  <span className="block truncate text-[12px] text-[var(--ink-faint)]">
-                    {entry.showTitle} · {t("library.finished")}
+                  <span className="block truncate text-[13.5px] font-medium">{entry.title}</span>
+                  <span className="mt-0.5 flex items-center gap-2 truncate text-[12px] text-[var(--ink-faint)]">
+                    <span className="truncate">{entry.showTitle}</span>
+                    <span aria-hidden>·</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/35 px-1.5 py-0.2 text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-300">
+                      <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 fill-none stroke-current shrink-0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5"/>
+                      </svg>
+                      <span>Completed</span>
+                    </span>
                   </span>
                 </button>
                 <button

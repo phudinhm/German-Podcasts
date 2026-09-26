@@ -66,7 +66,7 @@ export function GlobalFloatingTranscript() {
       <div
         className="hidden sm:block fixed z-40 pointer-events-auto sm:left-6"
         style={{
-          bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+          bottom: "calc(88px + env(safe-area-inset-bottom, 0px))",
         }}
       >
         <button
@@ -76,10 +76,16 @@ export function GlobalFloatingTranscript() {
             setTranscriptCollapsed(false);
             setExplicitlyOpened(true);
           }}
-          className="inline-flex items-center gap-2 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 px-3.5 py-1.5 text-[12px] font-semibold text-[var(--ink)] shadow-lg backdrop-blur-md transition hover:border-[var(--accent)] hover:text-[var(--accent)] active:scale-95"
+          className="inline-flex items-center gap-2 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 px-3 py-1.5 text-[12px] font-semibold text-[var(--ink)] shadow-md backdrop-blur-xl transition-all hover:scale-105 hover:border-[var(--accent)] hover:text-[var(--accent)] active:scale-95"
           title="Mở cửa sổ Running Transcript"
         >
-          <span>📝</span>
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-[var(--accent)] stroke-current fill-none shrink-0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6" />
+            <path d="M16 13H8" />
+            <path d="M16 17H8" />
+            <path d="M10 9H8" />
+          </svg>
           <span>Transcript</span>
         </button>
       </div>
@@ -91,8 +97,7 @@ export function GlobalFloatingTranscript() {
       aria-label="Floating Transcript"
       className="hidden sm:block fixed z-40 max-w-xl transition-all duration-300 pointer-events-auto sm:left-6 sm:w-[480px] max-sm:inset-x-3 drop-shadow-[0_12px_40px_rgba(0,0,0,0.15)]"
       style={{
-        // Stacks neatly above the quick navigation pill on the left
-        bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+        bottom: "calc(88px + env(safe-area-inset-bottom, 0px))",
       }}
     >
       <LiveTranscriptPanel

@@ -12,6 +12,7 @@ import {
   type SavedWord,
 } from "@/lib/vocabulary";
 import { usePlayer } from "./PlayerProvider";
+import { Art } from "../listen/Art";
 
 import { FONT_FAMILIES, type FontFamily, type CaptionTheme, captionThemeStyle } from "../caption/CaptionSettings";
 
@@ -59,6 +60,8 @@ export function TranscriptReader({
     transcribingRegion,
     generatingTranscript,
     transcriptOffsetSec,
+    nextTrack,
+    playNext,
   } = usePlayer();
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
   const [savedWords, setSavedWords] = useState<Record<string, SavedWord>>({});
@@ -314,51 +317,15 @@ export function TranscriptReader({
         }`}
         style={{ ...(isLightTheme ? {} : captionThemeStyle(theme)), scrollbarWidth: "none" }}
       >
-        {/* Subtle sticky top header with overall podcast time, percentage & 1-tap Regional Ad/DAI Transcribe */}
-        <div className="sticky top-0 z-20 mx-auto max-w-xl pt-1.5 pb-1.5">
-          <div
-            className={`flex items-center justify-between gap-2 rounded-full px-3 py-1 backdrop-blur-md border text-[10.5px] ${
-              isLightTheme
-                ? "bg-[var(--paper-raised)]/90 border-[var(--rule)] text-[var(--ink-soft)] shadow-xs"
-                : "bg-black/45 border-white/10 text-white/75"
-            }`}
-          >
-            <span className="inline-flex items-center gap-1.5 min-w-0 truncate">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)] animate-pulse" />
-              <span className="truncate">
-                {transcribingRegion
-                  ? "Đang tự động quét & transcribe vùng âm thanh hiện tại..."
-                  : "Bấm từ bất kỳ để dịch · Tự động quét quảng cáo/vùng"}
-              </span>
-            </span>
-            <div className="flex items-center gap-2 shrink-0">
-              {track?.url ? (
-                <button
-                  type="button"
-                  onClick={onTranscribeCurrentRegion}
-                  disabled={transcribingRegion}
-                  className={`pointer-events-auto inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold active:scale-95 disabled:opacity-60 transition ${
-                    isLightTheme
-                      ? "bg-[var(--accent-soft)] border-[var(--accent)]/35 text-[var(--accent)] hover:opacity-90"
-                      : "bg-amber-500/20 border-amber-400/40 text-amber-300 hover:bg-amber-500/35"
-                  }`}
-                  title="Quét & Transcribe trực tiếp vùng âm thanh đang phát (khớp quảng cáo chèn động DAI)"
-                >
-                  <span>{transcribingRegion ? "⏳" : "🎯"}</span>
-                  <span>{transcribingRegion ? "Đang quét..." : "Quét vùng này"}</span>
-                </button>
-              ) : null}
-              <span className={`font-mono tabular-nums font-semibold ${isLightTheme ? "text-[var(--accent)]" : "text-amber-300/95"}`}>
-                {formatSegTime(currentTime)}
-                {episodeDuration > 0
-                  ? ` / ${formatSegTime(episodeDuration)} (${Math.round(episodePct)}%)`
-                  : ""}
-              </span>
-            </div>
+        {/* Subtle transient scanning toast when regional transcribe is running */}
+        {transcribingRegion ? (
+          <div className="sticky top-2 z-20 mx-auto max-w-sm flex items-center justify-center gap-2 rounded-full border border-amber-500/40 bg-zinc-950/90 px-3.5 py-1 text-xs text-amber-200 shadow-xl backdrop-blur-md animate-pulse">
+            <span>⏳</span>
+            <span>Đang quét & đồng bộ lại vùng âm thanh...</span>
           </div>
-        </div>
+        ) : null}
 
-        <div className="mx-auto max-w-xl py-[16vh] space-y-2.5">
+        <div className="mx-auto max-w-xl py-[12vh] space-y-2.5">
           {segments.map((seg, idx) => {
             const isActive = seg.id === activeSegmentId;
             const showForSeg = showTranslation;
@@ -547,6 +514,53 @@ export function TranscriptReader({
               </div>
             );
           })}
+
+          {/* Next Episode Suggestion Card (Cuối podcast suggest xem/nghe tập tiếp theo) */}
+          {nextTrack && (
+            <div
+              className={`mt-10 rounded-2xl border p-4 sm:p-5 backdrop-blur-md transition-all shadow-lg ${
+                isLightTheme
+                  ? "border-[var(--rule)] bg-[var(--paper-raised)]/95 text-[var(--ink)]"
+                  : "border-white/15 bg-white/[0.06] text-white"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-inherit/20">
+                <span className="flex items-center gap-1.5 text-[11px] font-bold tracking-wider uppercase text-[var(--accent)]">
+                  <span>✨</span>
+                  <span>Tập tiếp theo · Next Episode</span>
+                </span>
+                {nextTrack.durationSec ? (
+                  <span className="font-mono text-[11px] opacity-70 tabular-nums">
+                    {Math.round(nextTrack.durationSec / 60)} phút
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="flex items-center gap-3.5">
+                <div className="shrink-0 overflow-hidden rounded-xl shadow-md ring-1 ring-black/10 dark:ring-white/10">
+                  <Art src={nextTrack.artwork} alt="" size={52} seed={nextTrack.showTitle || nextTrack.title} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="line-clamp-1 text-[14px] font-bold leading-snug">
+                    {nextTrack.title}
+                  </h4>
+                  <p className="mt-0.5 truncate text-[12px] opacity-75">
+                    {nextTrack.showTitle}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={playNext}
+                  className="btn btn-primary shrink-0 flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-semibold rounded-full shadow-md shadow-[var(--accent)]/30 transition-all hover:scale-105 active:scale-95"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  <span>Phát tiếp</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

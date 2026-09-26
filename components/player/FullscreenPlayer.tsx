@@ -406,6 +406,8 @@ export function FullscreenPlayer() {
     mediaElement,
     playbackRate: speed,
     setPlaybackRate,
+    nextTrack,
+    playNext,
   } = usePlayer();
   const videoStageRef = useVideoStage(Boolean(fullscreenOpen && isVideoTrack));
   const { t } = useUi();
@@ -420,6 +422,7 @@ export function FullscreenPlayer() {
   const [playerTheme, setPlayerTheme] = useState<PlayerThemeId>("light");
   const [docked, setDocked] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [dismissedNextId, setDismissedNextId] = useState<string | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const applySpeed = (nextSpeed: number) => {
@@ -696,11 +699,13 @@ export function FullscreenPlayer() {
               }
               setFullscreenOpen(false);
             }}
-            className="icon-btn text-[20px] text-[var(--ink)] active:scale-95"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--rule)]/60 bg-[var(--surface)] text-[var(--ink)] shadow-2xs hover:scale-105 active:scale-90 transition-all"
             aria-label={t("player.exitFullscreen")}
             title={t("player.exitFullscreen")}
           >
-            ⌄
+            <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
           </button>
 
           <p className="max-w-[30%] sm:max-w-[40%] truncate text-[11.5px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
@@ -1065,6 +1070,45 @@ export function FullscreenPlayer() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Next Episode Floating Recommendation (cuối podcast suggest xem/nghe tập tiếp theo) */}
+        {nextTrack && duration > 0 && currentTime >= duration - 45 && dismissedNextId !== nextTrack.id && (
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/40 bg-[var(--paper-raised)]/95 p-3 shadow-xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-black/5 dark:ring-white/10">
+                <Art src={nextTrack.artwork} alt="" size={38} seed={nextTrack.showTitle || nextTrack.title} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
+                  ✨ Tập tiếp theo · Next
+                </p>
+                <p className="truncate text-[12.5px] font-semibold text-[var(--ink)]">
+                  {nextTrack.title}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={playNext}
+                className="btn btn-primary flex items-center gap-1 px-3 py-1.5 text-[12px] font-semibold rounded-full shadow-md shadow-[var(--accent)]/30 hover:scale-105 active:scale-95 transition-all"
+              >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                <span>Phát ngay</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDismissedNextId(nextTrack.id)}
+                className="icon-btn h-7 w-7 rounded-full text-[var(--ink-faint)] hover:text-[var(--ink)] active:scale-90 transition-all text-xs"
+                title="Bỏ qua"
+              >
+                ✕
+              </button>
             </div>
           </div>
         )}

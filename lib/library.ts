@@ -192,6 +192,20 @@ export function notePosition(id: string, position: number, durationSec: number |
   const finished = Boolean(durationSec && position >= durationSec - 25);
   recents[index] = { ...entry, position, finished, playedAt: new Date().toISOString() };
   write(RECENTS_KEY, recents);
+  if (finished && !entry.finished) {
+    touch();
+  }
+}
+
+/** Explicitly marks an episode as completed, e.g. when audio element ends. */
+export function markEpisodeFinished(id: string): void {
+  const recents = read<RecentEpisode[]>(RECENTS_KEY, []);
+  const index = recents.findIndex((item) => item.id === id);
+  if (index < 0) return;
+  const entry = recents[index];
+  recents[index] = { ...entry, finished: true, playedAt: new Date().toISOString() };
+  write(RECENTS_KEY, recents);
+  touch();
 }
 
 export function forgetRecent(id: string): void {

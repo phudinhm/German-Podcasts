@@ -18,6 +18,7 @@ import { liveCaptionService } from "@/lib/liveCaption";
 import { generateTranscript, loadPublishedTranscript, type GenerateTranscriptError } from "@/lib/transcriptPipeline";
 import { transcribeAndSpliceRegion } from "@/lib/regionalTranscribe";
 import { getTranscriptOffset, setTranscriptOffset } from "@/lib/transcriptSync";
+import { markEpisodeFinished, notePosition } from "@/lib/library";
 
 export interface Track {
   /** Stable id, used to tell "same episode" from "new episode". */
@@ -43,10 +44,15 @@ export interface Track {
   /** What language the episode is actually spoken in, for auto-translating
    * a published transcript in the right direction. */
   sourceLang?: SpokenLang;
+  /** Suggested next track in queue or playlist, if available. */
+  nextTrack?: Track | null;
 }
 
 interface PlayerContextValue {
   track: Track | null;
+  nextTrack: Track | null;
+  setNextTrack: (track: Track | null) => void;
+  playNext: () => void;
   play: (track: Track) => void;
   stop: () => void;
   handle: PlayerHandle;
@@ -121,6 +127,7 @@ export function usePlayer(): PlayerContextValue {
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [track, setTrack] = useState<Track | null>(null);
+  const [nextTrack, setNextTrack] = useState<Track | null>(null);
   const pendingSeekRef = useRef<number | null>(null);
   const [stage, setStageElement] = useState<HTMLElement | null>(null);
   const [waitingForTranscript, setWaitingForTranscript] = useState(false);
@@ -183,6 +190,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setVideoPipMode(false);
       pendingSeekRef.current = next.startAt && next.startAt > 0 ? next.startAt : null;
 
+      if (next.nextTrack !== undefined) {
+        setNextTrack(next.nextTrack);
+      }
+
       setTrack((current) => {
         if (current?.id === next.id && current?.url === next.url) {
           return { ...next };
@@ -198,6 +209,41 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     },
     [media.handle, media.mediaRef],
   );
+
+  const playNext = useCallback(() => {
+    if (nextTrack) {
+      play(nextTrack);
+    }
+  }, [nextTrack, play]);
+
+  // Automatically mark episode as finished when audio reaches end or ends naturally
+  useEffect(() => {
+    const el = media.mediaRef.current;
+    if (!el || !track?.id) return;
+
+    const onEnded = () => {
+      markEpisodeFinished(track.id);
+      window.dispatchEvent(new CustomEvent("hoerbar:library-changed"));
+    };
+
+    const onTimeUpdate = () => {
+      const dur = el.duration;
+      const cur = el.currentTime;
+      if (Number.isFinite(dur) && dur > 0 && cur > 0) {
+        notePosition(track.id, cur, dur);
+        if (cur >= dur - 20) {
+          markEpisodeFinished(track.id);
+        }
+      }
+    };
+
+    el.addEventListener("ended", onEnded);
+    el.addEventListener("timeupdate", onTimeUpdate);
+    return () => {
+      el.removeEventListener("ended", onEnded);
+      el.removeEventListener("timeupdate", onTimeUpdate);
+    };
+  }, [media.mediaRef, track?.id]);
 
   /**
    * Applies a requested start position as soon as the element is ready.
@@ -668,6 +714,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<PlayerContextValue>(
     () => ({
       track,
+      nextTrack,
+      setNextTrack,
+      playNext,
       play,
       stop,
       handle,
@@ -705,6 +754,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       track,
+      nextTrack,
+      playNext,
       play,
       stop,
       handle,

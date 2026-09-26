@@ -50,11 +50,11 @@ export function Nav() {
           <button
             type="button"
             onClick={() => setFullscreenOpen(true)}
-            className="hidden sm:flex items-center gap-1.5 max-w-[220px] md:max-w-[260px] rounded-full bg-zinc-950/90 dark:bg-white/10 border border-[var(--accent)]/40 px-2.5 py-1 text-white shadow-md backdrop-blur-xl transition-all hover:scale-[1.02] active:scale-95"
+            className="hidden lg:flex items-center gap-2 max-w-[240px] rounded-full border border-[var(--rule)] bg-[var(--surface)] px-3 py-1 text-[var(--ink)] shadow-xs transition-all hover:scale-[1.02] hover:border-[var(--accent)]/50 active:scale-95"
             title={`${t("player.openFullPlayer")}: ${track.title}`}
           >
             <AudioVisualizer isPlaying={handle.isPlaying()} barCount={4} />
-            <span className="truncate text-[11.5px] font-semibold text-amber-200">
+            <span className="truncate text-[11.5px] font-semibold text-[var(--accent)]">
               {track.title}
             </span>
           </button>

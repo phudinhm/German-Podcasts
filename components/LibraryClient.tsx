@@ -50,9 +50,11 @@ export function LibraryClient() {
       <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-2.5 py-1 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60"
+          className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-3 py-1.5 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60"
         >
-          <span>←</span>
+          <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
           <span>{t("common.back")} ({t("nav.listen")})</span>
         </Link>
       </div>
@@ -75,15 +77,19 @@ export function LibraryClient() {
             href="/"
             className="btn text-[12.5px] flex items-center gap-1.5"
           >
-            <span aria-hidden>←</span>
+            <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
             <span>{t("common.back")} ({t("nav.listen")})</span>
           </Link>
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="btn text-[12.5px] flex items-center gap-1"
+            className="btn text-[12.5px] flex items-center gap-1.5"
           >
-            <span aria-hidden>↑</span>
+            <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
             <span>{t("common.scrollToTop")}</span>
           </button>
         </div>
