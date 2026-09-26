@@ -187,9 +187,10 @@ export function notePosition(id: string, position: number, durationSec: number |
   const entry = recents[index];
   if (Math.abs(entry.position - position) < 5) return;
 
-  // "Finished" a little before the true end: trailers and outros mean nobody
-  // listens to the last few seconds, and an episode stuck at 98% is a nag.
-  const finished = Boolean(durationSec && position >= durationSec - 25);
+  // Only mark finished when played to 100% (within 3 seconds of true end or 99.5% of full duration)
+  const finished = Boolean(
+    durationSec && durationSec > 30 && (position >= durationSec - 3 || (position / durationSec) >= 0.995)
+  );
   recents[index] = { ...entry, position, finished, playedAt: new Date().toISOString() };
   write(RECENTS_KEY, recents);
   if (finished && !entry.finished) {

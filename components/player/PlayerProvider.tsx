@@ -19,6 +19,7 @@ import { generateTranscript, loadPublishedTranscript, type GenerateTranscriptErr
 import { transcribeAndSpliceRegion } from "@/lib/regionalTranscribe";
 import { getTranscriptOffset, setTranscriptOffset } from "@/lib/transcriptSync";
 import { markEpisodeFinished, notePosition } from "@/lib/library";
+import { PipSubtitleOverlay } from "./PipSubtitleOverlay";
 
 export interface Track {
   /** Stable id, used to tell "same episode" from "new episode". */
@@ -115,6 +116,8 @@ interface PlayerContextValue {
   setTranscriptOffsetSec: (offsetSec: number) => void;
   playbackRate: number;
   setPlaybackRate: (rate: number) => void;
+  centerSubtitleActive: boolean;
+  registerCenterSubtitle: (id: string, active: boolean) => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -150,6 +153,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [videoPipMode, setVideoPipMode] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(1);
   const playbackRateRef = useRef(1);
+
+  const [activeCenterSubtitles, setActiveCenterSubtitles] = useState<Set<string>>(() => new Set());
+
+  const registerCenterSubtitle = useCallback((id: string, active: boolean) => {
+    setActiveCenterSubtitles((prev) => {
+      if (active) {
+        if (prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      } else {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }
+    });
+  }, []);
+
+  const centerSubtitleActive = activeCenterSubtitles.size > 0;
 
   const setFullscreenOpen = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(
     (action) => {
@@ -229,9 +252,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const onTimeUpdate = () => {
       const dur = el.duration;
       const cur = el.currentTime;
-      if (Number.isFinite(dur) && dur > 0 && cur > 0) {
+      if (Number.isFinite(dur) && dur > 30 && cur > 0) {
         notePosition(track.id, cur, dur);
-        if (cur >= dur - 20) {
+        if (cur >= dur - 3 || (cur / dur) >= 0.995) {
           markEpisodeFinished(track.id);
         }
       }
@@ -647,7 +670,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const [videoMinimized, setVideoMinimized] = useState(false);
-  const [pipTopCorner, setPipTopCorner] = useState(false);
+  const [pipCorner, setPipCorner] = useState<"auto" | "top" | "bottom">("auto");
+
+  const togglePipCorner = useCallback(() => {
+    setPipCorner((prev) => {
+      if (prev === "auto") {
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+        return isMobile ? "bottom" : "top";
+      }
+      return prev === "top" ? "bottom" : "top";
+    });
+  }, []);
 
   const isVideoTrack = Boolean(
     track &&
@@ -751,6 +784,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setTranscriptOffsetSec,
       playbackRate,
       setPlaybackRate,
+      centerSubtitleActive,
+      registerCenterSubtitle,
     }),
     [
       track,
@@ -786,6 +821,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setTranscriptOffsetSec,
       playbackRate,
       setPlaybackRate,
+      centerSubtitleActive,
+      registerCenterSubtitle,
     ],
   );
 
@@ -811,9 +848,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => setVideoMinimized(false)}
               className={`fixed right-3 sm:right-5 z-[65] flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-zinc-950/90 px-3.5 py-1.5 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md transition hover:bg-zinc-900 ${
-                pipTopCorner
-                  ? "top-[calc(88px+env(safe-area-inset-top,0px))] sm:top-16"
-                  : "bottom-[142px] sm:bottom-24"
+                pipCorner === "bottom"
+                  ? "bottom-[calc(130px+env(safe-area-inset-bottom,10px))] sm:bottom-20"
+                  : "top-[calc(62px+env(safe-area-inset-top,0px))] sm:top-auto sm:bottom-20"
               }`}
               title="Hiện lại cửa sổ video Picture-in-Picture"
             >
@@ -824,7 +861,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
           {/* Persistent Video Player:
               - When inside Media Player (stageRect present), docked over the active stage box
-              - When exited to search/browse other podcasts (!stageRect), floats in iOS Picture-in-Picture corner window */}
+              - When exited to search/browse other podcasts (!stageRect), floats in Picture-in-Picture corner window */}
           <div
             ref={attachLayer}
             style={
@@ -842,13 +879,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               stageRect
                 ? `fixed ${fullscreenOpen ? "z-[85]" : "z-30"} overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl`
                 : `fixed right-3 sm:right-5 z-[65] overflow-hidden rounded-2xl border border-white/25 bg-black shadow-[0_16px_48px_rgba(0,0,0,0.6)] ring-1 ring-black/50 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
-                    pipTopCorner
-                      ? "top-[calc(88px+env(safe-area-inset-top,0px))] sm:top-16"
-                      : "bottom-[142px] sm:bottom-24"
+                    pipCorner === "bottom"
+                      ? "bottom-[calc(130px+env(safe-area-inset-bottom,10px))] sm:bottom-20"
+                      : "top-[calc(62px+env(safe-area-inset-top,0px))] sm:top-auto sm:bottom-20"
                   } ${
                     videoMinimized
                       ? "pointer-events-none h-0 w-0 opacity-0 scale-75"
-                      : "w-56 sm:w-80 aspect-video opacity-100 scale-100"
+                      : "w-44 xs:w-52 sm:w-80 aspect-video opacity-100 scale-100"
                   }`
             }
           >
@@ -898,7 +935,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
                     <>
                       <button
                         type="button"
-                        onClick={() => setPipTopCorner((v) => !v)}
+                        onClick={togglePipCorner}
                         className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-white/30"
                         title="Đổi vị trí góc trên / góc dưới"
                       >
@@ -944,6 +981,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </div>
+
+          {/* Floating Subtitle Overlay when playing in Picture-in-Picture */}
+          <PipSubtitleOverlay
+            active={Boolean(track && isVideoTrack && !stageRect && !videoMinimized)}
+            videoRef={media.mediaRef as React.RefObject<HTMLVideoElement>}
+            transcriptOffsetSec={transcriptOffsetSec}
+            onVisibleChange={(active) => registerCenterSubtitle("pip", active)}
+            pipPosition={pipCorner === "bottom" ? "bottom" : "top"}
+          />
         </>
       ) : null}
     </PlayerContext.Provider>

@@ -125,7 +125,7 @@ export function SettingsMenu() {
           role="menu"
           data-origin="top-right"
           aria-hidden={!open}
-          className={`t-dropdown card absolute right-0 top-full z-50 mt-2 w-[300px] max-h-[82vh] overflow-y-auto p-3 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-2xl ${
+          className={`t-dropdown macos-window absolute right-0 top-full z-50 mt-2 w-[310px] max-h-[82vh] overflow-y-auto p-3.5 shadow-2xl ${
             entered ? "is-open" : open ? "" : "is-closing"
           }`}
         >

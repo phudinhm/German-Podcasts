@@ -83,6 +83,7 @@ export function ListenClient() {
   const router = useRouter();
 
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [results, setResults] = useState<DiscoverResult[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +130,15 @@ export function ListenClient() {
     return results; // Default: most listened / relevant
   }, [results, resultsSort]);
 
+  const episodes = useMemo(() => {
+    let list = feed?.episodes ?? [];
+    if (feedSearch) {
+      const lower = feedSearch.toLowerCase();
+      list = list.filter((e) => e.title.toLowerCase().includes(lower));
+    }
+    return sortEpisodes(list, sort, recents);
+  }, [feed, sort, recents, feedSearch]);
+
   useEffect(() => {
     const onScroll = () => {
       setScrolledDown(window.scrollY > 280);
@@ -161,6 +171,36 @@ export function ListenClient() {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [player.handle]);
+
+  const [isNearEnd, setIsNearEnd] = useState(false);
+
+  useEffect(() => {
+    const el = player.mediaElement();
+    if (!el || !player.track) {
+      setIsNearEnd(false);
+      return;
+    }
+    const checkNearEnd = () => {
+      const cur = el.currentTime;
+      const dur = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : (player.track?.durationSec ?? 0);
+      const near = dur > 15 && cur > 0 && cur >= dur - 10;
+      setIsNearEnd((prev) => (prev !== near ? near : prev));
+    };
+    const onEnd = () => {
+      setIsNearEnd(true);
+      setCurrentTime(el.duration || el.currentTime);
+    };
+
+    checkNearEnd();
+    el.addEventListener("timeupdate", checkNearEnd);
+    el.addEventListener("ended", onEnd);
+    el.addEventListener("seeked", checkNearEnd);
+    return () => {
+      el.removeEventListener("timeupdate", checkNearEnd);
+      el.removeEventListener("ended", onEnd);
+      el.removeEventListener("seeked", checkNearEnd);
+    };
+  }, [player.track?.id, player.track?.durationSec, player.mediaElement]);
 
   // Tracks whichever source is actually feeding the recognizer, so the
   // toolbar can always say "tab audio" or "microphone" rather than a label
@@ -232,6 +272,14 @@ export function ListenClient() {
   useEffect(() => {
     stopLiveCaption();
   }, [playing?.id, stopLiveCaption]);
+
+  const isLiveCaptionActive = Boolean(playing && showCaption && !showTranscript);
+  useEffect(() => {
+    player.registerCenterSubtitle("live-caption", isLiveCaptionActive);
+    return () => {
+      player.registerCenterSubtitle("live-caption", false);
+    };
+  }, [isLiveCaptionActive, player.registerCenterSubtitle]);
 
   useEffect(() => () => liveCaptionService.stopCapture(), []);
 
@@ -429,68 +477,72 @@ export function ListenClient() {
     Boolean(showInlinePlayer && player.isVideoTrack && !player.fullscreenOpen)
   );
 
-  const playEpisode = useCallback(
-    (episode: FeedEpisode, from?: number) => {
+  const createTrackFromEpisode = useCallback(
+    (ep: FeedEpisode, nextCandidate?: FeedEpisode | null, from?: number): Track => {
       const showPrefix = show?.feedUrl || feed?.title || show?.title || "show";
-      const id = `${showPrefix}::${episode.guid || episode.url}::${episode.url}`;
-      const isVideoUrl =
-        episode.type.startsWith("video/") ||
-        /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(episode.url || "");
+      const id = `${showPrefix}::${ep.guid || ep.url}::${ep.url}`;
+      const isVideo =
+        ep.type.startsWith("video/") ||
+        /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(ep.url || "");
 
       let nextTrack: Track | null = null;
-      if (feed?.episodes && feed.episodes.length > 1) {
-        const epIdx = feed.episodes.findIndex(
-          (e) => (e.guid || e.url) === (episode.guid || episode.url)
-        );
-        const nextCandidate =
-          epIdx > 0
-            ? feed.episodes[epIdx - 1]
-            : epIdx + 1 < feed.episodes.length
-            ? feed.episodes[epIdx + 1]
-            : null;
-
-        if (nextCandidate) {
-          const nextId = `${showPrefix}::${nextCandidate.guid || nextCandidate.url}::${nextCandidate.url}`;
-          const isNextVideo =
-            nextCandidate.type.startsWith("video/") ||
-            /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(nextCandidate.url || "");
-          nextTrack = {
-            id: nextId,
-            title: nextCandidate.title,
-            showTitle: feed?.title ?? show?.title ?? "",
-            artwork: nextCandidate.image ?? show?.artwork ?? feed?.image ?? null,
-            description: nextCandidate.description,
-            kind: isNextVideo ? "video" : "audio",
-            url: nextCandidate.url || undefined,
-            pageUrl: nextCandidate.pageUrl,
-            durationSec: nextCandidate.durationSec,
-            publishedAt: nextCandidate.publishedAt,
-            startAt: 0,
-            transcripts: nextCandidate.transcripts,
-            sourceLang: detectSpokenLang(feed?.language, `${nextCandidate.title} ${nextCandidate.description}`),
-          };
-        }
+      if (nextCandidate) {
+        const nextId = `${showPrefix}::${nextCandidate.guid || nextCandidate.url}::${nextCandidate.url}`;
+        const isNextVideo =
+          nextCandidate.type.startsWith("video/") ||
+          /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(nextCandidate.url || "");
+        nextTrack = {
+          id: nextId,
+          title: nextCandidate.title,
+          showTitle: feed?.title ?? show?.title ?? "",
+          artwork: nextCandidate.image ?? show?.artwork ?? feed?.image ?? null,
+          description: nextCandidate.description,
+          kind: isNextVideo ? "video" : "audio",
+          url: nextCandidate.url || undefined,
+          pageUrl: nextCandidate.pageUrl,
+          durationSec: nextCandidate.durationSec,
+          publishedAt: nextCandidate.publishedAt,
+          startAt: 0,
+          transcripts: nextCandidate.transcripts,
+          sourceLang: detectSpokenLang(feed?.language, `${nextCandidate.title} ${nextCandidate.description}`),
+        };
       }
 
-      const track: Track = {
+      return {
         id,
-        title: episode.title,
+        title: ep.title,
         showTitle: feed?.title ?? show?.title ?? "",
-        artwork: episode.image ?? show?.artwork ?? feed?.image ?? null,
-        description: episode.description,
-        kind: isVideoUrl ? "video" : "audio",
-        url: episode.url || undefined,
-        pageUrl: episode.pageUrl,
-        durationSec: episode.durationSec,
-        publishedAt: episode.publishedAt,
+        artwork: ep.image ?? show?.artwork ?? feed?.image ?? null,
+        description: ep.description,
+        kind: isVideo ? "video" : "audio",
+        url: ep.url || undefined,
+        pageUrl: ep.pageUrl,
+        durationSec: ep.durationSec,
+        publishedAt: ep.publishedAt,
         startAt: from ?? resumeAt(id),
-        transcripts: episode.transcripts,
-        sourceLang: detectSpokenLang(feed?.language, `${episode.title} ${episode.description}`),
+        transcripts: ep.transcripts,
+        sourceLang: detectSpokenLang(feed?.language, `${ep.title} ${ep.description}`),
         nextTrack,
       };
+    },
+    [show, feed],
+  );
+
+  const playEpisode = useCallback(
+    (episode: FeedEpisode, from?: number) => {
+      const episodeList = episodes.length > 0 ? episodes : (feed?.episodes ?? []);
+      const epIdx = episodeList.findIndex(
+        (e) => (e.guid || e.url) === (episode.guid || episode.url)
+      );
+      const nextCandidate =
+        epIdx >= 0 && epIdx + 1 < episodeList.length
+          ? episodeList[epIdx + 1]
+          : null;
+
+      const track = createTrackFromEpisode(episode, nextCandidate, from);
       player.play(track);
       noteplayed({
-        id,
+        id: track.id,
         title: episode.title,
         showTitle: track.showTitle,
         feedUrl: show?.feedUrl ?? null,
@@ -520,7 +572,7 @@ export function ListenClient() {
         window.scrollTo({ top, behavior: "smooth" });
       }, 90);
     },
-    [feed, show, player],
+    [episodes, feed, show, player, createTrackFromEpisode],
   );
 
   const scrollToPlayer = useCallback(() => {
@@ -626,6 +678,33 @@ export function ListenClient() {
     return () => window.removeEventListener("hoerbar:navigate-home", onNavHome);
   }, [browse]);
 
+  // macOS ⌘K or '/' Spotlight-style keyboard search shortcut
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      } else if (
+        e.key === "/" &&
+        !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    const onCustomFocus = () => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("hoerbar:focus-search", onCustomFocus);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("hoerbar:focus-search", onCustomFocus);
+    };
+  }, []);
+
   /** Returns to search results if they exist, otherwise returns to full browse. */
   const backToResultsOrBrowse = useCallback(() => {
     if (results && results.length > 0) {
@@ -674,15 +753,6 @@ export function ListenClient() {
     setQuery(requestedQuery);
     void search(requestedQuery);
   }, [requestedQuery, search]);
-
-  const episodes = useMemo(() => {
-    let list = feed?.episodes ?? [];
-    if (feedSearch) {
-      const lower = feedSearch.toLowerCase();
-      list = list.filter((e) => e.title.toLowerCase().includes(lower));
-    }
-    return sortEpisodes(list, sort, recents);
-  }, [feed, sort, recents, feedSearch]);
 
   const jumpToEpisode = useCallback(
     (targetIndex: number, fromIndex: number | null) => {
@@ -743,6 +813,20 @@ export function ListenClient() {
     }
     return null;
   }, [playing, episodes]);
+
+  // Keep player.nextTrack in sync with current playing episode's next episode in the list
+  useEffect(() => {
+    if (!playingEpInfo) return;
+    if (playingEpInfo.nextEp) {
+      const nextCandidate = playingEpInfo.nextEp;
+      const nextTrackObj = createTrackFromEpisode(nextCandidate, null, 0);
+      if (player.nextTrack?.id !== nextTrackObj.id) {
+        player.setNextTrack(nextTrackObj);
+      }
+    } else if (player.nextTrack !== null) {
+      player.setNextTrack(null);
+    }
+  }, [playingEpInfo, createTrackFromEpisode, player]);
 
   const displayedEpisodes = useMemo(() => {
     if (feedSearch) {
@@ -872,6 +956,7 @@ export function ListenClient() {
             🔍
           </span>
           <input
+            ref={searchInputRef}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -881,20 +966,27 @@ export function ListenClient() {
             spellCheck={false}
             aria-label={t("listen.title")}
             placeholder={t("listen.placeholder")}
-            className="field min-w-0 w-full pl-9 pr-9 shadow-2xs"
+            className="field min-w-0 w-full pl-9 pr-14 shadow-2xs rounded-xl"
           />
           {query ? (
             <button
               type="button"
-              onClick={() => setQuery("")}
+              onClick={() => {
+                setQuery("");
+                searchInputRef.current?.focus();
+              }}
               aria-label="Clear search"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ink-faint)]/25 text-[12px] font-bold text-[var(--ink-soft)] hover:bg-[var(--ink-faint)]/40"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ink-faint)]/25 text-[12px] font-bold text-[var(--ink-soft)] hover:bg-[var(--ink-faint)]/40 transition active:scale-90"
             >
               ×
             </button>
-          ) : null}
+          ) : (
+            <span className="macos-kbd hidden sm:inline-flex absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none select-none">
+              ⌘K
+            </span>
+          )}
         </div>
-        <button type="submit" className="btn btn-primary shrink-0 px-4" disabled={searching}>
+        <button type="submit" className="btn btn-primary shrink-0 px-4 rounded-xl shadow-xs active:scale-95 transition" disabled={searching}>
           {searching ? t("common.searching") : t("common.search")}
         </button>
       </form>
@@ -1004,7 +1096,7 @@ export function ListenClient() {
           ref={playerRef}
           className={`card mt-6 overflow-hidden transition-all duration-300 ${
             freezePane
-              ? "sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[52px] z-30 bg-[var(--paper-raised)] shadow-2xl border-[var(--accent)]/60 ring-1 ring-[var(--accent)]/30"
+              ? "sticky top-[calc(50px+env(safe-area-inset-top,0px))] sm:top-[62px] z-30 bg-[var(--paper-raised)] shadow-2xl border-[var(--accent)]/60 ring-1 ring-[var(--accent)]/30"
               : ""
           }`}
         >
@@ -1268,7 +1360,7 @@ export function ListenClient() {
         <div
           className="fixed left-0 right-0 z-40 mx-auto w-full max-w-2xl px-3 pointer-events-none transition-all duration-300 sm:!bottom-8"
           style={{
-            bottom: "calc(120px + env(safe-area-inset-bottom, 14px))",
+            bottom: "calc(126px + env(safe-area-inset-bottom, 10px))",
           }}
         >
           <div className="pointer-events-auto">
@@ -1287,7 +1379,7 @@ export function ListenClient() {
       {/* ---------------- results ---------------- */}
       {results && results.length > 0 && !feed ? (
         <section className="mt-6 relative">
-          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[50px] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)]/60 shadow-xs">
+          <div className="sticky top-[calc(50px+env(safe-area-inset-top,0px))] sm:top-[62px] z-20 -mx-2 mb-3 flex items-center justify-between gap-3 bg-[var(--paper-raised)] px-3 py-2.5 backdrop-blur-2xl border-b border-[var(--rule)] shadow-xs rounded-xl">
             <button
               type="button"
               className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-3 py-1 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--rule)]/60 active:scale-95"
@@ -1387,7 +1479,7 @@ export function ListenClient() {
       {/* ---------------- episodes ---------------- */}
       {feed ? (
         <section className="mt-4 relative animate-panel-in">
-          <div className="sticky top-[calc(48px+env(safe-area-inset-top,0px))] sm:top-[52px] z-20 -mx-2 mb-3 flex items-center justify-between gap-2 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)]/95 backdrop-blur-2xl px-3.5 py-2 shadow-sm">
+          <div className={`${!freezePane ? "sticky top-[calc(50px+env(safe-area-inset-top,0px))] sm:top-[62px] z-20" : "relative z-10"} -mx-2 mb-3 flex items-center justify-between gap-2 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)] px-3.5 py-2 shadow-sm`}>
             <button
               type="button"
               className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition px-3 py-1.5 rounded-full bg-[var(--surface)] shadow-2xs border border-[var(--rule)]/70 active:scale-95"
@@ -1436,13 +1528,17 @@ export function ListenClient() {
                       {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
                     </p>
                     {(() => {
-                      const listenedCount = episodes.filter((ep) => {
+                      const completedCount = episodes.filter((ep) => {
                         const epId = ep.guid || ep.url;
-                        return recents.some((r) => r.id === epId && (r.position > 15 || r.finished));
+                        return recents.some((r) => {
+                          const match = r.id === epId || r.id.includes(epId) || (r.url && r.url === ep.url);
+                          const dur = ep.durationSec || r.durationSec;
+                          return match && Boolean(r.finished || (dur && dur > 30 && (r.position >= dur - 3 || (r.position / dur) >= 0.995)));
+                        });
                       }).length;
-                      return listenedCount > 0 ? (
-                        <span className="chip text-[11px] bg-[var(--accent-soft)] text-[var(--accent)] font-medium">
-                          🎧 {t("feed.listenedCount", { count: listenedCount, total: feed.episodes.length })}
+                      return completedCount > 0 ? (
+                        <span className="chip text-[11px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-500/30">
+                          ✓ {t("feed.listenedCount", { count: completedCount, total: feed.episodes.length })}
                         </span>
                       ) : null;
                     })()}
@@ -1549,30 +1645,48 @@ export function ListenClient() {
             if (!target || episodes.length < 5 || feedSearch) return null;
             const { ep, epIdx, nextEp, nextEpIdx } = target;
 
+            const epId = ep.guid || ep.url;
+            const epRec = recents.find(
+              (r) => r.id === epId || r.id.includes(epId) || (r.url && r.url === ep.url)
+            );
+            const epDur = ep.durationSec || epRec?.durationSec;
+            const isEpFinished = Boolean(
+              epRec?.finished ||
+              (epDur && epRec && epDur > 30 && (epRec.position >= epDur - 3 || (epRec.position / epDur) >= 0.995))
+            );
+            const isPlayingThis = Boolean(playing && (playing.id === epId || playing.id.includes(epId) || (playing.url && playing.url === ep.url)));
+            const showNextSuggestion = (isEpFinished || (isPlayingThis && isNearEnd)) && nextEp;
+
             return (
               <div className="mb-4 overflow-hidden rounded-2xl border border-[var(--accent)]/35 bg-gradient-to-r from-[var(--accent-soft)]/50 via-[var(--paper-raised)] to-[var(--paper-raised)] p-3.5 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent)]">
-                      <span>🎧</span>
-                      <span>{t("feed.playingEp", { n: epIdx + 1 })}:</span>
+                      <span>{isEpFinished ? "✓" : isNearEnd && isPlayingThis ? "✨" : "🎧"}</span>
+                      <span>
+                        {isEpFinished
+                          ? `Đã hoàn tất tập #${epIdx + 1}`
+                          : isNearEnd && isPlayingThis
+                          ? `10s cuối tập #${epIdx + 1} · Gợi ý tiếp theo:`
+                          : `${t("feed.playingEp", { n: epIdx + 1 })}:`}
+                      </span>
                     </div>
                     <p className="truncate text-[13.5px] font-semibold text-[var(--ink)] mt-0.5">
                       {ep.title}
                     </p>
-                    {nextEp && (
+                    {showNextSuggestion ? (
                       <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--ink-soft)]">
                         <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                          👉 {t("feed.nextEpisode")}:
+                          {isEpFinished ? "👉 Tiếp theo:" : "✨ 10s cuối · Tập tiếp theo:"}
                         </span>
                         <span className="truncate font-medium text-[var(--ink)]">
                           #{nextEpIdx + 1} {nextEp.title}
                         </span>
                       </p>
-                    )}
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                    {nextEp ? (
+                    {showNextSuggestion ? (
                       <>
                         <button
                           type="button"
@@ -1594,11 +1708,17 @@ export function ListenClient() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => playEpisode(ep)}
+                        onClick={() => {
+                          if (playing && (playing.id.includes(epId) || (playing.url && playing.url === ep.url))) {
+                            scrollToPlayer();
+                          } else {
+                            playEpisode(ep);
+                          }
+                        }}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white shadow-xs hover:opacity-95 transition active:scale-95"
                       >
-                        <span>▶</span>
-                        <span>{t("nav.listenShort")}</span>
+                        <span>{playing && (playing.id.includes(epId) || (playing.url && playing.url === ep.url)) ? "🎧" : "▶"}</span>
+                        <span>{playing && (playing.id.includes(epId) || (playing.url && playing.url === ep.url)) ? t("player.nowPlaying") : t("nav.listenShort")}</span>
                       </button>
                     )}
                     {epIdx > 2 && collapsedPriorCount === 0 && (
@@ -1678,20 +1798,23 @@ export function ListenClient() {
             <ul className="space-y-1">
             {displayedEpisodes.map(({ episode, actualIndex }) => {
               const id = episode.guid || episode.url;
-              const remembered = recents.find((item) => item.id === id);
+              const remembered = recents.find(
+                (item) => item.id === id || item.id.includes(id) || (item.url && item.url === episode.url)
+              );
               const duration = episode.durationSec || remembered?.durationSec;
               const isFinished = Boolean(
-                remembered?.finished || (duration && remembered && remembered.position >= duration - 25),
+                remembered?.finished ||
+                (duration && remembered && duration > 30 && (remembered.position >= duration - 3 || (remembered.position / duration) >= 0.995))
               );
               const progress =
-                remembered && duration
+                remembered && duration && duration > 0
                   ? Math.min(100, Math.round((remembered.position / duration) * 100))
-                  : remembered && remembered.position > 15
-                    ? 15
-                    : 0;
+                  : 0;
               const remainingSec = duration && remembered ? Math.max(0, duration - remembered.position) : null;
               const remainingMin = remainingSec ? Math.ceil(remainingSec / 60) : null;
-              const current = playing?.id === id;
+              const current = Boolean(
+                playing && (playing.id === id || playing.id.includes(id) || (playing.url && playing.url === episode.url))
+              );
               const isFav = isEpisodeFavorited(id);
 
               return (
@@ -1843,15 +1966,17 @@ export function ListenClient() {
                     {isFav ? "❤️" : "🤍"}
                   </button>
 
-                  {/* Next Episode Suggestion banner (when this episode is playing or focused) */}
-                  {(current || focusedEpIndex === actualIndex) && actualIndex + 1 < episodes.length && (
-                    <div className="mx-3 mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)]/50 p-2.5 text-[12px] shadow-2xs backdrop-blur-xs animate-fade-in">
+                  {/* Next Episode Suggestion banner: ONLY show when completed 100% or in last 10s of playback */}
+                  {(isFinished || (current && isNearEnd)) && actualIndex + 1 < episodes.length && (
+                    <div className="mx-3 mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-[12px] shadow-2xs backdrop-blur-xs animate-fade-in">
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-bold text-white shrink-0">
-                          ▶
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white shrink-0">
+                          {isFinished ? "✓" : "✨"}
                         </span>
                         <span className="text-[12px] font-medium text-[var(--ink)] truncate">
-                          <span className="font-semibold text-[var(--accent)]">{t("feed.nextEpisode")}:</span>{" "}
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                            {isFinished ? `Đã xong tập #${actualIndex + 1}` : `10s cuối cùng`} · Tiếp theo:
+                          </span>{" "}
                           <span className="font-semibold text-[var(--ink)]">#{actualIndex + 2}</span> {episodes[actualIndex + 1].title}
                         </span>
                       </div>
@@ -1986,11 +2111,11 @@ export function ListenClient() {
       {(scrolledDown || feed || (results && results.length > 0)) && (
         <aside
           aria-label="Quick navigation"
-          className="animate-dock-in fixed right-3.5 z-40 flex items-center justify-center gap-1.5 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 backdrop-blur-2xl p-1 shadow-[0_10px_32px_rgba(0,0,0,0.18)] transition-all duration-300 sm:left-6 sm:right-auto sm:px-2 sm:py-1 sm:!bottom-6"
+          className="animate-dock-in fixed left-3.5 right-auto z-40 flex items-center justify-center gap-1.5 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 backdrop-blur-2xl p-1 shadow-[0_10px_32px_rgba(0,0,0,0.18)] transition-all duration-300 sm:left-6 sm:px-2 sm:py-1 sm:!bottom-6"
           style={{
             bottom: playing
-              ? "calc(132px + env(safe-area-inset-bottom, 12px))"
-              : "calc(68px + env(safe-area-inset-bottom, 12px))",
+              ? "calc(126px + env(safe-area-inset-bottom, 10px))"
+              : "calc(64px + env(safe-area-inset-bottom, 10px))",
           }}
         >
           {feed ? (
