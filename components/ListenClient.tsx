@@ -130,6 +130,15 @@ export function ListenClient() {
     return results; // Default: most listened / relevant
   }, [results, resultsSort]);
 
+  const episodes = useMemo(() => {
+    let list = feed?.episodes ?? [];
+    if (feedSearch) {
+      const lower = feedSearch.toLowerCase();
+      list = list.filter((e) => e.title.toLowerCase().includes(lower));
+    }
+    return sortEpisodes(list, sort, recents);
+  }, [feed, sort, recents, feedSearch]);
+
   useEffect(() => {
     const onScroll = () => {
       setScrolledDown(window.scrollY > 280);
@@ -468,68 +477,72 @@ export function ListenClient() {
     Boolean(showInlinePlayer && player.isVideoTrack && !player.fullscreenOpen)
   );
 
-  const playEpisode = useCallback(
-    (episode: FeedEpisode, from?: number) => {
+  const createTrackFromEpisode = useCallback(
+    (ep: FeedEpisode, nextCandidate?: FeedEpisode | null, from?: number): Track => {
       const showPrefix = show?.feedUrl || feed?.title || show?.title || "show";
-      const id = `${showPrefix}::${episode.guid || episode.url}::${episode.url}`;
-      const isVideoUrl =
-        episode.type.startsWith("video/") ||
-        /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(episode.url || "");
+      const id = `${showPrefix}::${ep.guid || ep.url}::${ep.url}`;
+      const isVideo =
+        ep.type.startsWith("video/") ||
+        /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(ep.url || "");
 
       let nextTrack: Track | null = null;
-      if (feed?.episodes && feed.episodes.length > 1) {
-        const epIdx = feed.episodes.findIndex(
-          (e) => (e.guid || e.url) === (episode.guid || episode.url)
-        );
-        const nextCandidate =
-          epIdx > 0
-            ? feed.episodes[epIdx - 1]
-            : epIdx + 1 < feed.episodes.length
-            ? feed.episodes[epIdx + 1]
-            : null;
-
-        if (nextCandidate) {
-          const nextId = `${showPrefix}::${nextCandidate.guid || nextCandidate.url}::${nextCandidate.url}`;
-          const isNextVideo =
-            nextCandidate.type.startsWith("video/") ||
-            /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(nextCandidate.url || "");
-          nextTrack = {
-            id: nextId,
-            title: nextCandidate.title,
-            showTitle: feed?.title ?? show?.title ?? "",
-            artwork: nextCandidate.image ?? show?.artwork ?? feed?.image ?? null,
-            description: nextCandidate.description,
-            kind: isNextVideo ? "video" : "audio",
-            url: nextCandidate.url || undefined,
-            pageUrl: nextCandidate.pageUrl,
-            durationSec: nextCandidate.durationSec,
-            publishedAt: nextCandidate.publishedAt,
-            startAt: 0,
-            transcripts: nextCandidate.transcripts,
-            sourceLang: detectSpokenLang(feed?.language, `${nextCandidate.title} ${nextCandidate.description}`),
-          };
-        }
+      if (nextCandidate) {
+        const nextId = `${showPrefix}::${nextCandidate.guid || nextCandidate.url}::${nextCandidate.url}`;
+        const isNextVideo =
+          nextCandidate.type.startsWith("video/") ||
+          /\.(mp4|m3u8|webm|mov|m4v)(\?|$)/i.test(nextCandidate.url || "");
+        nextTrack = {
+          id: nextId,
+          title: nextCandidate.title,
+          showTitle: feed?.title ?? show?.title ?? "",
+          artwork: nextCandidate.image ?? show?.artwork ?? feed?.image ?? null,
+          description: nextCandidate.description,
+          kind: isNextVideo ? "video" : "audio",
+          url: nextCandidate.url || undefined,
+          pageUrl: nextCandidate.pageUrl,
+          durationSec: nextCandidate.durationSec,
+          publishedAt: nextCandidate.publishedAt,
+          startAt: 0,
+          transcripts: nextCandidate.transcripts,
+          sourceLang: detectSpokenLang(feed?.language, `${nextCandidate.title} ${nextCandidate.description}`),
+        };
       }
 
-      const track: Track = {
+      return {
         id,
-        title: episode.title,
+        title: ep.title,
         showTitle: feed?.title ?? show?.title ?? "",
-        artwork: episode.image ?? show?.artwork ?? feed?.image ?? null,
-        description: episode.description,
-        kind: isVideoUrl ? "video" : "audio",
-        url: episode.url || undefined,
-        pageUrl: episode.pageUrl,
-        durationSec: episode.durationSec,
-        publishedAt: episode.publishedAt,
+        artwork: ep.image ?? show?.artwork ?? feed?.image ?? null,
+        description: ep.description,
+        kind: isVideo ? "video" : "audio",
+        url: ep.url || undefined,
+        pageUrl: ep.pageUrl,
+        durationSec: ep.durationSec,
+        publishedAt: ep.publishedAt,
         startAt: from ?? resumeAt(id),
-        transcripts: episode.transcripts,
-        sourceLang: detectSpokenLang(feed?.language, `${episode.title} ${episode.description}`),
+        transcripts: ep.transcripts,
+        sourceLang: detectSpokenLang(feed?.language, `${ep.title} ${ep.description}`),
         nextTrack,
       };
+    },
+    [show, feed],
+  );
+
+  const playEpisode = useCallback(
+    (episode: FeedEpisode, from?: number) => {
+      const episodeList = episodes.length > 0 ? episodes : (feed?.episodes ?? []);
+      const epIdx = episodeList.findIndex(
+        (e) => (e.guid || e.url) === (episode.guid || episode.url)
+      );
+      const nextCandidate =
+        epIdx >= 0 && epIdx + 1 < episodeList.length
+          ? episodeList[epIdx + 1]
+          : null;
+
+      const track = createTrackFromEpisode(episode, nextCandidate, from);
       player.play(track);
       noteplayed({
-        id,
+        id: track.id,
         title: episode.title,
         showTitle: track.showTitle,
         feedUrl: show?.feedUrl ?? null,
@@ -559,7 +572,7 @@ export function ListenClient() {
         window.scrollTo({ top, behavior: "smooth" });
       }, 90);
     },
-    [feed, show, player],
+    [episodes, feed, show, player, createTrackFromEpisode],
   );
 
   const scrollToPlayer = useCallback(() => {
@@ -741,15 +754,6 @@ export function ListenClient() {
     void search(requestedQuery);
   }, [requestedQuery, search]);
 
-  const episodes = useMemo(() => {
-    let list = feed?.episodes ?? [];
-    if (feedSearch) {
-      const lower = feedSearch.toLowerCase();
-      list = list.filter((e) => e.title.toLowerCase().includes(lower));
-    }
-    return sortEpisodes(list, sort, recents);
-  }, [feed, sort, recents, feedSearch]);
-
   const jumpToEpisode = useCallback(
     (targetIndex: number, fromIndex: number | null) => {
       if (targetIndex < 0 || targetIndex >= episodes.length) return;
@@ -809,6 +813,20 @@ export function ListenClient() {
     }
     return null;
   }, [playing, episodes]);
+
+  // Keep player.nextTrack in sync with current playing episode's next episode in the list
+  useEffect(() => {
+    if (!playingEpInfo) return;
+    if (playingEpInfo.nextEp) {
+      const nextCandidate = playingEpInfo.nextEp;
+      const nextTrackObj = createTrackFromEpisode(nextCandidate, null, 0);
+      if (player.nextTrack?.id !== nextTrackObj.id) {
+        player.setNextTrack(nextTrackObj);
+      }
+    } else if (player.nextTrack !== null) {
+      player.setNextTrack(null);
+    }
+  }, [playingEpInfo, createTrackFromEpisode, player]);
 
   const displayedEpisodes = useMemo(() => {
     if (feedSearch) {
