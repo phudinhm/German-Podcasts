@@ -38,7 +38,7 @@ function formatTime(seconds: number): string {
 
 export function MiniPlayer() {
   const { t } = useUi();
-  const { track, handle, stop, mediaState, inlineVisible, setFullscreenOpen } = usePlayer();
+  const { track, handle, stop, mediaState, inlineVisible, setFullscreenOpen, centerSubtitleActive } = usePlayer();
   const pathname = usePathname();
 
   const [playing, setPlaying] = useState(false);
@@ -467,11 +467,15 @@ export function MiniPlayer() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[12px] font-semibold leading-tight text-[var(--ink)]">
-                  {activeDockSeg?.text || track.title}
+                  {!centerSubtitleActive && activeDockSeg?.text ? activeDockSeg.text : track.title}
                 </div>
-                {activeDockTrans ? (
+                {!centerSubtitleActive && activeDockTrans ? (
                   <div className="truncate text-[11px] italic text-[var(--accent)] mt-0.5">
                     {activeDockTrans}
+                  </div>
+                ) : track.showTitle ? (
+                  <div className="truncate text-[11px] text-[var(--ink-faint)] mt-0.5">
+                    {track.showTitle}
                   </div>
                 ) : null}
               </div>
@@ -630,7 +634,7 @@ export function MiniPlayer() {
                 <AudioVisualizer isPlaying={playing} barCount={6} />
               </div>
 
-              {activeDockSeg?.text ? (
+              {!centerSubtitleActive && activeDockSeg?.text ? (
                 <div
                   onClick={() => setFullscreenOpen(true)}
                   className="cursor-pointer rounded-xl bg-[var(--surface)]/80 border border-[var(--rule)]/70 px-2.5 py-1.5 text-[11.5px] transition hover:border-[var(--accent)]/50 shadow-2xs"
@@ -710,9 +714,9 @@ export function MiniPlayer() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)]">
-                {activeDockSeg?.text || track.title}
+                {!centerSubtitleActive && activeDockSeg?.text ? activeDockSeg.text : track.title}
               </p>
-              {activeDockTrans ? (
+              {!centerSubtitleActive && activeDockTrans ? (
                 <p className="truncate text-[11.5px] italic text-[var(--accent)] mt-0.5">
                   {activeDockTrans}
                 </p>

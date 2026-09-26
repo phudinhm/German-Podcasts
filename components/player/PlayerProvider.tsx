@@ -116,6 +116,8 @@ interface PlayerContextValue {
   setTranscriptOffsetSec: (offsetSec: number) => void;
   playbackRate: number;
   setPlaybackRate: (rate: number) => void;
+  centerSubtitleActive: boolean;
+  registerCenterSubtitle: (id: string, active: boolean) => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -151,6 +153,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [videoPipMode, setVideoPipMode] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(1);
   const playbackRateRef = useRef(1);
+
+  const [activeCenterSubtitles, setActiveCenterSubtitles] = useState<Set<string>>(() => new Set());
+
+  const registerCenterSubtitle = useCallback((id: string, active: boolean) => {
+    setActiveCenterSubtitles((prev) => {
+      if (active) {
+        if (prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      } else {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }
+    });
+  }, []);
+
+  const centerSubtitleActive = activeCenterSubtitles.size > 0;
 
   const setFullscreenOpen = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(
     (action) => {
@@ -752,6 +774,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setTranscriptOffsetSec,
       playbackRate,
       setPlaybackRate,
+      centerSubtitleActive,
+      registerCenterSubtitle,
     }),
     [
       track,
@@ -787,6 +811,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setTranscriptOffsetSec,
       playbackRate,
       setPlaybackRate,
+      centerSubtitleActive,
+      registerCenterSubtitle,
     ],
   );
 
@@ -951,6 +977,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             active={Boolean(track && isVideoTrack && !stageRect && !videoMinimized)}
             videoRef={media.mediaRef as React.RefObject<HTMLVideoElement>}
             transcriptOffsetSec={transcriptOffsetSec}
+            onVisibleChange={(active) => registerCenterSubtitle("pip", active)}
           />
         </>
       ) : null}

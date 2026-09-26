@@ -264,6 +264,14 @@ export function ListenClient() {
     stopLiveCaption();
   }, [playing?.id, stopLiveCaption]);
 
+  const isLiveCaptionActive = Boolean(playing && showCaption && !showTranscript);
+  useEffect(() => {
+    player.registerCenterSubtitle("live-caption", isLiveCaptionActive);
+    return () => {
+      player.registerCenterSubtitle("live-caption", false);
+    };
+  }, [isLiveCaptionActive, player.registerCenterSubtitle]);
+
   useEffect(() => () => liveCaptionService.stopCapture(), []);
 
   useEffect(() => {

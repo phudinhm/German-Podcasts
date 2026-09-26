@@ -12,12 +12,15 @@ interface PipSubtitleOverlayProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   /** Optional DAI offset applied to transcripts. */
   transcriptOffsetSec?: number;
+  /** Notifies whether the center subtitle overlay is active/visible. */
+  onVisibleChange?: (active: boolean) => void;
 }
 
 export function PipSubtitleOverlay({
   active,
   videoRef,
   transcriptOffsetSec = 0,
+  onVisibleChange,
 }: PipSubtitleOverlayProps) {
   const { t, lang } = useUi();
   const targetTranslateLang = lang === "vi" ? "vi" : lang === "de" ? "de" : "en";
@@ -38,6 +41,15 @@ export function PipSubtitleOverlay({
     setManuallyDismissed(false);
     setSelectedWord(null);
   }, [active]);
+
+  const isPipSubActive = Boolean(active && !manuallyDismissed);
+
+  useEffect(() => {
+    onVisibleChange?.(isPipSubActive);
+    return () => {
+      onVisibleChange?.(false);
+    };
+  }, [isPipSubActive, onVisibleChange]);
 
   // Subscribe to liveCaptionService
   useEffect(() => {
