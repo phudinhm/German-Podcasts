@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { usePlayer } from "@/components/player/PlayerProvider";
+import { useTransitionStage } from "@/lib/useTransitionStage";
 import { LiveTranscriptPanel } from "./LiveTranscriptPanel";
 import { DEFAULT_CAPTION_SETTINGS, loadCaptionSettings, saveCaptionSettings, type CaptionSettingsState } from "./CaptionSettings";
 
@@ -50,6 +51,13 @@ export function GlobalFloatingTranscript() {
   }, [handle]);
 
   const shouldFloat = pathname !== "/" || !inlineVisible;
+  const shouldShowPanel = explicitlyOpened && showTranscript;
+  const { mounted: panelMounted, entered: panelOpen } = useTransitionStage(
+    shouldShowPanel,
+    "--panel-close-dur",
+    350,
+  );
+
   if (!track || !shouldFloat) return null;
 
   const onSeekWithPlay = (seconds: number) => {
@@ -61,7 +69,7 @@ export function GlobalFloatingTranscript() {
 
   // Never auto-open the floating Running Transcript popup!
   // Only render the expanded popup if the user explicitly clicked the compact pill to open it.
-  if (!explicitlyOpened || !showTranscript) {
+  if (!panelMounted) {
     return (
       <div
         className="hidden sm:block fixed z-40 pointer-events-auto sm:left-6"
@@ -95,7 +103,8 @@ export function GlobalFloatingTranscript() {
   return (
     <aside
       aria-label="Floating Transcript"
-      className="hidden sm:block fixed z-40 max-w-xl transition-all duration-300 pointer-events-auto sm:left-6 sm:w-[480px] max-sm:inset-x-3 drop-shadow-[0_12px_40px_rgba(0,0,0,0.15)]"
+      data-open={panelOpen ? "true" : "false"}
+      className="t-panel-slide hidden sm:block fixed z-40 max-w-xl sm:left-6 sm:w-[480px] max-sm:inset-x-3 drop-shadow-[0_12px_40px_rgba(0,0,0,0.15)]"
       style={{
         bottom: "calc(88px + env(safe-area-inset-bottom, 0px))",
       }}

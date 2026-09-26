@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { useUi } from "@/lib/i18n";
 import { useTheme, type Theme } from "@/lib/theme";
 import { useSwipe } from "@/lib/useSwipe";
+import { useTransitionStage } from "@/lib/useTransitionStage";
 import { resolveTranslationLang } from "@/lib/language";
 import { listVocabulary } from "@/lib/vocabulary";
 import { usePlayer, useVideoStage } from "./PlayerProvider";
@@ -417,6 +418,9 @@ export function FullscreenPlayer() {
   const [showSettings, setShowSettings] = useState(false);
   const [showSpeedPicker, setShowSpeedPicker] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
+  const settingsStage = useTransitionStage(showSettings, "--dropdown-close-dur", 150);
+  const speedPickerStage = useTransitionStage(showSpeedPicker, "--dropdown-close-dur", 150);
+  const themePickerStage = useTransitionStage(showThemePicker, "--dropdown-close-dur", 150);
   const [showVocabModal, setShowVocabModal] = useState(false);
   const [vocabCount, setVocabCount] = useState(0);
   const [playerTheme, setPlayerTheme] = useState<PlayerThemeId>("light");
@@ -811,8 +815,14 @@ export function FullscreenPlayer() {
         </div>
 
         {/* Theme Picker Popover */}
-        {showThemePicker && (
-          <div className="absolute left-3 right-3 sm:left-auto sm:right-6 sm:w-96 max-h-[78vh] overflow-y-auto top-14 z-30 rounded-2xl bg-[var(--paper-raised)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
+        {themePickerStage.mounted && (
+          <div
+            data-origin="top-right"
+            aria-hidden={!showThemePicker}
+            className={`t-dropdown absolute left-3 right-3 sm:left-auto sm:right-6 sm:w-96 max-h-[78vh] overflow-y-auto top-14 z-30 rounded-2xl bg-[var(--paper-raised)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl ${
+              themePickerStage.entered ? "is-open" : showThemePicker ? "" : "is-closing"
+            }`}
+          >
             <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[var(--rule)]">
               <span className="text-xs font-bold text-[var(--ink)]">
                 🎨 Bảng màu giao diện (16 Chủ đề Sáng & Tối)
@@ -899,8 +909,14 @@ export function FullscreenPlayer() {
         )}
 
         {/* Caption & Reader Settings Popover */}
-        {showSettings ? (
-          <div className="absolute left-4 right-4 top-14 z-30 rounded-2xl bg-[var(--paper-raised)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
+        {settingsStage.mounted ? (
+          <div
+            data-origin="top-right"
+            aria-hidden={!showSettings}
+            className={`t-dropdown absolute left-4 right-4 top-14 z-30 rounded-2xl bg-[var(--paper-raised)] p-3.5 shadow-2xl border border-[var(--rule)] backdrop-blur-xl ${
+              settingsStage.entered ? "is-open" : showSettings ? "" : "is-closing"
+            }`}
+          >
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--rule)]">
               <span className="text-[13px] font-semibold text-[var(--ink)]">
                 {t("common.settings")}
@@ -1019,8 +1035,14 @@ export function FullscreenPlayer() {
         </div>
 
         {/* Multi-level Speed Picker Popover (anchored above the bottom media bar) */}
-        {showSpeedPicker && (
-          <div className="mt-2 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)] p-3 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-150">
+        {speedPickerStage.mounted && (
+          <div
+            data-origin="bottom-center"
+            aria-hidden={!showSpeedPicker}
+            className={`t-dropdown mt-2 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)] p-3 shadow-2xl backdrop-blur-xl ${
+              speedPickerStage.entered ? "is-open" : showSpeedPicker ? "" : "is-closing"
+            }`}
+          >
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-bold text-[var(--ink)]">
                 ⚡ Tốc độ phát đa mức (Playback Speed)
