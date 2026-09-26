@@ -1113,8 +1113,8 @@ export function FullscreenPlayer() {
           </div>
         )}
 
-        {/* Next Episode Floating Recommendation (cuối podcast suggest xem/nghe tập tiếp theo) */}
-        {nextTrack && duration > 0 && currentTime >= duration - 45 && dismissedNextId !== nextTrack.id && (
+        {/* Next Episode Floating Recommendation: ONLY suggest when completed 100% */}
+        {nextTrack && duration > 30 && currentTime > 0 && (currentTime >= duration - 2 || (currentTime / duration) >= 0.995) && dismissedNextId !== nextTrack.id && (
           <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/40 bg-[var(--paper-raised)]/95 p-3 shadow-xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-black/5 dark:ring-white/10">

@@ -1472,13 +1472,17 @@ export function ListenClient() {
                       {show ? ` · ${ORIGIN_LABEL[show.origin]}` : ""}
                     </p>
                     {(() => {
-                      const listenedCount = episodes.filter((ep) => {
+                      const completedCount = episodes.filter((ep) => {
                         const epId = ep.guid || ep.url;
-                        return recents.some((r) => r.id === epId && (r.position > 15 || r.finished));
+                        return recents.some((r) => {
+                          const match = r.id === epId || r.id.includes(epId) || (r.url && r.url === ep.url);
+                          const dur = ep.durationSec || r.durationSec;
+                          return match && Boolean(r.finished || (dur && dur > 30 && (r.position >= dur - 3 || (r.position / dur) >= 0.995)));
+                        });
                       }).length;
-                      return listenedCount > 0 ? (
-                        <span className="chip text-[11px] bg-[var(--accent-soft)] text-[var(--accent)] font-medium">
-                          🎧 {t("feed.listenedCount", { count: listenedCount, total: feed.episodes.length })}
+                      return completedCount > 0 ? (
+                        <span className="chip text-[11px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-500/30">
+                          ✓ {t("feed.listenedCount", { count: completedCount, total: feed.episodes.length })}
                         </span>
                       ) : null;
                     })()}
@@ -1585,18 +1589,33 @@ export function ListenClient() {
             if (!target || episodes.length < 5 || feedSearch) return null;
             const { ep, epIdx, nextEp, nextEpIdx } = target;
 
+            const epId = ep.guid || ep.url;
+            const epRec = recents.find(
+              (r) => r.id === epId || r.id.includes(epId) || (r.url && r.url === ep.url)
+            );
+            const epDur = ep.durationSec || epRec?.durationSec;
+            const isEpFinished = Boolean(
+              epRec?.finished ||
+              (epDur && epRec && epDur > 30 && (epRec.position >= epDur - 3 || (epRec.position / epDur) >= 0.995))
+            );
+            const showNextSuggestion = isEpFinished && nextEp;
+
             return (
               <div className="mb-4 overflow-hidden rounded-2xl border border-[var(--accent)]/35 bg-gradient-to-r from-[var(--accent-soft)]/50 via-[var(--paper-raised)] to-[var(--paper-raised)] p-3.5 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent)]">
-                      <span>🎧</span>
-                      <span>{t("feed.playingEp", { n: epIdx + 1 })}:</span>
+                      <span>{isEpFinished ? "✓" : "🎧"}</span>
+                      <span>
+                        {isEpFinished
+                          ? `Đã hoàn tất tập #${epIdx + 1}`
+                          : `${t("feed.playingEp", { n: epIdx + 1 })}:`}
+                      </span>
                     </div>
                     <p className="truncate text-[13.5px] font-semibold text-[var(--ink)] mt-0.5">
                       {ep.title}
                     </p>
-                    {nextEp && (
+                    {showNextSuggestion ? (
                       <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--ink-soft)]">
                         <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                           👉 {t("feed.nextEpisode")}:
@@ -1605,10 +1624,10 @@ export function ListenClient() {
                           #{nextEpIdx + 1} {nextEp.title}
                         </span>
                       </p>
-                    )}
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                    {nextEp ? (
+                    {showNextSuggestion ? (
                       <>
                         <button
                           type="button"
@@ -1630,11 +1649,17 @@ export function ListenClient() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => playEpisode(ep)}
+                        onClick={() => {
+                          if (playing && (playing.id.includes(epId) || (playing.url && playing.url === ep.url))) {
+                            scrollToPlayer();
+                          } else {
+                            playEpisode(ep);
+                          }
+                        }}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white shadow-xs hover:opacity-95 transition active:scale-95"
                       >
-                        <span>▶</span>
-                        <span>{t("nav.listenShort")}</span>
+                        <span>{playing && (playing.id.includes(epId) || (playing.url && playing.url === ep.url)) ? "🎧" : "▶"}</span>
+                        <span>{playing && (playing.id.includes(epId) || (playing.url && playing.url === ep.url)) ? t("player.nowPlaying") : t("nav.listenShort")}</span>
                       </button>
                     )}
                     {epIdx > 2 && collapsedPriorCount === 0 && (
@@ -1714,20 +1739,23 @@ export function ListenClient() {
             <ul className="space-y-1">
             {displayedEpisodes.map(({ episode, actualIndex }) => {
               const id = episode.guid || episode.url;
-              const remembered = recents.find((item) => item.id === id);
+              const remembered = recents.find(
+                (item) => item.id === id || item.id.includes(id) || (item.url && item.url === episode.url)
+              );
               const duration = episode.durationSec || remembered?.durationSec;
               const isFinished = Boolean(
-                remembered?.finished || (duration && remembered && remembered.position >= duration - 25),
+                remembered?.finished ||
+                (duration && remembered && duration > 30 && (remembered.position >= duration - 3 || (remembered.position / duration) >= 0.995))
               );
               const progress =
-                remembered && duration
+                remembered && duration && duration > 0
                   ? Math.min(100, Math.round((remembered.position / duration) * 100))
-                  : remembered && remembered.position > 15
-                    ? 15
-                    : 0;
+                  : 0;
               const remainingSec = duration && remembered ? Math.max(0, duration - remembered.position) : null;
               const remainingMin = remainingSec ? Math.ceil(remainingSec / 60) : null;
-              const current = playing?.id === id;
+              const current = Boolean(
+                playing && (playing.id === id || playing.id.includes(id) || (playing.url && playing.url === episode.url))
+              );
               const isFav = isEpisodeFavorited(id);
 
               return (
@@ -1879,15 +1907,15 @@ export function ListenClient() {
                     {isFav ? "❤️" : "🤍"}
                   </button>
 
-                  {/* Next Episode Suggestion banner (when this episode is playing or focused) */}
-                  {(current || focusedEpIndex === actualIndex) && actualIndex + 1 < episodes.length && (
-                    <div className="mx-3 mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)]/50 p-2.5 text-[12px] shadow-2xs backdrop-blur-xs animate-fade-in">
+                  {/* Next Episode Suggestion banner: ONLY show when this episode is 100% completed! */}
+                  {isFinished && actualIndex + 1 < episodes.length && (
+                    <div className="mx-3 mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-[12px] shadow-2xs backdrop-blur-xs animate-fade-in">
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-bold text-white shrink-0">
-                          ▶
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white shrink-0">
+                          ✓
                         </span>
                         <span className="text-[12px] font-medium text-[var(--ink)] truncate">
-                          <span className="font-semibold text-[var(--accent)]">{t("feed.nextEpisode")}:</span>{" "}
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-300">Đã xong tập #{actualIndex + 1} · Tiếp theo:</span>{" "}
                           <span className="font-semibold text-[var(--ink)]">#{actualIndex + 2}</span> {episodes[actualIndex + 1].title}
                         </span>
                       </div>

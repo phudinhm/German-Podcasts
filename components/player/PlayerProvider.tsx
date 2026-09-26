@@ -230,9 +230,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const onTimeUpdate = () => {
       const dur = el.duration;
       const cur = el.currentTime;
-      if (Number.isFinite(dur) && dur > 0 && cur > 0) {
+      if (Number.isFinite(dur) && dur > 30 && cur > 0) {
         notePosition(track.id, cur, dur);
-        if (cur >= dur - 20) {
+        if (cur >= dur - 3 || (cur / dur) >= 0.995) {
           markEpisodeFinished(track.id);
         }
       }

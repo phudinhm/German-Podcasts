@@ -55,6 +55,7 @@ export function TranscriptReader({
   const {
     track,
     duration,
+    mediaState,
     onGenerateTranscript,
     onTranscribeCurrentRegion,
     transcribingRegion,
@@ -515,8 +516,8 @@ export function TranscriptReader({
             );
           })}
 
-          {/* Next Episode Suggestion Card (Cuối podcast suggest xem/nghe tập tiếp theo) */}
-          {nextTrack && (
+          {/* Next Episode Suggestion Card: only visible when track is finished / completed 100% */}
+          {nextTrack && duration > 30 && currentTime > 0 && (currentTime >= duration - 2 || (currentTime / duration) >= 0.995) && (
             <div
               className={`mt-10 rounded-2xl border p-4 sm:p-5 backdrop-blur-md transition-all shadow-lg ${
                 isLightTheme
