@@ -115,6 +115,11 @@ export function ListenClient() {
   const [freezePane, setFreezePane] = useState(false);
   const [scrolledDown, setScrolledDown] = useState(false);
   const [resultsSort, setResultsSort] = useState<"popular" | "az">("popular");
+  const [focusedEpIndex, setFocusedEpIndex] = useState<number | null>(null);
+  const [lastJumpFromIndex, setLastJumpFromIndex] = useState<number | null>(null);
+  const [highlightedEpId, setHighlightedEpId] = useState<string | null>(null);
+  const [collapsedPriorCount, setCollapsedPriorCount] = useState<number>(0);
+  const [showCollapsedPrior, setShowCollapsedPrior] = useState<boolean>(false);
 
   const sortedResults = useMemo(() => {
     if (!results) return null;
@@ -593,6 +598,11 @@ export function ListenClient() {
     setFeed(null);
     setShow(null);
     setVisible(PAGE_SIZE);
+    setFocusedEpIndex(null);
+    setLastJumpFromIndex(null);
+    setHighlightedEpId(null);
+    setCollapsedPriorCount(0);
+    setShowCollapsedPrior(false);
     openedFeedRef.current = null;
     if (player.isVideoTrack) {
       setVideoPipMode(true);
@@ -673,6 +683,86 @@ export function ListenClient() {
     }
     return sortEpisodes(list, sort, recents);
   }, [feed, sort, recents, feedSearch]);
+
+  const jumpToEpisode = useCallback(
+    (targetIndex: number, fromIndex: number | null) => {
+      if (targetIndex < 0 || targetIndex >= episodes.length) return;
+      const targetEp = episodes[targetIndex];
+      const targetId = targetEp ? targetEp.guid || targetEp.url : null;
+      if (!targetId) return;
+
+      if (targetIndex >= visible) {
+        setVisible(Math.min(episodes.length, targetIndex + 25));
+      }
+      setFocusedEpIndex(targetIndex);
+      if (fromIndex !== null) {
+        setLastJumpFromIndex(fromIndex);
+      }
+      setHighlightedEpId(targetId);
+
+      // Smooth scroll to the target episode card
+      window.setTimeout(() => {
+        const el = document.getElementById(`feed-ep-${targetId}`);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const top = rect.top + window.scrollY - 110;
+          window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        }
+      }, 70);
+
+      window.setTimeout(() => {
+        setHighlightedEpId((prev) => (prev === targetId ? null : prev));
+      }, 2600);
+    },
+    [episodes, visible],
+  );
+
+  const lastListened = useMemo(() => {
+    if (!feed?.episodes || episodes.length === 0) return null;
+    for (const r of recents) {
+      const epIdx = episodes.findIndex((e) => (e.guid || e.url) === r.id);
+      if (epIdx >= 0) {
+        const ep = episodes[epIdx];
+        const nextEp = epIdx + 1 < episodes.length ? episodes[epIdx + 1] : null;
+        return { ep, epIdx, nextEp, nextEpIdx: epIdx + 1, recent: r };
+      }
+    }
+    return null;
+  }, [feed, episodes, recents]);
+
+  const playingEpInfo = useMemo(() => {
+    if (!playing || episodes.length === 0) return null;
+    const epIdx = episodes.findIndex((e) => {
+      const id = e.guid || e.url;
+      return playing.id.includes(id) || (playing.url && playing.url === e.url);
+    });
+    if (epIdx >= 0) {
+      const ep = episodes[epIdx];
+      const nextEp = epIdx + 1 < episodes.length ? episodes[epIdx + 1] : null;
+      return { ep, epIdx, nextEp, nextEpIdx: epIdx + 1 };
+    }
+    return null;
+  }, [playing, episodes]);
+
+  const displayedEpisodes = useMemo(() => {
+    if (feedSearch) {
+      return episodes.map((ep, index) => ({
+        episode: ep,
+        actualIndex: index,
+      }));
+    }
+    if (collapsedPriorCount > 0 && !showCollapsedPrior) {
+      const end = Math.max(visible, collapsedPriorCount + PAGE_SIZE);
+      return episodes.slice(collapsedPriorCount, end).map((ep, offset) => ({
+        episode: ep,
+        actualIndex: collapsedPriorCount + offset,
+      }));
+    }
+    return episodes.slice(0, visible).map((ep, index) => ({
+      episode: ep,
+      actualIndex: index,
+    }));
+  }, [episodes, visible, collapsedPriorCount, showCollapsedPrior, feedSearch]);
 
   // Loads the next page itself once the sentinel below the list scrolls
   // near view, rather than waiting for someone to find and tap a button -
@@ -1416,13 +1506,177 @@ export function ListenClient() {
                 )}
               </div>
 
+              {/* Quick Episode Range Selector (e.g. 1-25, 26-50, 51-75...) */}
+              {episodes.length > 20 && !feedSearch && (
+                <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1 text-[12px] scrollbar-none border-t border-[var(--rule)]/40 pt-2.5">
+                  <span className="text-[11px] font-semibold text-[var(--ink-faint)] uppercase tracking-wider shrink-0 mr-0.5">
+                    {t("feed.episodeRange")}:
+                  </span>
+                  {Array.from({ length: Math.ceil(episodes.length / 25) }, (_, chunkIdx) => {
+                    const startEp = chunkIdx * 25 + 1;
+                    const endEp = Math.min((chunkIdx + 1) * 25, episodes.length);
+                    const isRangeActive =
+                      focusedEpIndex !== null
+                        ? focusedEpIndex >= chunkIdx * 25 && focusedEpIndex < endEp
+                        : collapsedPriorCount > 0
+                        ? collapsedPriorCount >= chunkIdx * 25 && collapsedPriorCount < endEp
+                        : chunkIdx === 0;
+
+                    return (
+                      <button
+                        key={chunkIdx}
+                        type="button"
+                        onClick={() => {
+                          const targetIdx = chunkIdx * 25;
+                          jumpToEpisode(targetIdx, focusedEpIndex);
+                        }}
+                        className={`shrink-0 rounded-full px-2.5 py-0.8 text-[11.5px] font-medium transition ${
+                          isRangeActive
+                            ? "bg-[var(--accent)] text-white shadow-2xs font-semibold"
+                            : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)] hover:bg-[var(--rule)]/60"
+                        }`}
+                      >
+                        {startEp} – {endEp}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+          {/* Spotlight continue / next episode banner */}
+          {(() => {
+            const target = playingEpInfo ?? lastListened;
+            if (!target || episodes.length < 5 || feedSearch) return null;
+            const { ep, epIdx, nextEp, nextEpIdx } = target;
+
+            return (
+              <div className="mb-4 overflow-hidden rounded-2xl border border-[var(--accent)]/35 bg-gradient-to-r from-[var(--accent-soft)]/50 via-[var(--paper-raised)] to-[var(--paper-raised)] p-3.5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent)]">
+                      <span>🎧</span>
+                      <span>{t("feed.playingEp", { n: epIdx + 1 })}:</span>
+                    </div>
+                    <p className="truncate text-[13.5px] font-semibold text-[var(--ink)] mt-0.5">
+                      {ep.title}
+                    </p>
+                    {nextEp && (
+                      <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--ink-soft)]">
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          👉 {t("feed.nextEpisode")}:
+                        </span>
+                        <span className="truncate font-medium text-[var(--ink)]">
+                          #{nextEpIdx + 1} {nextEp.title}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                    {nextEp ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => playEpisode(nextEp)}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white shadow-xs hover:opacity-95 transition active:scale-95"
+                        >
+                          <span>▶</span>
+                          <span>{t("feed.suggestNext", { n: nextEpIdx + 1 })}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => jumpToEpisode(nextEpIdx, epIdx)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--rule)] bg-[var(--paper-raised)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition shadow-2xs active:scale-95"
+                        >
+                          <span>↓</span>
+                          <span>{t("feed.viewEp", { n: nextEpIdx + 1 })}</span>
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => playEpisode(ep)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white shadow-xs hover:opacity-95 transition active:scale-95"
+                      >
+                        <span>▶</span>
+                        <span>{t("nav.listenShort")}</span>
+                      </button>
+                    )}
+                    {epIdx > 2 && collapsedPriorCount === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCollapsedPriorCount(epIdx);
+                          setShowCollapsedPrior(false);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-xl border border-[var(--rule)]/60 bg-[var(--surface)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--ink-soft)] hover:text-[var(--ink)] transition shadow-2xs active:scale-95"
+                        title={t("feed.collapsePrior", { n: epIdx })}
+                      >
+                        <span>📁</span>
+                        <span className="hidden sm:inline">{t("feed.startFromHere")}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Accordion card for collapsed earlier episodes */}
+          {collapsedPriorCount > 0 && !feedSearch && (
+            <div className="mb-3 overflow-hidden rounded-2xl border border-[var(--accent)]/30 bg-gradient-to-r from-[var(--surface)] via-[var(--paper-raised)] to-[var(--surface)] p-3 shadow-xs transition-all">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[15px] shrink-0 text-[var(--accent)]">
+                    📁
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-[var(--ink)] truncate">
+                      {t("feed.priorCollapsed", { n: collapsedPriorCount })}
+                    </p>
+                    <p className="text-[11.5px] text-[var(--ink-soft)]">
+                      {showCollapsedPrior
+                        ? t("feed.hidePriorAgain")
+                        : t("feed.showPrior", { n: collapsedPriorCount })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowCollapsedPrior(!showCollapsedPrior)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white border border-[var(--rule)] transition shadow-2xs active:scale-95"
+                  >
+                    <span>{showCollapsedPrior ? "📁" : "👁️"}</span>
+                    <span>
+                      {showCollapsedPrior
+                        ? t("feed.hidePriorAgain")
+                        : t("feed.showPrior", { n: collapsedPriorCount })}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCollapsedPriorCount(0);
+                      setShowCollapsedPrior(false);
+                    }}
+                    className="icon-btn text-[14px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                    title={t("common.close")}
+                    aria-label={t("common.close")}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {episodes.length === 0 && feedSearch ? (
             <p className="py-8 text-center text-[13.5px] text-[var(--ink-faint)]">
               {t("feed.noMatch")}
             </p>
           ) : (
             <ul className="space-y-1">
-            {episodes.slice(0, visible).map((episode) => {
+            {displayedEpisodes.map(({ episode, actualIndex }) => {
               const id = episode.guid || episode.url;
               const remembered = recents.find((item) => item.id === id);
               const duration = episode.durationSec || remembered?.durationSec;
@@ -1441,10 +1695,21 @@ export function ListenClient() {
               const isFav = isEpisodeFavorited(id);
 
               return (
-                <li key={id} className="relative min-w-0 group/item">
+                <li
+                  key={id}
+                  id={`feed-ep-${id}`}
+                  className={`relative min-w-0 group/item transition-all duration-300 rounded-2xl ${
+                    highlightedEpId === id
+                      ? "ring-2 ring-[var(--accent)] bg-[var(--accent-soft)]/35 shadow-md scale-[1.008]"
+                      : ""
+                  }`}
+                >
                   <button
                     type="button"
-                    onClick={() => playEpisode(episode)}
+                    onClick={() => {
+                      playEpisode(episode);
+                      setFocusedEpIndex(actualIndex);
+                    }}
                     className={`flex w-full items-start gap-3.5 p-3 pr-11 text-left rounded-2xl transition-all duration-200 ${
                       current
                         ? "bg-[var(--row-active)] border border-[var(--accent)]/50 shadow-sm"
@@ -1482,7 +1747,11 @@ export function ListenClient() {
                             <span />
                             <span />
                           </span>
-                        ) : null}
+                        ) : (
+                          <span className="mt-[1px] shrink-0 rounded-md bg-[var(--surface)] px-1.5 py-0.5 text-[10.5px] font-bold tracking-tight text-[var(--accent)] border border-[var(--rule)]/60">
+                            #{actualIndex + 1}
+                          </span>
+                        )}
                         <span className="min-w-0 text-[15px] font-semibold tracking-tight leading-snug text-[var(--ink)]">
                           {episode.title}
                         </span>
@@ -1519,6 +1788,21 @@ export function ListenClient() {
                               {remainingMin ? t("feed.remaining", { min: remainingMin }) : t("library.resumeAt", { percent: progress })}
                             </span>
                           </>
+                        ) : null}
+                        {actualIndex > 2 && collapsedPriorCount === 0 ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCollapsedPriorCount(actualIndex);
+                              setShowCollapsedPrior(false);
+                            }}
+                            className="opacity-0 group-hover/item:opacity-100 focus:opacity-100 transition inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--ink-faint)] hover:text-[var(--accent)] hover:bg-[var(--surface)] ml-auto"
+                            title={t("feed.collapsePrior", { n: actualIndex })}
+                          >
+                            <span>📁</span>
+                            <span className="hidden sm:inline">{t("feed.startFromHere")}</span>
+                          </button>
                         ) : null}
                       </span>
                       {!isFinished && progress > 0 ? (
@@ -1558,6 +1842,45 @@ export function ListenClient() {
                   >
                     {isFav ? "❤️" : "🤍"}
                   </button>
+
+                  {/* Next Episode Suggestion banner (when this episode is playing or focused) */}
+                  {(current || focusedEpIndex === actualIndex) && actualIndex + 1 < episodes.length && (
+                    <div className="mx-3 mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)]/50 p-2.5 text-[12px] shadow-2xs backdrop-blur-xs animate-fade-in">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-bold text-white shrink-0">
+                          ▶
+                        </span>
+                        <span className="text-[12px] font-medium text-[var(--ink)] truncate">
+                          <span className="font-semibold text-[var(--accent)]">{t("feed.nextEpisode")}:</span>{" "}
+                          <span className="font-semibold text-[var(--ink)]">#{actualIndex + 2}</span> {episodes[actualIndex + 1].title}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            jumpToEpisode(actualIndex + 1, actualIndex);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg bg-[var(--paper-raised)] px-2.5 py-1 text-[11.5px] font-semibold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition shadow-2xs border border-[var(--rule)]/60 active:scale-95"
+                        >
+                          <span>👁️</span>
+                          <span>{t("feed.viewEp", { n: actualIndex + 2 })}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playEpisode(episodes[actualIndex + 1]);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent)] px-2.5 py-1 text-[11.5px] font-semibold text-white hover:opacity-95 transition shadow-2xs active:scale-95"
+                        >
+                          <span>▶</span>
+                          <span>{t("nav.listenShort")}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -1695,6 +2018,20 @@ export function ListenClient() {
               <span>{t("common.back")}</span>
             </button>
           ) : null}
+
+          {feed && lastJumpFromIndex !== null && (
+            <button
+              type="button"
+              onClick={() => jumpToEpisode(lastJumpFromIndex, null)}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--accent)] px-3 text-[12px] font-semibold text-white shadow-md hover:opacity-95 transition active:scale-95 animate-fade-in"
+              title={t("feed.backToEp", { n: lastJumpFromIndex + 1 })}
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 stroke-current fill-none shrink-0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              <span>{t("feed.backToEp", { n: lastJumpFromIndex + 1 })}</span>
+            </button>
+          )}
 
           {playing && !player.inlineVisible ? (
             <button

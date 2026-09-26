@@ -296,6 +296,17 @@ const en = {
   "player.openDirect": "Open source file",
   "player.tryProxy": "Play via proxy",
   "player.errorBlocked": "This address could not be played directly. The host may block browser requests or require proxying.",
+  "feed.nextEpisode": "Next episode",
+  "feed.viewEp": "View episode {n}",
+  "feed.backToEp": "Back to episode {n}",
+  "feed.collapsePrior": "Collapse {n} earlier episodes",
+  "feed.priorCollapsed": "{n} earlier episodes collapsed (Ep 1 – {n})",
+  "feed.showPrior": "Show earlier {n} episodes",
+  "feed.hidePriorAgain": "Collapse again",
+  "feed.startFromHere": "Start viewing from here",
+  "feed.episodeRange": "Range",
+  "feed.suggestNext": "Up next: Episode #{n}",
+  "feed.playingEp": "Currently at Episode #{n}",
 } as const;
 
 export type UiKey = keyof typeof en;
@@ -567,6 +578,17 @@ const de: Record<UiKey, string> = {
   "player.openDirect": "Quelldatei öffnen",
   "player.tryProxy": "Über Proxy abspielen",
   "player.errorBlocked": "Diese Adresse konnte nicht direkt abgespielt werden. Möglicherweise blockiert der Host Browser-Anfragen.",
+  "feed.nextEpisode": "Nächste Episode",
+  "feed.viewEp": "Episode {n} ansehen",
+  "feed.backToEp": "Zurück zu Episode {n}",
+  "feed.collapsePrior": "{n} vorherige Episoden einklappen",
+  "feed.priorCollapsed": "{n} vorherige Episoden eingeklappt (Ep 1 – {n})",
+  "feed.showPrior": "Vorherige {n} Episoden anzeigen",
+  "feed.hidePriorAgain": "Wieder einklappen",
+  "feed.startFromHere": "Ab hier anzeigen",
+  "feed.episodeRange": "Bereich",
+  "feed.suggestNext": "Als Nächstes: Episode #{n}",
+  "feed.playingEp": "Aktuell bei Episode #{n}",
 };
 
 const vi: Record<UiKey, string> = {
@@ -836,6 +858,17 @@ const vi: Record<UiKey, string> = {
   "player.openDirect": "Mở file gốc",
   "player.tryProxy": "Phát qua Proxy",
   "player.errorBlocked": "Không thể phát trực tiếp địa chỉ này. Máy chủ nguồn có thể chặn trình duyệt hoặc luồng cần chuyển qua proxy.",
+  "feed.nextEpisode": "Tập tiếp theo",
+  "feed.viewEp": "Xem tập {n}",
+  "feed.backToEp": "Quay lại tập {n}",
+  "feed.collapsePrior": "Thu gọn {n} tập trước",
+  "feed.priorCollapsed": "Đã thu gọn {n} tập trước (Tập 1 – {n})",
+  "feed.showPrior": "Xem lại {n} tập kia",
+  "feed.hidePriorAgain": "Thu gọn lại",
+  "feed.startFromHere": "Bắt đầu xem từ tập này",
+  "feed.episodeRange": "Chặng tập",
+  "feed.suggestNext": "Gợi ý tiếp theo: Tập #{n}",
+  "feed.playingEp": "Bạn đang ở Tập #{n}",
 };
 
 export const STRINGS: Record<UiLang, Record<UiKey, string>> = { en, de, vi };
