@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useUi } from "@/lib/i18n";
 import { liveCaptionService, type CaptionSegment } from "@/lib/liveCaption";
+import { useTransitionStage } from "@/lib/useTransitionStage";
 import { normalizeVocabWord, saveVocabularyWord, isWordSaved } from "@/lib/vocabulary";
 
 interface PipSubtitleOverlayProps {
@@ -179,11 +180,6 @@ export function PipSubtitleOverlay({
     setSaved(true);
   }, [selectedWord, wordMeaning, activeSegment, targetTranslateLang]);
 
-  // "ngừng play thì tắt đi": only show when active, video is actively playing, and not manually dismissed
-  if (!active || !isPlaying || manuallyDismissed) {
-    return null;
-  }
-
   // Segment text and translation
   const germanText = activeSegment?.text?.trim();
   const translationText =
@@ -192,7 +188,20 @@ export function PipSubtitleOverlay({
     activeSegment?.translations?.vi ??
     activeSegment?.translations?.en;
 
-  if (!germanText) {
+  // "ngừng play thì tắt đi": only show when active, video is actively playing, and not manually dismissed
+  const shouldShowPip = Boolean(active && isPlaying && !manuallyDismissed && germanText);
+  const { mounted: pipMounted, entered: pipOpen } = useTransitionStage(
+    shouldShowPip,
+    "--panel-close-dur",
+    350,
+  );
+  const { mounted: wordMounted, entered: wordOpen } = useTransitionStage(
+    Boolean(selectedWord),
+    "--tt-out-dur",
+    50,
+  );
+
+  if (!pipMounted) {
     return null;
   }
 
@@ -201,7 +210,8 @@ export function PipSubtitleOverlay({
   return (
     <div
       aria-live="polite"
-      className={`fixed left-1/2 -translate-x-1/2 z-[70] w-[92vw] max-w-lg sm:max-w-2xl pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-fade-in ${
+      data-open={pipOpen ? "true" : "false"}
+      className={`t-panel-slide fixed left-1/2 -translate-x-1/2 z-[70] w-[92vw] max-w-lg sm:max-w-2xl pointer-events-none ${
         isPipBottom
           ? "bottom-[calc(236px+env(safe-area-inset-bottom,10px))] sm:bottom-24"
           : "bottom-[calc(126px+env(safe-area-inset-bottom,10px))] sm:bottom-20"
@@ -226,8 +236,12 @@ export function PipSubtitleOverlay({
         </div>
 
         {/* Word Lookup Floating Tooltip */}
-        {selectedWord && (
-          <div className="mb-2 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-zinc-900/95 px-3 py-1.5 text-xs text-white shadow-xl backdrop-blur-md animate-fade-in">
+        {wordMounted && (
+          <div
+            className={`t-tt-word mb-2 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-zinc-900/95 px-3 py-1.5 text-xs text-white shadow-xl backdrop-blur-md ${
+              wordOpen ? "is-open" : ""
+            }`}
+          >
             <span className="font-bold text-amber-300">{selectedWord}:</span>
             <span className="text-zinc-200">
               {loadingWord ? "Đang tra từ..." : wordMeaning || "—"}
@@ -256,7 +270,7 @@ export function PipSubtitleOverlay({
 
         {/* German Spoken Sentence with Interactive Words */}
         <p className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 text-center text-[14px] sm:text-[17px] font-semibold text-white tracking-wide leading-snug drop-shadow-sm select-text">
-          {germanText.split(/(\s+)/).map((token, i) => {
+          {(germanText ?? "").split(/(\s+)/).map((token, i) => {
             if (/^\s+$/.test(token)) return <span key={i}>{token}</span>;
             const cleanToken = token.replace(/[^a-zA-ZäöüÄÖÜß]/g, "");
             return (

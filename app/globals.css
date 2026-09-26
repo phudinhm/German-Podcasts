@@ -545,7 +545,7 @@ h3 {
   color: var(--ink);
 }
 
-/* transitions-dev motion tokens - menu-dropdown, modal, panel-reveal */
+/* transitions-dev motion tokens - menu-dropdown, modal, panel-reveal, tooltip, toast */
 :root {
   --dropdown-open-dur: 250ms;
   --dropdown-close-dur: 150ms;
@@ -562,6 +562,18 @@ h3 {
   --panel-translate-y: 16px;
   --panel-blur: 2px;
   --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tt-in-dur: 150ms;
+  --tt-out-dur: 50ms;
+  --tt-scale: 0.98;
+  --tt-delay: 80ms;
+  --tt-in-ease: ease-out;
+  --tt-out-ease: ease-out;
+  --toast-open: 350ms;
+  --toast-close: 250ms;
+  --toast-distance: 16px;
+  --toast-blur: 2px;
+  --toast-scale: 0.97;
+  --toast-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /*
@@ -1098,6 +1110,47 @@ h3 {
       transform var(--panel-open-dur) var(--panel-ease),
       opacity var(--panel-open-dur) var(--panel-ease),
       filter var(--panel-open-dur) var(--panel-ease);
+  }
+
+  /* --- transitions-dev: tooltip (single, fixed-position variant), toast -- */
+
+  /* A simplified single-target take on the shared-group tooltip pattern -
+     no travel between multiple triggers to tween, so no JS geometry is
+     needed, just the fade + scale + appear-delay on show, instant on hide. */
+  .t-tt-word {
+    opacity: 0;
+    transform: scale(var(--tt-scale));
+    transform-origin: bottom center;
+    transition:
+      opacity var(--tt-out-dur) var(--tt-out-ease),
+      transform var(--tt-out-dur) var(--tt-out-ease);
+  }
+  .t-tt-word.is-open {
+    opacity: 1;
+    transform: scale(1);
+    transition:
+      opacity var(--tt-in-dur) var(--tt-in-ease) var(--tt-delay),
+      transform var(--tt-in-dur) var(--tt-in-ease) var(--tt-delay);
+  }
+
+  .t-toast {
+    opacity: 0;
+    transform: translateY(var(--toast-distance)) scale(var(--toast-scale));
+    filter: blur(var(--toast-blur));
+    will-change: transform, opacity, filter;
+    transition:
+      opacity var(--toast-close) var(--toast-ease),
+      transform var(--toast-close) var(--toast-ease),
+      filter var(--toast-close) var(--toast-ease);
+  }
+  .t-toast.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    transition:
+      opacity var(--toast-open) var(--toast-ease),
+      transform var(--toast-open) var(--toast-ease),
+      filter var(--toast-open) var(--toast-ease);
   }
 }
 
