@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTransitionStage } from "@/lib/useTransitionStage";
 import {
   listVocabulary,
   removeVocabularyWord,
@@ -28,6 +29,7 @@ export function VocabularyModal({
   const [words, setWords] = useState<SavedWord[]>([]);
   const [query, setQuery] = useState("");
   const [hideMeaning, setHideMeaning] = useState(false);
+  const { mounted, entered } = useTransitionStage(open, "--modal-close-dur", 150);
 
   useEffect(() => {
     const refresh = () => setWords(listVocabulary());
@@ -36,7 +38,9 @@ export function VocabularyModal({
     return () => window.removeEventListener("hoerbar:vocab-changed", refresh);
   }, [open]);
 
-  if (!open || typeof document === "undefined") return null;
+  if (!mounted || typeof document === "undefined") return null;
+
+  const modalState = entered ? "is-open" : open ? "" : "is-closing";
 
   const filtered = words.filter((w) => {
     if (!query.trim()) return true;
@@ -63,11 +67,14 @@ export function VocabularyModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 sm:p-6 backdrop-blur-md animate-fade-in"
+      className={`t-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 sm:p-6 backdrop-blur-md ${modalState}`}
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[86vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-zinc-900/95 text-zinc-100 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden={!open}
+        className={`t-modal relative flex max-h-[86vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-zinc-900/95 text-zinc-100 shadow-2xl ${modalState}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

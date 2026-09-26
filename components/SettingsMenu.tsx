@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { UI_LANGS, useUi } from "@/lib/i18n";
 import { useTheme, type AccentColor, type Theme } from "@/lib/theme";
+import { useTransitionStage } from "@/lib/useTransitionStage";
 import { listVocabulary } from "@/lib/vocabulary";
 import { useZoom } from "@/lib/zoom";
 import { VocabularyModal } from "./caption/VocabularyModal";
@@ -60,6 +61,7 @@ export function SettingsMenu() {
   const { theme, resolved, setTheme, accent, setAccent } = useTheme();
   const { zoom, zoomIn, zoomOut, resetZoom } = useZoom();
   const [open, setOpen] = useState(false);
+  const { mounted, entered } = useTransitionStage(open, "--dropdown-close-dur", 150);
   const [vocabOpen, setVocabOpen] = useState(false);
   const [vocabCount, setVocabCount] = useState(0);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -118,10 +120,14 @@ export function SettingsMenu() {
         <span className="hidden sm:inline">{lang.toUpperCase()}</span>
       </button>
 
-      {open ? (
+      {mounted ? (
         <div
           role="menu"
-          className="macos-window absolute right-0 top-full z-50 mt-2 w-[310px] max-h-[82vh] overflow-y-auto p-3.5 shadow-2xl"
+          data-origin="top-right"
+          aria-hidden={!open}
+          className={`t-dropdown macos-window absolute right-0 top-full z-50 mt-2 w-[310px] max-h-[82vh] overflow-y-auto p-3.5 shadow-2xl ${
+            entered ? "is-open" : open ? "" : "is-closing"
+          }`}
         >
           <p className="px-1.5 pb-1.5 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
             🎨 {t("theme.title")} (16+ Chủ đề màu)
