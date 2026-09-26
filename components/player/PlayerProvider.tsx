@@ -19,6 +19,7 @@ import { generateTranscript, loadPublishedTranscript, type GenerateTranscriptErr
 import { transcribeAndSpliceRegion } from "@/lib/regionalTranscribe";
 import { getTranscriptOffset, setTranscriptOffset } from "@/lib/transcriptSync";
 import { markEpisodeFinished, notePosition } from "@/lib/library";
+import { PipSubtitleOverlay } from "./PipSubtitleOverlay";
 
 export interface Track {
   /** Stable id, used to tell "same episode" from "new episode". */
@@ -944,6 +945,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </div>
+
+          {/* Floating Subtitle Overlay when playing in Picture-in-Picture */}
+          <PipSubtitleOverlay
+            active={Boolean(track && isVideoTrack && !stageRect && !videoMinimized)}
+            videoRef={media.mediaRef as React.RefObject<HTMLVideoElement>}
+            transcriptOffsetSec={transcriptOffsetSec}
+          />
         </>
       ) : null}
     </PlayerContext.Provider>
