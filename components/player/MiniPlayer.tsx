@@ -38,7 +38,7 @@ function formatTime(seconds: number): string {
 
 export function MiniPlayer() {
   const { t } = useUi();
-  const { track, handle, stop, mediaState, inlineVisible, setFullscreenOpen, centerSubtitleActive } = usePlayer();
+  const { track, handle, stop, mediaState, inlineVisible, setFullscreenOpen, centerSubtitleActive, fullscreenOpen } = usePlayer();
   const pathname = usePathname();
 
   const [playing, setPlaying] = useState(false);
@@ -406,6 +406,11 @@ export function MiniPlayer() {
     );
   }
 
+  // Hide dock and tab bar when full-screen player is open to prevent overlapping
+  if (fullscreenOpen) {
+    return null;
+  }
+
   // Hide the dock if the inline player is on screen, but keep the mobile tab bar visible
   if (inlineVisible) {
     return mobileTabBar;
@@ -676,7 +681,7 @@ export function MiniPlayer() {
           dockDrag.active ? "transition-none" : "transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
         }`}
         style={{
-          bottom: "calc(58px + env(safe-area-inset-bottom, 10px))",
+          bottom: "calc(56px + env(safe-area-inset-bottom, 8px))",
           transform: dockDrag.active
             ? `translate3d(${Math.max(-52, Math.min(52, dockDrag.x * 0.36))}px, ${Math.max(-44, Math.min(48, dockDrag.y * 0.45))}px, 0) scale(${
                 dockDrag.y < -12 ? 1.025 : dockDrag.y > 12 ? 0.975 : 1

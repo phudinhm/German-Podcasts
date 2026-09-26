@@ -1360,7 +1360,7 @@ export function ListenClient() {
         <div
           className="fixed left-0 right-0 z-40 mx-auto w-full max-w-2xl px-3 pointer-events-none transition-all duration-300 sm:!bottom-8"
           style={{
-            bottom: "calc(120px + env(safe-area-inset-bottom, 14px))",
+            bottom: "calc(126px + env(safe-area-inset-bottom, 10px))",
           }}
         >
           <div className="pointer-events-auto">
@@ -2111,11 +2111,11 @@ export function ListenClient() {
       {(scrolledDown || feed || (results && results.length > 0)) && (
         <aside
           aria-label="Quick navigation"
-          className="animate-dock-in fixed right-3.5 z-40 flex items-center justify-center gap-1.5 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 backdrop-blur-2xl p-1 shadow-[0_10px_32px_rgba(0,0,0,0.18)] transition-all duration-300 sm:left-6 sm:right-auto sm:px-2 sm:py-1 sm:!bottom-6"
+          className="animate-dock-in fixed left-3.5 right-auto z-40 flex items-center justify-center gap-1.5 rounded-full border border-[var(--rule)] bg-[var(--paper-raised)]/95 backdrop-blur-2xl p-1 shadow-[0_10px_32px_rgba(0,0,0,0.18)] transition-all duration-300 sm:left-6 sm:px-2 sm:py-1 sm:!bottom-6"
           style={{
             bottom: playing
-              ? "calc(132px + env(safe-area-inset-bottom, 12px))"
-              : "calc(68px + env(safe-area-inset-bottom, 12px))",
+              ? "calc(126px + env(safe-area-inset-bottom, 10px))"
+              : "calc(64px + env(safe-area-inset-bottom, 10px))",
           }}
         >
           {feed ? (

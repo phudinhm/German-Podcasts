@@ -14,6 +14,8 @@ interface PipSubtitleOverlayProps {
   transcriptOffsetSec?: number;
   /** Notifies whether the center subtitle overlay is active/visible. */
   onVisibleChange?: (active: boolean) => void;
+  /** Whether the floating PiP video window is positioned at the top or bottom corner. */
+  pipPosition?: "top" | "bottom";
 }
 
 export function PipSubtitleOverlay({
@@ -21,6 +23,7 @@ export function PipSubtitleOverlay({
   videoRef,
   transcriptOffsetSec = 0,
   onVisibleChange,
+  pipPosition = "top",
 }: PipSubtitleOverlayProps) {
   const { t, lang } = useUi();
   const targetTranslateLang = lang === "vi" ? "vi" : lang === "de" ? "de" : "en";
@@ -193,20 +196,23 @@ export function PipSubtitleOverlay({
     return null;
   }
 
+  const isPipBottom = pipPosition === "bottom";
+
   return (
     <div
       aria-live="polite"
-      className="fixed left-1/2 -translate-x-1/2 z-[70] w-[94vw] max-w-xl sm:max-w-2xl pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-fade-in"
-      style={{
-        bottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
-      }}
+      className={`fixed left-1/2 -translate-x-1/2 z-[70] w-[92vw] max-w-lg sm:max-w-2xl pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-fade-in ${
+        isPipBottom
+          ? "bottom-[calc(236px+env(safe-area-inset-bottom,10px))] sm:bottom-24"
+          : "bottom-[calc(126px+env(safe-area-inset-bottom,10px))] sm:bottom-20"
+      }`}
     >
-      <div className="pointer-events-auto relative mx-auto flex flex-col items-center justify-center rounded-2xl border border-white/25 bg-black/85 px-4 sm:px-6 py-2.5 sm:py-3 shadow-[0_16px_48px_rgba(0,0,0,0.65)] ring-1 ring-black/40 backdrop-blur-xl">
+      <div className="pointer-events-auto relative mx-auto flex flex-col items-center justify-center rounded-2xl border border-white/20 bg-black/85 px-3.5 sm:px-6 py-2 sm:py-3 shadow-[0_16px_48px_rgba(0,0,0,0.65)] ring-1 ring-white/10 backdrop-blur-xl">
         {/* Dismiss button */}
         <button
           type="button"
           onClick={() => setManuallyDismissed(true)}
-          className="absolute right-2 top-2 h-6 w-6 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition flex items-center justify-center text-xs"
+          className="absolute right-2 top-2 h-6 w-6 rounded-full text-white/50 hover:text-white hover:bg-white/10 active:scale-90 transition flex items-center justify-center text-xs"
           title="Tạm ẩn phụ đề PiP"
           aria-label="Tạm ẩn phụ đề PiP"
         >
@@ -214,8 +220,8 @@ export function PipSubtitleOverlay({
         </button>
 
         {/* Header Tag / Indicator */}
-        <div className="mb-1 flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-white/60">
-          <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="mb-1 flex items-center gap-1.5 text-[9.5px] sm:text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+          <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span>Subtitle · PiP</span>
         </div>
 
@@ -249,7 +255,7 @@ export function PipSubtitleOverlay({
         )}
 
         {/* German Spoken Sentence with Interactive Words */}
-        <p className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 text-center text-[15.5px] sm:text-[17.5px] font-semibold text-white tracking-wide leading-snug drop-shadow-sm select-text">
+        <p className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 text-center text-[14px] sm:text-[17px] font-semibold text-white tracking-wide leading-snug drop-shadow-sm select-text">
           {germanText.split(/(\s+)/).map((token, i) => {
             if (/^\s+$/.test(token)) return <span key={i}>{token}</span>;
             const cleanToken = token.replace(/[^a-zA-ZäöüÄÖÜß]/g, "");
@@ -275,7 +281,7 @@ export function PipSubtitleOverlay({
 
         {/* Translation (Vietnamese / English) */}
         {translationText && (
-          <p className="mt-1 text-center text-[12.5px] sm:text-[14px] font-medium text-amber-300 leading-normal drop-shadow-xs">
+          <p className="mt-1 text-center text-[12px] sm:text-[13.5px] font-medium text-amber-300 leading-normal drop-shadow-xs">
             {translationText}
           </p>
         )}
