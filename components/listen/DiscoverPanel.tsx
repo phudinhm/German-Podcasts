@@ -27,7 +27,15 @@ const TOPICS_SHOWN = 8;
  * that is the only filter that changes what a listener can use at all - a
  * German show is no use to someone who wanted English, whatever its topic.
  */
-export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
+export function DiscoverPanel({
+  onPick,
+  searchQuery = "",
+  onSearchChange,
+}: {
+  onPick: (query: string) => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+}) {
   const { t } = useUi();
   const [lang, setLang] = useState<SourceLang | "">("");
   const [topic, setTopic] = useState("");
@@ -55,15 +63,41 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
   }, [loadCharts]);
 
   const pool = byLang(ALL_SUGGESTIONS, lang);
-  const topics = topicsOf(pool);
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredBySearch = useMemo(() => {
+    if (!normalizedQuery) return null;
+    return pool.filter((item) => {
+      const matchLabel = item.label.toLowerCase().includes(normalizedQuery);
+      const matchPublisher = item.publisher.toLowerCase().includes(normalizedQuery);
+      const matchWhy = item.why.toLowerCase().includes(normalizedQuery);
+      const matchTopics = item.topics.some((t) => t.toLowerCase().includes(normalizedQuery));
+      const matchCefr = item.cefr?.toLowerCase() === normalizedQuery;
+      return matchLabel || matchPublisher || matchWhy || matchTopics || matchCefr;
+    });
+  }, [pool, normalizedQuery]);
+
+  const basePool = filteredBySearch !== null ? filteredBySearch : pool;
+  const topics = topicsOf(basePool);
   const shownTopics =
     allTopics || topics.length <= TOPICS_SHOWN
       ? topics
       : [...new Set([...topics.slice(0, TOPICS_SHOWN), ...(topic ? [topic] : [])])];
   // Levels only mean something for German, so the filter only appears when
   // German shows are in view at all.
-  const levelsApply = lang !== "en" && pool.some((item) => item.cefr);
-  const filtered = byLevel(byTopic(pool, topic), levelsApply ? level : "");
+  const levelsApply = lang !== "en" && basePool.some((item) => item.cefr);
+  const filtered = byLevel(byTopic(basePool, topic), levelsApply ? level : "");
+
+  const filteredCharts = useMemo(() => {
+    if (!charts) return null;
+    if (!normalizedQuery) return charts;
+    return charts.filter(
+      (entry) =>
+        entry.title.toLowerCase().includes(normalizedQuery) ||
+        (entry.publisher && entry.publisher.toLowerCase().includes(normalizedQuery))
+    );
+  }, [charts, normalizedQuery]);
 
   const sortedCatalog = useMemo(() => {
     const list = [...filtered];
@@ -84,11 +118,12 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
 
   return (
     <div className="mt-7 space-y-7">
-      {charts && charts.length > 0 ? (
+      {filteredCharts && filteredCharts.length > 0 ? (
         <section>
           <div className="mb-2 flex items-baseline gap-x-3">
             <h2 className="text-[15px] font-semibold">
               {lang === "en" ? t("listen.chartsEn") : t("listen.charts")}
+              {normalizedQuery ? ` (${filteredCharts.length})` : ""}
             </h2>
             {/* The note is context, not instruction, so it is the first thing
                 to go when the row is too narrow to hold both it and Refresh. */}
@@ -104,7 +139,7 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
             </button>
           </div>
           <ul className="scroll-row -mx-4 gap-3 px-4 pb-2 sm:mx-0 sm:px-0">
-            {charts.map((entry, index) => (
+            {filteredCharts.map((entry, index) => (
               <li key={entry.appleId} className="w-[132px] shrink-0 sm:w-[140px]">
                 <button
                   type="button"
@@ -138,9 +173,25 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
         <div className="mb-3">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[15px] font-semibold">{t("listen.suggested")}</h2>
-            <span className="text-[12px] text-[var(--ink-faint)]">
-              {filtered.length} {filtered.length === 1 ? "show" : "shows"}
-            </span>
+            {normalizedQuery ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-[11.5px] font-medium">
+                <span>{t("library.matchingCount", { n: filtered.length })}</span>
+                {onSearchChange && (
+                  <button
+                    type="button"
+                    onClick={() => onSearchChange("")}
+                    className="hover:opacity-75 p-0.5 font-bold"
+                    title={t("library.clearSearch") || "Clear search"}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ) : (
+              <span className="text-[12px] text-[var(--ink-faint)]">
+                {filtered.length} {filtered.length === 1 ? "show" : "shows"}
+              </span>
+            )}
             <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
               <div className="flex overflow-hidden rounded-full border border-[var(--rule)] bg-[var(--surface)] p-0.5">
                 {([" ", "de", "en"] as const).map((option) => {
@@ -288,36 +339,105 @@ export function DiscoverPanel({ onPick }: { onPick: (query: string) => void }) {
             ) : null}
           </div>
         </div>
+        {normalizedQuery && sortedCatalog.length > 0 ? (
+          <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5 rounded-xl bg-[var(--surface)] p-2.5 sm:p-3 border border-[var(--rule)]/70 text-[12.5px] shadow-2xs">
+            <span className="text-[var(--ink-soft)]">
+              {t("library.searchGlobal")}: <strong className="text-[var(--ink)]">&ldquo;{searchQuery}&rdquo;</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => onPick(searchQuery)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--accent)] text-[var(--paper)] text-[12px] font-semibold hover:opacity-95 active:scale-95 transition shadow-2xs"
+            >
+              <span>{t("library.searchGlobalAction", { q: searchQuery })}</span>
+              <span>→</span>
+            </button>
+          </div>
+        ) : null}
 
-        <ul className="grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3">
-          {sortedCatalog.map((item: Suggestion) => (
-            <li key={`${item.label}|${item.lang}`} className="min-w-0">
-              <button
-                type="button"
-                className="group relative flex h-full w-full flex-col justify-between rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-4 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/60 hover:shadow-md active:scale-[0.985]"
-                onClick={() => onPick(item.feedUrl ?? item.query)}
-              >
-                <div>
-                  <div className="flex flex-wrap items-baseline justify-between gap-1.5">
-                    <span className="text-[14.5px] font-semibold text-[var(--ink)] group-hover:text-[var(--accent)] transition-colors">
-                      {item.label}
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="chip text-[10px] uppercase font-medium">{item.lang === "de" ? "DE" : "EN"}</span>
-                      {item.cefr ? (
-                        <span className="chip chip-level text-[10px] font-semibold">{item.cefr}</span>
-                      ) : null}
+        {sortedCatalog.length === 0 ? (
+          <div className="py-12 text-center rounded-2xl border border-dashed border-[var(--rule)] bg-[var(--surface)]/40 p-6">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
+              <svg viewBox="0 0 24 24" className="w-6 h-6 stroke-current fill-none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
+            </div>
+            <h3 className="text-[15px] font-semibold text-[var(--ink)]">
+              {normalizedQuery
+                ? t("library.noSourceMatch", { q: searchQuery })
+                : t("feed.noMatch")}
+            </h3>
+            <p className="mt-1 text-[13px] text-[var(--ink-soft)] max-w-md mx-auto">
+              {topic && basePool.length > 0
+                ? `Không có kết quả trong chủ đề "${topic}". Bạn có thể xóa bộ lọc chủ đề để xem ${basePool.length} nguồn khác.`
+                : t("library.noSourceMatchHint")}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {normalizedQuery && (
+                <button
+                  type="button"
+                  onClick={() => onPick(searchQuery)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--accent)] text-[var(--paper)] text-[13px] font-semibold shadow-xs hover:opacity-95 active:scale-95 transition"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none shrink-0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="M21 21l-4.35-4.35" />
+                  </svg>
+                  <span>{t("library.searchGlobalAction", { q: searchQuery })}</span>
+                </button>
+              )}
+              {topic && basePool.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTopic("")}
+                  className="px-3.5 py-2 rounded-full bg-[var(--surface)] text-[var(--ink)] text-[13px] font-medium border border-[var(--rule)] hover:bg-[var(--surface-high)] active:scale-95 transition"
+                >
+                  Xóa lọc chủ đề ({basePool.length})
+                </button>
+              )}
+              {onSearchChange && normalizedQuery && (
+                <button
+                  type="button"
+                  onClick={() => onSearchChange("")}
+                  className="px-3.5 py-2 rounded-full bg-[var(--surface)] text-[var(--ink)] text-[13px] font-medium border border-[var(--rule)] hover:bg-[var(--surface-high)] active:scale-95 transition"
+                >
+                  {t("common.all")}
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <ul className="grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3">
+            {sortedCatalog.map((item: Suggestion) => (
+              <li key={`${item.label}|${item.lang}`} className="min-w-0">
+                <button
+                  type="button"
+                  className="group relative flex h-full w-full flex-col justify-between rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-4 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/60 hover:shadow-md active:scale-[0.985]"
+                  onClick={() => onPick(item.feedUrl ?? item.query)}
+                >
+                  <div>
+                    <div className="flex flex-wrap items-baseline justify-between gap-1.5">
+                      <span className="text-[14.5px] font-semibold text-[var(--ink)] group-hover:text-[var(--accent)] transition-colors">
+                        {item.label}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="chip text-[10px] uppercase font-medium">{item.lang === "de" ? "DE" : "EN"}</span>
+                        {item.cefr ? (
+                          <span className="chip chip-level text-[10px] font-semibold">{item.cefr}</span>
+                        ) : null}
+                      </div>
                     </div>
+                    <span className="mt-1 block truncate text-[12px] font-medium text-[var(--ink-soft)]">{item.publisher}</span>
                   </div>
-                  <span className="mt-1 block truncate text-[12px] font-medium text-[var(--ink-soft)]">{item.publisher}</span>
-                </div>
-                <span className="mt-2 block text-[12px] leading-relaxed text-[var(--ink-faint)]">
-                  {item.why}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+                  <span className="mt-2 block text-[12px] leading-relaxed text-[var(--ink-faint)]">
+                    {item.why}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );
