@@ -432,6 +432,15 @@ export function MiniPlayer() {
     activeDockSeg?.translation ??
     null;
 
+  useEffect(() => {
+    const onMinimize = () => {
+      setIsHovered(false);
+      setPinned(false);
+    };
+    window.addEventListener("hoerbar:minimize-player", onMinimize);
+    return () => window.removeEventListener("hoerbar:minimize-player", onMinimize);
+  }, []);
+
   return (
     <>
       {/* ========================================================================= */}
@@ -450,12 +459,14 @@ export function MiniPlayer() {
           {!isExpandedDesktop ? (
             <div
               onClick={() => setFullscreenOpen(true)}
-              className="group flex items-center gap-2.5 rounded-2xl border border-[var(--rule)] bg-[var(--paper-raised)]/95 text-[var(--ink)] px-3.5 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.14)] backdrop-blur-3xl transition-all duration-300 hover:scale-[1.02] cursor-pointer max-w-[460px]"
+              className="group macos-window flex items-center gap-2.5 px-3 py-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)] transition-all duration-300 hover:scale-[1.02] cursor-pointer max-w-[460px]"
               title={t("player.openFullPlayer")}
             >
-              <Art src={track.artwork} alt="" size={32} seed={track.showTitle || track.title} />
+              <div className="shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-black/5 dark:ring-white/10">
+                <Art src={track.artwork} alt="" size={32} seed={track.showTitle || track.title} />
+              </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-semibold leading-tight">
+                <div className="truncate text-[12px] font-semibold leading-tight text-[var(--ink)]">
                   {activeDockSeg?.text || track.title}
                 </div>
                 {activeDockTrans ? (
@@ -464,9 +475,8 @@ export function MiniPlayer() {
                   </div>
                 ) : null}
               </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs shrink-0">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] border border-[var(--rule)]/80 px-2 py-0.5 text-[11px] font-semibold text-[var(--ink)] shadow-2xs shrink-0 group-hover:border-[var(--accent)]/50 transition">
                 <span>🎧</span>
-                <span>Player</span>
                 <span className="text-[10px]">⤢</span>
               </span>
               <AudioVisualizer isPlaying={playing} barCount={5} />
@@ -492,7 +502,7 @@ export function MiniPlayer() {
             </div>
           ) : (
             /* FULL EXPANDED CARD STATE */
-            <div className="group card relative flex w-full max-w-[440px] flex-col gap-2 p-3 shadow-[var(--shadow-pop)] border border-[var(--rule)]">
+            <div className="group macos-window relative flex w-full max-w-[440px] flex-col gap-2.5 p-3.5 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.22)] border border-[var(--rule)]/80">
               {/* Height adjustment controls */}
               <div className="pointer-events-none absolute -left-1 top-1/2 hidden -translate-x-full -translate-y-1/2 flex-col gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 sm:flex">
                 <button
@@ -515,11 +525,86 @@ export function MiniPlayer() {
                 </button>
               </div>
 
-              {/* Top Row: Artwork, Info, Close/Pin */}
+              {/* macOS Window Header Bar with Traffic Lights */}
+              <div className="flex items-center justify-between gap-2 border-b border-[var(--rule)]/60 pb-2 -mx-1 px-1">
+                <div className="flex items-center gap-1.5 group/win-traffic">
+                  <button
+                    type="button"
+                    onClick={stop}
+                    className="macos-traffic-close h-2.5 w-2.5 rounded-full flex items-center justify-center text-[6px] text-[#4a0002] opacity-90 hover:scale-110 active:scale-95 transition-all shadow-xs"
+                    title={t("player.miniClose")}
+                  >
+                    <span className="opacity-0 group-hover/win-traffic:opacity-100 font-bold leading-none">✕</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsHovered(false);
+                      setPinned(false);
+                    }}
+                    className="macos-traffic-min h-2.5 w-2.5 rounded-full flex items-center justify-center text-[7px] text-[#543b00] opacity-90 hover:scale-110 active:scale-95 transition-all shadow-xs"
+                    title={t("player.collapse")}
+                  >
+                    <span className="opacity-0 group-hover/win-traffic:opacity-100 font-bold leading-none">−</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFullscreenOpen(true)}
+                    className="macos-traffic-zoom h-2.5 w-2.5 rounded-full flex items-center justify-center text-[5.5px] text-[#004f11] opacity-90 hover:scale-110 active:scale-95 transition-all shadow-xs"
+                    title={t("player.openFullPlayer")}
+                  >
+                    <span className="opacity-0 group-hover/win-traffic:opacity-100 font-bold leading-none">⤢</span>
+                  </button>
+                </div>
+
+                <span className="truncate text-[11px] font-semibold text-[var(--ink-faint)] tracking-tight">
+                  {track.showTitle}
+                </span>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={toggleFav}
+                    className={`h-6 w-6 rounded-md flex items-center justify-center text-[12px] transition ${
+                      favorited ? "text-rose-500 scale-105" : "text-[var(--ink-faint)] hover:text-rose-500 hover:bg-black/5 dark:hover:bg-white/5"
+                    }`}
+                    aria-label={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+                    title={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
+                  >
+                    {favorited ? "❤️" : "🤍"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={togglePinned}
+                    className={`h-6 w-6 rounded-md flex items-center justify-center text-[11px] transition ${
+                      pinned ? "text-[var(--accent)] bg-[var(--accent-soft)]" : "text-[var(--ink-faint)] hover:bg-black/5 dark:hover:bg-white/5"
+                    }`}
+                    aria-label={pinned ? t("player.unpinExpanded") : t("player.pinExpanded")}
+                    aria-pressed={pinned}
+                    title={pinned ? t("player.unpinExpanded") : t("player.pinExpanded")}
+                  >
+                    📌
+                  </button>
+                  {popout.supported && (
+                    <button
+                      type="button"
+                      onClick={() => void popout.open()}
+                      className="h-6 w-6 rounded-md flex items-center justify-center text-[11px] text-[var(--ink-faint)] hover:text-[var(--ink)] hover:bg-black/5 dark:hover:bg-white/5 transition"
+                      title={t("player.popout")}
+                    >
+                      ▣
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Main Content: Artwork, Title */}
               <div className="flex items-center gap-3">
                 {hasVideoLayer ? <span className="h-[48px] w-[80px] shrink-0" aria-hidden /> : null}
                 {!hasVideoLayer && (
-                  <Art src={track.artwork} alt="" size={44} seed={track.showTitle || track.title} />
+                  <div className="shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-black/5 dark:ring-white/10">
+                    <Art src={track.artwork} alt="" size={46} seed={track.showTitle || track.title} />
+                  </div>
                 )}
 
                 <div
@@ -527,59 +612,10 @@ export function MiniPlayer() {
                   className="min-w-0 flex-1 cursor-pointer hover:opacity-85"
                   title={t("player.openFullPlayer")}
                 >
-                  <p className="truncate text-[13.5px] font-medium leading-tight">{track.title}</p>
-                  <p className="truncate text-[11.5px] text-[var(--ink-faint)]">
+                  <p className="truncate text-[13.5px] font-semibold leading-tight text-[var(--ink)]">{track.title}</p>
+                  <p className="truncate text-[11px] text-[var(--ink-faint)] mt-0.5">
                     {mediaState.loading ? t("player.buffering") : track.showTitle}
                   </p>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  {/* Favorite heart button */}
-                  <button
-                    type="button"
-                    onClick={toggleFav}
-                    className={`icon-btn h-7 w-7 text-[13px] transition ${
-                      favorited ? "text-rose-500 scale-105" : "text-[var(--ink-faint)] hover:text-rose-500"
-                    }`}
-                    aria-label={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
-                    title={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
-                  >
-                    {favorited ? "❤️" : "🤍"}
-                  </button>
-
-                  {/* Pin expanded button */}
-                  <button
-                    type="button"
-                    onClick={togglePinned}
-                    className={`icon-btn h-7 w-7 text-[12px] ${pinned ? "text-[var(--accent)]" : "text-[var(--ink-faint)]"}`}
-                    aria-label={pinned ? t("player.unpinExpanded") : t("player.pinExpanded")}
-                    aria-pressed={pinned}
-                    title={pinned ? t("player.unpinExpanded") : t("player.pinExpanded")}
-                  >
-                    &#128204;
-                  </button>
-
-                  {/* Popout PiP button */}
-                  {popout.supported && (
-                    <button
-                      type="button"
-                      onClick={() => void popout.open()}
-                      className="icon-btn h-7 w-7 text-[12px]"
-                      title={t("player.popout")}
-                    >
-                      ▣
-                    </button>
-                  )}
-
-                  {/* Close button */}
-                  <button
-                    type="button"
-                    onClick={stop}
-                    className="icon-btn h-7 w-7 text-[15px]"
-                    aria-label={t("player.miniClose")}
-                  >
-                    &times;
-                  </button>
                 </div>
               </div>
 
@@ -588,8 +624,8 @@ export function MiniPlayer() {
                 <span ref={timeRef} className="shrink-0 font-mono text-[10px] tabular-nums text-[var(--ink-faint)]">
                   0:00
                 </span>
-                <span className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--rule)]">
-                  <span ref={fillRef} className="block h-full bg-[var(--accent-ring)]" style={{ width: 0 }} />
+                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--rule)]/60">
+                  <span ref={fillRef} className="block h-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-ring,var(--accent))]" style={{ width: 0 }} />
                 </span>
                 <AudioVisualizer isPlaying={playing} barCount={6} />
               </div>
@@ -597,16 +633,16 @@ export function MiniPlayer() {
               {activeDockSeg?.text ? (
                 <div
                   onClick={() => setFullscreenOpen(true)}
-                  className="cursor-pointer rounded-xl bg-[var(--surface)]/80 border border-[var(--rule)] px-2.5 py-1.5 text-[11.5px] transition hover:border-[var(--accent)]/50"
+                  className="cursor-pointer rounded-xl bg-[var(--surface)]/80 border border-[var(--rule)]/70 px-2.5 py-1.5 text-[11.5px] transition hover:border-[var(--accent)]/50 shadow-2xs"
                 >
-                  <p className="font-semibold text-[var(--ink)] line-clamp-2">{activeDockSeg.text}</p>
+                  <p className="font-semibold text-[var(--ink)] line-clamp-2 leading-snug">{activeDockSeg.text}</p>
                   {activeDockTrans ? (
-                    <p className="mt-0.5 italic text-[var(--accent)] line-clamp-2">{activeDockTrans}</p>
+                    <p className="mt-0.5 italic text-[var(--accent)] line-clamp-2 leading-snug">{activeDockTrans}</p>
                   ) : null}
                 </div>
               ) : null}
 
-              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-[var(--rule)]">
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--rule)]/60">
                 <div className="flex items-center gap-2">{transport}</div>
                 <button
                   type="button"

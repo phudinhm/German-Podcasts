@@ -83,6 +83,7 @@ export function ListenClient() {
   const router = useRouter();
 
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [results, setResults] = useState<DiscoverResult[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -626,6 +627,33 @@ export function ListenClient() {
     return () => window.removeEventListener("hoerbar:navigate-home", onNavHome);
   }, [browse]);
 
+  // macOS ⌘K or '/' Spotlight-style keyboard search shortcut
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      } else if (
+        e.key === "/" &&
+        !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    const onCustomFocus = () => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("hoerbar:focus-search", onCustomFocus);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("hoerbar:focus-search", onCustomFocus);
+    };
+  }, []);
+
   /** Returns to search results if they exist, otherwise returns to full browse. */
   const backToResultsOrBrowse = useCallback(() => {
     if (results && results.length > 0) {
@@ -872,6 +900,7 @@ export function ListenClient() {
             🔍
           </span>
           <input
+            ref={searchInputRef}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -881,20 +910,27 @@ export function ListenClient() {
             spellCheck={false}
             aria-label={t("listen.title")}
             placeholder={t("listen.placeholder")}
-            className="field min-w-0 w-full pl-9 pr-9 shadow-2xs"
+            className="field min-w-0 w-full pl-9 pr-14 shadow-2xs rounded-xl"
           />
           {query ? (
             <button
               type="button"
-              onClick={() => setQuery("")}
+              onClick={() => {
+                setQuery("");
+                searchInputRef.current?.focus();
+              }}
               aria-label="Clear search"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ink-faint)]/25 text-[12px] font-bold text-[var(--ink-soft)] hover:bg-[var(--ink-faint)]/40"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ink-faint)]/25 text-[12px] font-bold text-[var(--ink-soft)] hover:bg-[var(--ink-faint)]/40 transition active:scale-90"
             >
               ×
             </button>
-          ) : null}
+          ) : (
+            <span className="macos-kbd hidden sm:inline-flex absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none select-none">
+              ⌘K
+            </span>
+          )}
         </div>
-        <button type="submit" className="btn btn-primary shrink-0 px-4" disabled={searching}>
+        <button type="submit" className="btn btn-primary shrink-0 px-4 rounded-xl shadow-xs active:scale-95 transition" disabled={searching}>
           {searching ? t("common.searching") : t("common.search")}
         </button>
       </form>

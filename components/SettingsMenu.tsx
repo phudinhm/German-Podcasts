@@ -121,7 +121,7 @@ export function SettingsMenu() {
       {open ? (
         <div
           role="menu"
-          className="card absolute right-0 top-full z-50 mt-2 w-[300px] max-h-[82vh] overflow-y-auto p-3 bg-[var(--paper-raised)] border border-[var(--rule)] shadow-2xl"
+          className="macos-window absolute right-0 top-full z-50 mt-2 w-[310px] max-h-[82vh] overflow-y-auto p-3.5 shadow-2xl"
         >
           <p className="px-1.5 pb-1.5 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
             🎨 {t("theme.title")} (16+ Chủ đề màu)

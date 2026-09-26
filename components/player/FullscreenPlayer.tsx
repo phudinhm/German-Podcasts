@@ -682,33 +682,72 @@ export function FullscreenPlayer() {
           {...topSwipe}
           className="flex shrink-0 items-center justify-between gap-2 py-1 select-none"
         >
-          <button
-            type="button"
-            onClick={() => {
-              if (isVideoTrack) {
-                const el = mediaElement() as HTMLVideoElement | null;
-                if (
-                  el &&
-                  !el.paused &&
-                  "requestPictureInPicture" in el &&
-                  typeof document !== "undefined" &&
-                  !document.pictureInPictureElement
-                ) {
-                  void el.requestPictureInPicture().catch(() => {});
-                }
-              }
-              setFullscreenOpen(false);
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--rule)]/60 bg-[var(--surface)] text-[var(--ink)] shadow-2xs hover:scale-105 active:scale-90 transition-all"
-            aria-label={t("player.exitFullscreen")}
-            title={t("player.exitFullscreen")}
-          >
-            <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Desktop macOS Traffic Lights */}
+            <div className="hidden sm:flex items-center gap-2 py-1 pr-1 group/fs-traffic">
+              <button
+                type="button"
+                onClick={() => setFullscreenOpen(false)}
+                className="macos-traffic-close h-3 w-3 rounded-full flex items-center justify-center text-[7.5px] text-[#4a0002] opacity-90 hover:scale-110 active:scale-95 transition-all shadow-xs cursor-pointer"
+                title="Đóng (Esc)"
+              >
+                <span className="opacity-0 group-hover/fs-traffic:opacity-100 font-bold transition-opacity leading-none">✕</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFullscreenOpen(false)}
+                className="macos-traffic-min h-3 w-3 rounded-full flex items-center justify-center text-[9px] text-[#543b00] opacity-90 hover:scale-110 active:scale-95 transition-all shadow-xs cursor-pointer"
+                title="Thu nhỏ Player"
+              >
+                <span className="opacity-0 group-hover/fs-traffic:opacity-100 font-bold transition-opacity leading-none">−</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof document !== "undefined") {
+                    if (document.fullscreenElement) {
+                      void document.exitFullscreen().catch(() => {});
+                    } else {
+                      void document.documentElement.requestFullscreen().catch(() => {});
+                    }
+                  }
+                }}
+                className="macos-traffic-zoom h-3 w-3 rounded-full flex items-center justify-center text-[6.5px] text-[#004f11] opacity-90 hover:scale-110 active:scale-95 transition-all shadow-xs cursor-pointer"
+                title="Toàn màn hình trình duyệt (F11)"
+              >
+                <span className="opacity-0 group-hover/fs-traffic:opacity-100 font-bold transition-opacity leading-none">⤢</span>
+              </button>
+            </div>
 
-          <p className="max-w-[30%] sm:max-w-[40%] truncate text-[11.5px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
+            {/* Mobile Exit button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (isVideoTrack) {
+                  const el = mediaElement() as HTMLVideoElement | null;
+                  if (
+                    el &&
+                    !el.paused &&
+                    "requestPictureInPicture" in el &&
+                    typeof document !== "undefined" &&
+                    !document.pictureInPictureElement
+                  ) {
+                    void el.requestPictureInPicture().catch(() => {});
+                  }
+                }
+                setFullscreenOpen(false);
+              }}
+              className="sm:hidden flex h-8 w-8 items-center justify-center rounded-full border border-[var(--rule)]/60 bg-[var(--surface)] text-[var(--ink)] shadow-2xs hover:scale-105 active:scale-90 transition-all"
+              aria-label={t("player.exitFullscreen")}
+              title={t("player.exitFullscreen")}
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-current fill-none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+
+          <p className="max-w-[40%] sm:max-w-[50%] truncate text-[12px] font-semibold text-[var(--ink-faint)] tracking-tight">
             {track.showTitle}
           </p>
 

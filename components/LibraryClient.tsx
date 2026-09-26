@@ -24,10 +24,14 @@ export function LibraryClient() {
       ? Math.min(88, libraryDrag.x * 0.34)
       : 0;
 
-  // Keyboard shortcut: '/' focuses the search bar
+  // Keyboard shortcut: '⌘K' or '/' focuses the search bar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      } else if (
         e.key === "/" &&
         !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)
       ) {
@@ -35,8 +39,16 @@ export function LibraryClient() {
         searchInputRef.current?.focus();
       }
     };
+    const onCustomFocus = () => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("hoerbar:focus-search", onCustomFocus);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("hoerbar:focus-search", onCustomFocus);
+    };
   }, []);
 
   return (
@@ -124,7 +136,7 @@ export function LibraryClient() {
                 </svg>
               </button>
             ) : (
-              <span className="hidden md:inline absolute right-2.5 pointer-events-none text-[10px] text-[var(--ink-faint)]/60 font-mono border border-[var(--rule)]/70 rounded px-1 py-0.2">
+              <span className="macos-kbd hidden md:inline-flex absolute right-2.5 pointer-events-none select-none">
                 /
               </span>
             )}
