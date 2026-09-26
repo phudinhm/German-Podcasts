@@ -59,6 +59,7 @@ export function TranscriptReader({
     onGenerateTranscript,
     onTranscribeCurrentRegion,
     transcribingRegion,
+    adSyncNotice,
     generatingTranscript,
     transcriptOffsetSec,
     nextTrack,
@@ -328,7 +329,16 @@ export function TranscriptReader({
         style={{ ...(isLightTheme ? {} : captionThemeStyle(theme)), scrollbarWidth: "none" }}
       >
         {/* Subtle transient scanning toast when regional transcribe is running */}
-        {transcribingRegion ? (
+        {adSyncNotice ? (
+          <div className="sticky top-2 z-20 mx-auto max-w-sm flex items-center justify-center gap-2 rounded-full border border-emerald-500/40 bg-zinc-950/90 px-3.5 py-1 text-xs text-emerald-200 shadow-xl backdrop-blur-md">
+            <span>📢</span>
+            <span>
+              Đã tự động đồng bộ lại sau đoạn quảng cáo (
+              {adSyncNotice.deltaSec > 0 ? "+" : ""}
+              {adSyncNotice.deltaSec}s)
+            </span>
+          </div>
+        ) : transcribingRegion ? (
           <div className="sticky top-2 z-20 mx-auto max-w-sm flex items-center justify-center gap-2 rounded-full border border-amber-500/40 bg-zinc-950/90 px-3.5 py-1 text-xs text-amber-200 shadow-xl backdrop-blur-md animate-pulse">
             <span>⏳</span>
             <span>Đang quét & đồng bộ lại vùng âm thanh...</span>

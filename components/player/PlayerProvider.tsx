@@ -106,6 +106,13 @@ interface PlayerContextValue {
   onGenerateTranscript: () => void;
   onTranscribeCurrentRegion: () => void;
   transcribingRegion: boolean;
+  /**
+   * The most recent dynamically-inserted-ad shift the regional reconciler
+   * caught and corrected for, so a listener sees why the transcript's
+   * timing just visibly jumped rather than reading it as a glitch. Cleared
+   * a few seconds after it's set - see the effect below.
+   */
+  adSyncNotice: { deltaSec: number; atMs: number } | null;
   generatingTranscript: boolean;
   generateTranscriptError: GenerateTranscriptError | null;
   waitingForTranscript: boolean;
@@ -389,13 +396,30 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [generatingTranscript, setGeneratingTranscript] = useState(false);
   const [transcribingRegion, setTranscribingRegion] = useState(false);
   const [generateTranscriptError, setGenerateTranscriptError] = useState<GenerateTranscriptError | null>(null);
+  const [adSyncNotice, setAdSyncNotice] = useState<{ deltaSec: number; atMs: number } | null>(null);
   const generationRunIdRef = useRef(0);
   const scannedRegionBucketsRef = useRef<Set<string>>(new Set());
+
+  // A detected ad shift is only worth mentioning for a few seconds - long enough
+  // to explain why the transcript's timing just visibly jumped, not so long it
+  // lingers as clutter once the listener has moved on.
+  useEffect(() => {
+    if (!adSyncNotice) return;
+    const timer = window.setTimeout(() => setAdSyncNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [adSyncNotice]);
+
+  const reportAdShift = useCallback((detectedAdShiftSec: number) => {
+    if (detectedAdShiftSec !== 0) {
+      setAdSyncNotice({ deltaSec: detectedAdShiftSec, atMs: Date.now() });
+    }
+  }, []);
 
   // Automatically load or generate the transcript in parallel while the episode plays
   useEffect(() => {
     liveCaptionService.clearTranscript();
     scannedRegionBucketsRef.current.clear();
+    setAdSyncNotice(null);
     const runId = ++generationRunIdRef.current;
     setGenerateTranscriptError(null);
     setWaitingForTranscript(false);
@@ -425,7 +449,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               endSec: 50,
               totalDurationSec: media.handle.getDuration() || (track.durationSec ?? 0),
               sourceLang: track.sourceLang ?? "de",
-            }).catch(() => {});
+            })
+              .then((result) => reportAdShift(result.detectedAdShiftSec))
+              .catch(() => {});
           }
           return;
         }
@@ -440,14 +466,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // If resuming mid-episode (startPos > 15s), immediately fetch & transcribe the active window at `startPos`
         // via HTTP Range before starting the full sequential stream from 0:00!
         if (startPos > 15) {
-          await transcribeAndSpliceRegion({
+          const resumeResult = await transcribeAndSpliceRegion({
             url: track.url,
             startSec: startPos,
             endSec: startPos + 42,
             totalDurationSec: media.handle.getDuration() || (track.durationSec ?? 0),
             sourceLang: track.sourceLang ?? "de",
             forceReplaceWindow: true,
-          }).catch(() => {});
+          }).catch(() => null);
+          if (resumeResult) reportAdShift(resumeResult.detectedAdShiftSec);
         }
 
         if (isCancelled()) return;
@@ -486,7 +513,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         generationRunIdRef.current++;
       }
     };
-  }, [track?.id, track?.url]);
+  }, [track?.id, track?.url, reportAdShift]);
 
   const [transcriptOffsetSec, setTranscriptOffsetSecState] = useState(0);
   useEffect(() => {
@@ -555,6 +582,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         forceReplaceWindow: isSeekJump,
         signal: ac.signal,
       })
+        .then((result) => reportAdShift(result.detectedAdShiftSec))
         .catch(() => {})
         .finally(() => {
           if (regionAbortRef.current === ac) {
@@ -562,7 +590,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           }
         });
     },
-    [track?.id, track?.url, track?.durationSec, track?.sourceLang, media.handle, transcribingRegion]
+    [track?.id, track?.url, track?.durationSec, track?.sourceLang, media.handle, transcribingRegion, reportAdShift]
   );
 
   // Instant `seeked` & `timeupdate` synchronization on the media element:
@@ -598,17 +626,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [media.mediaRef, track, transcriptOffsetSec, triggerRegionalSyncAt]);
 
   // Automatic Playhead Regional Monitor (every 2s while playing):
+  const lastVerifyBucketRef = useRef(-1);
   useEffect(() => {
     if (!track?.url) return;
+    lastVerifyBucketRef.current = -1;
+    // A published transcript counts as "real coverage" the moment it loads
+    // (see hasRealCoverage above), so the plain per-position scan below never
+    // re-checks it during straight-through listening - only a seek forces
+    // that (isSeekJump bypasses hasRealCoverage). That leaves a mid-roll ad
+    // break undetected for anyone who never seeks past it. So, on top of the
+    // per-position scan, periodically re-verify the current window against
+    // the real audio anyway, at a coarse enough interval to not burn through
+    // transcription quota re-checking a transcript that is usually fine.
+    //
+    // Only worth doing when a publisher's own transcript is what's loaded:
+    // a Whisper-generated one has no independent reference to drift from -
+    // it's already timed against this exact audio - so re-verifying it would
+    // just re-transcribe a window Whisper already got right.
+    const hasPublishedTranscript = Boolean(
+      track.transcripts?.length && pickBestTranscript(track.transcripts)
+    );
+
+    const VERIFY_INTERVAL_SEC = 180;
     const timer = window.setInterval(() => {
       if (!media.handle.isPlaying()) return;
       const nowSec = media.handle.getTime();
       liveCaptionService.syncCaptionAtTime(nowSec - transcriptOffsetSec);
       triggerRegionalSyncAt(nowSec, false);
+
+      if (!hasPublishedTranscript) return;
+      const verifyBucket = Math.floor(nowSec / VERIFY_INTERVAL_SEC);
+      if (verifyBucket !== lastVerifyBucketRef.current) {
+        lastVerifyBucketRef.current = verifyBucket;
+        triggerRegionalSyncAt(nowSec, true);
+      }
     }, 2000);
 
     return () => window.clearInterval(timer);
-  }, [track?.url, media.handle, transcriptOffsetSec, triggerRegionalSyncAt]);
+  }, [track?.url, track?.transcripts, media.handle, transcriptOffsetSec, triggerRegionalSyncAt]);
 
   // Manual 1-Tap Regional Ad / Sync Transcriber for `[currentTime - 2s, currentTime + 45s]`
   const onTranscribeCurrentRegion = useCallback(() => {
@@ -774,6 +829,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       onGenerateTranscript,
       onTranscribeCurrentRegion,
       transcribingRegion,
+      adSyncNotice,
       generatingTranscript,
       generateTranscriptError,
       waitingForTranscript,
@@ -812,6 +868,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       onGenerateTranscript,
       onTranscribeCurrentRegion,
       transcribingRegion,
+      adSyncNotice,
       generatingTranscript,
       generateTranscriptError,
       waitingForTranscript,
