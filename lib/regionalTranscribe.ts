@@ -1,11 +1,9 @@
 "use client";
 
+import { decorateAdText } from "./adDetection";
 import { liveCaptionService, type CaptionSegment } from "./liveCaption";
 import { autoTranslateSegments } from "./transcriptPipeline";
 import type { SpokenLang } from "./language";
-
-const AD_KEYWORD_REGEX =
-  /\b(werbung|anzeige|sponsor|gesponsert|rabattcode|gutscheincode|prozent rabatt|link in den shownotes|episodenbeschreibung|werbepartner|sponsored by|brought to you by|promo code|discount code)\b/i;
 
 function normalizeWords(text: string): string[] {
   return text
@@ -25,16 +23,6 @@ function wordOverlapScore(a: string, b: string): number {
     if (setB.has(w)) matches++;
   }
   return matches / Math.min(wordsA.length, wordsB.length);
-}
-
-export function decorateAdText(text: string, isDetectedAdRegion: boolean): string {
-  const clean = text.trim();
-  if (!clean) return clean;
-  if (clean.startsWith("📢")) return clean;
-  if (isDetectedAdRegion || AD_KEYWORD_REGEX.test(clean)) {
-    return `📢 [Quảng cáo] ${clean}`;
-  }
-  return clean;
 }
 
 /**

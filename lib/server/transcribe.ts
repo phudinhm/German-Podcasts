@@ -1,3 +1,4 @@
+import { decorateAdText } from "../adDetection";
 import type { SpokenLang } from "../language";
 import type { TranscriptSegment } from "./transcript";
 import { fetchDwOfficialTranscript, resolveDwLessonId } from "./dwLearnGerman";
@@ -617,7 +618,30 @@ export async function resolveCompanionAudioUrl(rawUrl: string): Promise<string> 
   return rawUrl;
 }
 
+/**
+ * Flags segments that read as injected ad copy (pre-roll, mid-roll, or a
+ * sponsor read) so a listener can see at a glance what's ad rather than
+ * episode content. There's no independent transcript to anchor against
+ * here - this function *is* the transcript, generated straight from the
+ * audio - so unlike lib/regionalTranscribe.ts's reconciler, this can only
+ * flag by keyword; it can't detect or correct a timestamp shift.
+ */
+function tagLikelyAds(segments: TranscriptSegment[]): TranscriptSegment[] {
+  return segments.map((seg) => ({ ...seg, text: decorateAdText(seg.text, false) }));
+}
+
 export async function* transcribeAudioStream(
+  audioUrl: URL,
+  sourceLang?: SpokenLang,
+  signal?: AbortSignal,
+  meta?: TranscribeMeta
+): AsyncGenerator<TranscriptSegment[], void, unknown> {
+  for await (const segments of transcribeAudioStreamRaw(audioUrl, sourceLang, signal, meta)) {
+    yield tagLikelyAds(segments);
+  }
+}
+
+async function* transcribeAudioStreamRaw(
   audioUrl: URL,
   sourceLang?: SpokenLang,
   signal?: AbortSignal,
