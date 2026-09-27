@@ -12,6 +12,7 @@ import { Art } from "../listen/Art";
 import { AudioVisualizer } from "../caption/AudioVisualizer";
 import { TranscriptReader } from "./TranscriptReader";
 import { VocabularyModal } from "../caption/VocabularyModal";
+import { IconClose, IconMoon, IconPalette, IconSparkle, IconStar, IconSun, IconWarning, IconZap } from "../icons";
 import {
   CaptionSettings,
   DEFAULT_CAPTION_SETTINGS,
@@ -781,7 +782,7 @@ export function FullscreenPlayer() {
               }`}
               title="Sổ từ vựng đã lưu"
             >
-              <span>⭐</span>
+              <IconStar className="w-3 h-3" />
               <span className="hidden sm:inline">Từ vựng</span>
               <span
                 className={`rounded-full px-1.5 text-[10px] ${
@@ -803,7 +804,7 @@ export function FullscreenPlayer() {
               }`}
               title={isLight ? "Chuyển sang giao diện Tối (Dark Theme)" : "Chuyển sang giao diện Sáng (Light Theme)"}
             >
-              <span>{isLight ? "☀️" : "🌙"}</span>
+              {isLight ? <IconSun className="w-3 h-3" /> : <IconMoon className="w-3 h-3" />}
               <span className="hidden sm:inline">{isLight ? "Light" : "Dark"}</span>
             </button>
 
@@ -877,20 +878,20 @@ export function FullscreenPlayer() {
             }`}
           >
             <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[var(--rule)]">
-              <span className="text-xs font-bold text-[var(--ink)]">
-                🎨 Bảng màu giao diện (16 Chủ đề Sáng & Tối)
+              <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink)]">
+                <IconPalette className="w-3.5 h-3.5" /> Bảng màu giao diện (16 Chủ đề Sáng & Tối)
               </span>
               <button
                 type="button"
                 onClick={() => setShowThemePicker(false)}
-                className="icon-btn text-sm text-[var(--ink)]"
+                className="icon-btn text-[var(--ink)]"
               >
-                ✕
+                <IconClose className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="mb-1.5 text-[11px] font-semibold text-[var(--ink-soft)]">
-              ☀️ Giao diện Sáng (8 màu)
+            <p className="flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold text-[var(--ink-soft)]">
+              <IconSun className="w-3 h-3" /> Giao diện Sáng (8 màu)
             </p>
             <div className="grid grid-cols-2 gap-1.5 mb-3">
               {(Object.keys(PLAYER_THEMES) as PlayerThemeId[])
@@ -924,8 +925,8 @@ export function FullscreenPlayer() {
                 })}
             </div>
 
-            <p className="mb-1.5 text-[11px] font-semibold text-[var(--ink-soft)]">
-              🌙 Giao diện Tối (8 màu)
+            <p className="flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold text-[var(--ink-soft)]">
+              <IconMoon className="w-3 h-3" /> Giao diện Tối (8 màu)
             </p>
             <div className="grid grid-cols-2 gap-1.5">
               {(Object.keys(PLAYER_THEMES) as PlayerThemeId[])
@@ -1097,8 +1098,8 @@ export function FullscreenPlayer() {
             }`}
           >
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-bold text-[var(--ink)]">
-                ⚡ Tốc độ phát đa mức (Playback Speed)
+              <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink)]">
+                <IconZap className="w-3.5 h-3.5" /> Tốc độ phát đa mức (Playback Speed)
               </span>
               <div className="flex items-center gap-1.5">
                 <button
@@ -1121,9 +1122,9 @@ export function FullscreenPlayer() {
                 <button
                   type="button"
                   onClick={() => setShowSpeedPicker(false)}
-                  className="ml-1 rounded-lg p-1 text-xs text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                  className="ml-1 rounded-lg p-1 text-[var(--ink-faint)] hover:text-[var(--ink)]"
                 >
-                  ✕
+                  <IconClose className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -1161,8 +1162,8 @@ export function FullscreenPlayer() {
                 <Art src={nextTrack.artwork} alt="" size={38} seed={nextTrack.showTitle || nextTrack.title} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
-                  ✨ {currentTime >= totalDuration - 2 ? "Tập tiếp theo · Next" : "10s cuối · Tập tiếp theo"}
+                <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
+                  <IconSparkle className="w-2.5 h-2.5" /> {currentTime >= totalDuration - 2 ? "Tập tiếp theo · Next" : "10s cuối · Tập tiếp theo"}
                 </p>
                 <p className="truncate text-[12.5px] font-semibold text-[var(--ink)]">
                   {nextTrack.title}
@@ -1183,10 +1184,10 @@ export function FullscreenPlayer() {
               <button
                 type="button"
                 onClick={() => setDismissedNextId(nextTrack.id)}
-                className="icon-btn h-7 w-7 rounded-full text-[var(--ink-faint)] hover:text-[var(--ink)] active:scale-90 transition-all text-xs"
+                className="icon-btn h-7 w-7 rounded-full text-[var(--ink-faint)] hover:text-[var(--ink)] active:scale-90 transition-all"
                 title="Bỏ qua"
               >
-                ✕
+                <IconClose className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -1205,7 +1206,7 @@ export function FullscreenPlayer() {
           {mediaState?.error ? (
             <div className="mb-2.5 flex flex-col gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/15 p-2.5 text-[12px] text-rose-800 dark:text-rose-200">
               <div className="flex items-start gap-2">
-                <span className="text-sm shrink-0 leading-none mt-0.5">⚠️</span>
+                <IconWarning className="w-4 h-4 shrink-0 mt-0.5" />
                 <span className="min-w-0 flex-1 leading-snug">{mediaState.error}</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 pt-0.5">

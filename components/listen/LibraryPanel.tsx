@@ -12,6 +12,7 @@ import {
 } from "@/lib/library";
 import { Art } from "./Art";
 import { GoogleSync } from "./GoogleSync";
+import { IconCheck, IconClose, IconHeartFilled, IconMic, IconPlayFilled, IconStar, IconStarFilled } from "../icons";
 
 function percent(entry: RecentEpisode): number {
   if (!entry.durationSec) return 0;
@@ -113,7 +114,7 @@ export function LibraryPanel({
                 : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
             }`}
           >
-            <span>🎙️</span>
+            <IconMic className="w-3.5 h-3.5" />
             <span>{t("library.recentSources")}</span>
             <span className="rounded-full bg-black/10 px-1.5 py-0.2 text-[10.5px]">
               {recentSources.length}
@@ -131,7 +132,7 @@ export function LibraryPanel({
                 : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
             }`}
           >
-            <span>❤️</span>
+            <IconHeartFilled className="w-3.5 h-3.5" />
             <span>{t("library.favorites")}</span>
             <span className="rounded-full bg-black/10 px-1.5 py-0.2 text-[10.5px]">
               {favoriteEpisodes.length + shows.length}
@@ -163,7 +164,7 @@ export function LibraryPanel({
                 : "bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
             }`}
           >
-            <span>✓</span>
+            <IconCheck className="w-3.5 h-3.5" />
             <span>{t("library.finished")}</span>
             <span className="rounded-full bg-black/10 px-1.5 py-0.2 text-[10.5px]">
               {finished.length}
@@ -179,7 +180,7 @@ export function LibraryPanel({
         <div>
           <div className="mb-2.5 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--ink)]">
-              <span>🎙️</span>
+              <IconMic className="w-3.5 h-3.5" />
               <span>{t("library.recentSources")}</span>
             </h2>
             <span className="text-[12px] text-[var(--ink-faint)]">
@@ -212,8 +213,8 @@ export function LibraryPanel({
                         {source.title}
                       </p>
                       {source.lastEpisodeTitle ? (
-                        <p className="mt-0.5 truncate text-[11.5px] text-[var(--ink-soft)]">
-                          ▶ {source.lastEpisodeTitle}
+                        <p className="mt-0.5 flex items-center gap-1 truncate text-[11.5px] text-[var(--ink-soft)]">
+                          <IconPlayFilled className="w-2.5 h-2.5 shrink-0" /> {source.lastEpisodeTitle}
                         </p>
                       ) : source.publisher ? (
                         <p className="mt-0.5 truncate text-[11.5px] text-[var(--ink-faint)]">
@@ -236,13 +237,13 @@ export function LibraryPanel({
                         pageUrl: source.pageUrl,
                       });
                     }}
-                    className={`icon-btn text-[14px] shrink-0 transition ${
+                    className={`icon-btn shrink-0 transition ${
                       saved ? "text-amber-500 scale-105" : "text-[var(--ink-faint)] hover:text-amber-500"
                     }`}
                     title={saved ? t("library.saved") : t("library.save")}
                     aria-label={saved ? t("library.saved") : t("library.save")}
                   >
-                    {saved ? "★" : "☆"}
+                    {saved ? <IconStarFilled className="w-3.5 h-3.5" /> : <IconStar className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               );
@@ -258,7 +259,7 @@ export function LibraryPanel({
         <div>
           <div className="mb-2.5 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--ink)]">
-              <span>❤️</span>
+              <IconHeartFilled className="w-3.5 h-3.5" />
               <span>{t("library.favoriteEpisodes")}</span>
             </h2>
             <span className="text-[12px] text-[var(--ink-faint)]">
@@ -322,11 +323,11 @@ export function LibraryPanel({
                       );
                     }
                   }}
-                  className="icon-btn absolute right-2 top-3 text-[14px] text-rose-500 hover:scale-110 transition"
+                  className="icon-btn absolute right-2 top-3 text-rose-500 hover:scale-110 transition"
                   title={t("library.unfavoriteEpisode")}
                   aria-label={t("library.unfavoriteEpisode")}
                 >
-                  ❤️
+                  <IconHeartFilled className="w-3.5 h-3.5" />
                 </button>
               </li>
             ))}
@@ -390,10 +391,10 @@ export function LibraryPanel({
                   type="button"
                   aria-label={t("library.forget")}
                   title={t("library.forget")}
-                  className="icon-btn absolute right-1 top-1 text-[16px]"
+                  className="icon-btn absolute right-1 top-1"
                   onClick={() => onForget(entry.id)}
                 >
-                  ×
+                  <IconClose className="w-3.5 h-3.5" />
                 </button>
               </li>
               );
@@ -408,8 +409,14 @@ export function LibraryPanel({
       {(activeTab === "all" || activeTab === "favorites") && shows.length > 0 && (
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-[15px] font-semibold text-[var(--ink)]">
-              {activeTab === "favorites" ? `⭐ ${t("library.favoriteSources")}` : t("library.shows")}
+            <h2 className="flex items-center gap-1.5 text-[15px] font-semibold text-[var(--ink)]">
+              {activeTab === "favorites" ? (
+                <>
+                  <IconStarFilled className="w-3.5 h-3.5" /> {t("library.favoriteSources")}
+                </>
+              ) : (
+                t("library.shows")
+              )}
             </h2>
             <span className="text-[12px] text-[var(--ink-faint)]">
               {shows.length} podcast
@@ -439,10 +446,10 @@ export function LibraryPanel({
                     type="button"
                     aria-label={t("library.unfollowTitle", { name: show.title })}
                     title={t("library.unfollowTitle", { name: show.title })}
-                    className="icon-btn absolute right-1 top-1/2 -translate-y-1/2 text-[16px]"
+                    className="icon-btn absolute right-1 top-1/2 -translate-y-1/2"
                     onClick={() => onUnfollow(show)}
                   >
-                    ×
+                    <IconClose className="w-3.5 h-3.5" />
                   </button>
                 ) : null}
               </li>
@@ -491,12 +498,12 @@ export function LibraryPanel({
                 </button>
                 <button
                   type="button"
-                  className="icon-btn shrink-0 text-[16px]"
+                  className="icon-btn shrink-0"
                   aria-label={t("library.forget")}
                   title={t("library.forget")}
                   onClick={() => onForget(entry.id)}
                 >
-                  ×
+                  <IconClose className="w-3.5 h-3.5" />
                 </button>
               </li>
             ))}

@@ -5,6 +5,7 @@ import { useUi } from "@/lib/i18n";
 import { liveCaptionService, type CaptionSegment } from "@/lib/liveCaption";
 import { useTransitionStage } from "@/lib/useTransitionStage";
 import { normalizeVocabWord, saveVocabularyWord, isWordSaved } from "@/lib/vocabulary";
+import { IconClose, IconStar, IconStarFilled } from "../icons";
 
 interface PipSubtitleOverlayProps {
   /** True when the video is in Picture-in-Picture mode (video track, not docked in stage, not minimized). */
@@ -222,11 +223,11 @@ export function PipSubtitleOverlay({
         <button
           type="button"
           onClick={() => setManuallyDismissed(true)}
-          className="absolute right-2 top-2 h-6 w-6 rounded-full text-white/50 hover:text-white hover:bg-white/10 active:scale-90 transition flex items-center justify-center text-xs"
+          className="absolute right-2 top-2 h-6 w-6 rounded-full text-white/50 hover:text-white hover:bg-white/10 active:scale-90 transition flex items-center justify-center"
           title="Tạm ẩn phụ đề PiP"
           aria-label="Tạm ẩn phụ đề PiP"
         >
-          ✕
+          <IconClose className="w-3 h-3" />
         </button>
 
         {/* Header Tag / Indicator */}
@@ -249,21 +250,29 @@ export function PipSubtitleOverlay({
             <button
               type="button"
               onClick={toggleSaveWord}
-              className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition ${
+              className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition ${
                 saved
                   ? "bg-amber-500/20 text-amber-300"
                   : "bg-white/15 text-white hover:bg-amber-500 hover:text-black"
               }`}
               title={saved ? "Đã lưu từ vựng" : "Lưu vào sổ từ"}
             >
-              {saved ? "★ Đã lưu" : "☆ Lưu từ"}
+              {saved ? (
+                <>
+                  <IconStarFilled className="w-2.5 h-2.5" /> Đã lưu
+                </>
+              ) : (
+                <>
+                  <IconStar className="w-2.5 h-2.5" /> Lưu từ
+                </>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setSelectedWord(null)}
-              className="text-zinc-400 hover:text-white ml-1 text-xs"
+              className="text-zinc-400 hover:text-white ml-1"
             >
-              ✕
+              <IconClose className="w-3 h-3" />
             </button>
           </div>
         )}

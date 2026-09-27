@@ -9,6 +9,7 @@ import {
   clearVocabulary,
   type SavedWord,
 } from "@/lib/vocabulary";
+import { IconBook, IconClose, IconEye, IconEyeOff, IconMic, IconPlayFilled, IconSpeaker, IconStarFilled } from "../icons";
 
 function formatClock(sec?: number): string {
   if (sec === undefined || !isFinite(sec) || sec < 0) return "";
@@ -80,8 +81,8 @@ export function VocabularyModal({
         {/* Header */}
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-lg text-amber-300">
-              ⭐
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300">
+              <IconStarFilled className="w-4 h-4" />
             </span>
             <div>
               <h3 className="text-base font-bold text-white">
@@ -98,7 +99,7 @@ export function VocabularyModal({
             className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-zinc-300 transition hover:bg-white/20 hover:text-white"
             aria-label="Close vocabulary"
           >
-            ✕
+            <IconClose className="w-4 h-4" />
           </button>
         </div>
 
@@ -115,14 +116,22 @@ export function VocabularyModal({
             <button
               type="button"
               onClick={() => setHideMeaning((v) => !v)}
-              className={`rounded-xl border px-3 py-2 text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
                 hideMeaning
                   ? "border-amber-400/50 bg-amber-500/20 text-amber-200"
                   : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
               }`}
               title="Chế độ Flashcard: ẩn nghĩa để tự kiểm tra"
             >
-              {hideMeaning ? "👁 Hiện nghĩa" : "🙈 Ẩn nghĩa (Ôn tập)"}
+              {hideMeaning ? (
+                <>
+                  <IconEye className="w-3.5 h-3.5" /> Hiện nghĩa
+                </>
+              ) : (
+                <>
+                  <IconEyeOff className="w-3.5 h-3.5" /> Ẩn nghĩa (Ôn tập)
+                </>
+              )}
             </button>
             {words.length > 0 && (
               <button
@@ -144,7 +153,9 @@ export function VocabularyModal({
         <div className="flex-1 space-y-2.5 overflow-y-auto p-4 sm:p-5">
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="mb-2 text-3xl opacity-60">📚</div>
+              <div className="mb-2 flex justify-center opacity-60">
+              <IconBook className="w-8 h-8" />
+            </div>
               <p className="text-sm font-medium text-zinc-300">
                 {words.length === 0
                   ? "Chưa có từ vựng nào được lưu"
@@ -168,7 +179,7 @@ export function VocabularyModal({
                       className="inline-flex items-center gap-1.5 text-base font-bold text-amber-300 hover:underline"
                       title="Nghe phát âm tiếng Đức"
                     >
-                      <span>🔊</span>
+                      <IconSpeaker className="w-3.5 h-3.5" />
                       <span>{item.word}</span>
                     </button>
                     <span className="text-zinc-500">→</span>
@@ -192,19 +203,19 @@ export function VocabularyModal({
                           onSeek(item.timestamp!);
                           onClose();
                         }}
-                        className="rounded-lg bg-white/10 px-2 py-1 font-mono text-[11px] text-zinc-300 hover:bg-amber-500 hover:text-zinc-950"
+                        className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 font-mono text-[11px] text-zinc-300 hover:bg-amber-500 hover:text-zinc-950"
                         title="Tua tới đoạn có từ này"
                       >
-                        ▶ {formatClock(item.timestamp)}
+                        <IconPlayFilled className="w-2.5 h-2.5" /> {formatClock(item.timestamp)}
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => removeVocabularyWord(item.id)}
-                      className="rounded-lg p-1.5 text-xs text-zinc-500 hover:bg-rose-500/20 hover:text-rose-300"
+                      className="rounded-lg p-1.5 text-zinc-500 hover:bg-rose-500/20 hover:text-rose-300"
                       title="Xoá từ này"
                     >
-                      ✕
+                      <IconClose className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
@@ -224,8 +235,8 @@ export function VocabularyModal({
 
                 {(item.showTitle || item.episodeTitle) && (
                   <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-zinc-500">
-                    <span className="truncate">
-                      🎙 {item.showTitle ? `${item.showTitle} · ` : ""}
+                    <span className="flex items-center gap-1 truncate">
+                      <IconMic className="w-2.5 h-2.5" /> {item.showTitle ? `${item.showTitle} · ` : ""}
                       {item.episodeTitle || ""}
                     </span>
                   </div>

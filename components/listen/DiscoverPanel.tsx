@@ -15,6 +15,7 @@ import {
 import { CEFR_LEVELS, type Cefr } from "@/lib/types";
 import type { ChartEntry } from "@/app/api/charts/route";
 import { Art } from "./Art";
+import { IconBarChart, IconClose, IconFire, IconSortAz } from "../icons";
 
 /** Enough to suggest what kind of thing a topic is, without becoming a wall. */
 const TOPICS_SHOWN = 8;
@@ -180,10 +181,10 @@ export function DiscoverPanel({
                   <button
                     type="button"
                     onClick={() => onSearchChange("")}
-                    className="hover:opacity-75 p-0.5 font-bold"
+                    className="hover:opacity-75 p-0.5"
                     title={t("library.clearSearch") || "Clear search"}
                   >
-                    ×
+                    <IconClose className="w-3 h-3" />
                   </button>
                 )}
               </span>
@@ -224,39 +225,39 @@ export function DiscoverPanel({
                 <button
                   type="button"
                   onClick={() => setCatalogSort("popular")}
-                  className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
                     catalogSort === "popular"
                       ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
                       : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                   }`}
                   title={t("sort.mostListened")}
                 >
-                  🔥 {t("sort.mostListened")}
+                  <IconFire className="w-3 h-3" /> {t("sort.mostListened")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setCatalogSort("az")}
-                  className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
                     catalogSort === "az"
                       ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
                       : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                   }`}
                   title={t("sort.az")}
                 >
-                  🔤 {t("sort.az")}
+                  <IconSortAz className="w-3 h-3" /> {t("sort.az")}
                 </button>
                 {levelsApply && (
                   <button
                     type="button"
                     onClick={() => setCatalogSort("level")}
-                    className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
                       catalogSort === "level"
                         ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
                         : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                     }`}
                     title={t("sort.level")}
                   >
-                    📊 {t("sort.level")}
+                    <IconBarChart className="w-3 h-3" /> {t("sort.level")}
                   </button>
                 )}
               </div>

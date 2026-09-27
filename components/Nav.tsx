@@ -8,6 +8,7 @@ import { usePlayer } from "./player/PlayerProvider";
 import { AudioVisualizer } from "./caption/AudioVisualizer";
 import { SettingsMenu } from "./SettingsMenu";
 import { Logo } from "./Logo";
+import { IconMoon, IconSun } from "./icons";
 
 const ITEMS: Array<{ href: string; key: UiKey; short?: UiKey; wideOnly?: boolean }> = [
   { href: "/", key: "nav.listen", short: "nav.listenShort" },
@@ -155,11 +156,11 @@ export function Nav() {
           <button
             type="button"
             onClick={() => setTheme(resolved === "dark" ? "light" : "dark")}
-            className="btn h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0 text-[14px] sm:text-[15px] shadow-2xs"
+            className="btn h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0 shadow-2xs"
             title={resolved === "dark" ? "Light mode" : "Dark mode"}
             aria-label={resolved === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
-            <span aria-hidden>{resolved === "dark" ? "☀️" : "🌙"}</span>
+            {resolved === "dark" ? <IconSun className="w-4 h-4" /> : <IconMoon className="w-4 h-4" />}
           </button>
           <SettingsMenu />
         </div>

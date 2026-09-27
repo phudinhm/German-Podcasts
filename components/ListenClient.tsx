@@ -44,6 +44,31 @@ import {
 } from "./caption/CaptionSettings";
 import { liveCaptionService, checkCaptionSupport, type CaptureMode } from "@/lib/liveCaption";
 import { detectSpokenLang } from "@/lib/language";
+import {
+  IconArrowDown,
+  IconBook,
+  IconCheck,
+  IconChevronRight,
+  IconClapperboard,
+  IconClose,
+  IconExpand,
+  IconEye,
+  IconFire,
+  IconFolder,
+  IconHeadphones,
+  IconHeart,
+  IconHeartFilled,
+  IconHome,
+  IconMic,
+  IconPin,
+  IconPlayFilled,
+  IconSearch,
+  IconSortAz,
+  IconSparkle,
+  IconStar,
+  IconStarFilled,
+  IconTv,
+} from "./icons";
 
 const RECENT_KEY = "hoerbar.discover.v2";
 const PAGE_SIZE = 40;
@@ -951,9 +976,9 @@ export function ListenClient() {
         <div className="relative min-w-0 flex-1">
           <span
             aria-hidden
-            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[14px] text-[var(--ink-faint)]"
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-faint)]"
           >
-            🔍
+            <IconSearch className="w-3.5 h-3.5" />
           </span>
           <input
             ref={searchInputRef}
@@ -976,9 +1001,9 @@ export function ListenClient() {
                 searchInputRef.current?.focus();
               }}
               aria-label="Clear search"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ink-faint)]/25 text-[12px] font-bold text-[var(--ink-soft)] hover:bg-[var(--ink-faint)]/40 transition active:scale-90"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ink-faint)]/25 text-[var(--ink-soft)] hover:bg-[var(--ink-faint)]/40 transition active:scale-90"
             >
-              ×
+              <IconClose className="w-3 h-3" />
             </button>
           ) : (
             <span className="macos-kbd hidden sm:inline-flex absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none select-none">
@@ -1003,7 +1028,8 @@ export function ListenClient() {
             className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] border border-[var(--rule)]/70 px-2.5 py-1 font-medium text-[var(--ink-soft)] hover:text-[var(--accent)] active:scale-95 transition"
           >
             <span>‹</span>
-            <span>🏠 Khám phá</span>
+            <IconHome className="w-3 h-3" />
+            <span>Khám phá</span>
           </button>
           {results && results.length > 0 && feed ? (
             <button
@@ -1015,12 +1041,13 @@ export function ListenClient() {
               className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] border border-[var(--rule)]/70 px-2.5 py-1 font-medium text-[var(--ink-soft)] hover:text-[var(--accent)] active:scale-95 transition"
             >
               <span>‹</span>
-              <span>🔎 Kết quả ({results.length})</span>
+              <IconSearch className="w-3 h-3" />
+              <span>Kết quả ({results.length})</span>
             </button>
           ) : null}
           {feed ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)]/70 border border-[var(--accent)]/30 px-2.5 py-1 font-semibold text-[var(--accent)] max-w-[220px] sm:max-w-[320px] truncate">
-              <span>🎙️</span>
+              <IconMic className="w-3 h-3" />
               <span className="truncate">{feed.title}</span>
             </span>
           ) : null}
@@ -1031,8 +1058,8 @@ export function ListenClient() {
       {playing && !showInlinePlayer && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl glass-panel px-3.5 py-2.5 shadow-sm animate-panel-in">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white text-xs font-bold shadow-xs">
-              {player.isVideoTrack ? "🎬" : "🎧"}
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-xs">
+              {player.isVideoTrack ? <IconClapperboard className="w-3.5 h-3.5" /> : <IconHeadphones className="w-3.5 h-3.5" />}
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12.5px] font-semibold text-[var(--ink)]">
@@ -1048,17 +1075,17 @@ export function ListenClient() {
               <button
                 type="button"
                 onClick={() => player.setVideoPipMode(false)}
-                className="btn px-2.5 py-1 text-[11.5px] font-semibold text-[var(--accent)] border-[var(--accent)]/40"
+                className="btn flex items-center gap-1.5 px-2.5 py-1 text-[11.5px] font-semibold text-[var(--accent)] border-[var(--accent)]/40"
               >
-                📺 Hiện tại đây
+                <IconTv className="w-3.5 h-3.5" /> Hiện tại đây
               </button>
             ) : null}
             <button
               type="button"
               onClick={() => player.setFullscreenOpen(true)}
-              className="btn btn-primary px-3 py-1 text-[11.5px] font-semibold"
+              className="btn btn-primary flex items-center gap-1.5 px-3 py-1 text-[11.5px] font-semibold"
             >
-              ⛶ Mở Media Player
+              <IconExpand className="w-3.5 h-3.5" /> Mở Media Player
             </button>
           </div>
         </div>
@@ -1129,8 +1156,8 @@ export function ListenClient() {
               <div className="flex items-center gap-1 shrink-0 -mr-1 -mt-1">
                 <button
                   type="button"
-                  className={`icon-btn text-[14px] transition ${
-                    isEpisodeFavorited(playing.id) ? "text-rose-500 font-bold scale-105" : "text-[var(--ink-faint)] hover:text-rose-500"
+                  className={`icon-btn transition ${
+                    isEpisodeFavorited(playing.id) ? "text-rose-500 scale-105" : "text-[var(--ink-faint)] hover:text-rose-500"
                   }`}
                   aria-label={isEpisodeFavorited(playing.id) ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
                   title={isEpisodeFavorited(playing.id) ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
@@ -1149,18 +1176,18 @@ export function ListenClient() {
                     refreshLibrary();
                   }}
                 >
-                  {isEpisodeFavorited(playing.id) ? "❤️" : "🤍"}
+                  {isEpisodeFavorited(playing.id) ? <IconHeartFilled className="w-3.5 h-3.5" /> : <IconHeart className="w-3.5 h-3.5" />}
                 </button>
                 <button
                   type="button"
-                  className={`icon-btn text-[13px] ${
-                    freezePane ? "text-[var(--accent)] font-bold bg-[var(--accent-soft)]" : "text-[var(--ink-faint)]"
+                  className={`icon-btn ${
+                    freezePane ? "text-[var(--accent)] bg-[var(--accent-soft)]" : "text-[var(--ink-faint)]"
                   }`}
                   aria-label={freezePane ? t("player.unfreezePane") : t("player.freezePane")}
                   title={freezePane ? t("player.unfreezePane") : t("player.freezePane")}
                   onClick={() => setFreezePane((v) => !v)}
                 >
-                  📌
+                  <IconPin className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
@@ -1169,18 +1196,18 @@ export function ListenClient() {
                   aria-label={t("player.openFullPlayer")}
                   title={t("player.openFullPlayer")}
                 >
-                  <span aria-hidden className="text-[13px] leading-none">🎧</span>
+                  <IconHeadphones className="w-3.5 h-3.5" aria-hidden />
                   <span>Media Player</span>
-                  <span aria-hidden className="text-[11px] opacity-90">⤢</span>
+                  <IconExpand className="w-3 h-3 opacity-90" aria-hidden />
                 </button>
                 <button
                   type="button"
-                  className="icon-btn text-[18px]"
+                  className="icon-btn"
                   aria-label={t("common.close")}
                   title={t("common.close")}
                   onClick={() => player.stop()}
                 >
-                  ×
+                  <IconClose className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -1322,11 +1349,11 @@ export function ListenClient() {
                 ) : null}
                 <button
                   type="button"
-                  className="icon-btn text-[13px]"
+                  className="icon-btn"
                   aria-label={t("common.close")}
                   onClick={() => setCaptionNotice(null)}
                 >
-                  ×
+                  <IconClose className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : null}
@@ -1399,26 +1426,26 @@ export function ListenClient() {
                   <button
                     type="button"
                     onClick={() => setResultsSort("popular")}
-                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${
                       resultsSort === "popular"
                         ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
                         : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                     }`}
                     title={t("sort.mostListened")}
                   >
-                    🔥 {t("sort.mostListened")}
+                    <IconFire className="w-3 h-3" /> {t("sort.mostListened")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setResultsSort("az")}
-                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${
                       resultsSort === "az"
                         ? "bg-[var(--accent)] text-[var(--paper)] shadow-xs"
                         : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                     }`}
                     title={t("sort.az")}
                   >
-                    🔤 {t("sort.az")}
+                    <IconSortAz className="w-3 h-3" /> {t("sort.az")}
                   </button>
                 </div>
               )}
@@ -1507,7 +1534,7 @@ export function ListenClient() {
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] border border-[var(--accent-ring)]/40 px-2.5 py-1 text-[12px] font-semibold text-[var(--accent)] transition active:scale-95"
                 title={t("player.nowPlaying")}
               >
-                <span aria-hidden>🎧</span>
+                <IconHeadphones className="w-3.5 h-3.5" aria-hidden />
                 <span className="hidden sm:inline">{t("player.nowPlaying")}</span>
               </button>
             ) : null}
@@ -1537,8 +1564,8 @@ export function ListenClient() {
                         });
                       }).length;
                       return completedCount > 0 ? (
-                        <span className="chip text-[11px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-500/30">
-                          ✓ {t("feed.listenedCount", { count: completedCount, total: feed.episodes.length })}
+                        <span className="chip flex items-center gap-1 text-[11px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-500/30">
+                          <IconCheck className="w-2.5 h-2.5" /> {t("feed.listenedCount", { count: completedCount, total: feed.episodes.length })}
                         </span>
                       ) : null;
                     })()}
@@ -1549,7 +1576,7 @@ export function ListenClient() {
                 {show?.feedUrl ? (
                   <button
                     type="button"
-                    className="btn text-[12.5px]"
+                    className="btn flex items-center gap-1.5 text-[12.5px]"
                     data-active={saved}
                     aria-pressed={saved}
                     onClick={() => {
@@ -1565,7 +1592,15 @@ export function ListenClient() {
                       );
                     }}
                   >
-                    {saved ? `★ ${t("library.saved")}` : `☆ ${t("library.save")}`}
+                    {saved ? (
+                      <>
+                        <IconStarFilled className="w-3 h-3" /> {t("library.saved")}
+                      </>
+                    ) : (
+                      <>
+                        <IconStar className="w-3 h-3" /> {t("library.save")}
+                      </>
+                    )}
                   </button>
                 ) : null}
                 <button type="button" className="btn text-[12.5px]" onClick={backToResultsOrBrowse}>
@@ -1586,16 +1621,16 @@ export function ListenClient() {
                       value={feedSearch}
                       onChange={(e) => setFeedSearch(e.target.value)}
                     />
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-lg opacity-50" aria-hidden>
-                      🔍
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 opacity-50" aria-hidden>
+                      <IconSearch className="w-4 h-4" />
                     </span>
                     {feedSearch && (
                       <button
                         type="button"
                         onClick={() => setFeedSearch("")}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ink-faint)] hover:text-[var(--ink)]"
                       >
-                        ×
+                        <IconClose className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
@@ -1662,7 +1697,13 @@ export function ListenClient() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent)]">
-                      <span>{isEpFinished ? "✓" : isNearEnd && isPlayingThis ? "✨" : "🎧"}</span>
+                      {isEpFinished ? (
+                        <IconCheck className="w-3 h-3" />
+                      ) : isNearEnd && isPlayingThis ? (
+                        <IconSparkle className="w-3 h-3" />
+                      ) : (
+                        <IconHeadphones className="w-3 h-3" />
+                      )}
                       <span>
                         {isEpFinished
                           ? `Đã hoàn tất tập #${epIdx + 1}`
@@ -1676,8 +1717,16 @@ export function ListenClient() {
                     </p>
                     {showNextSuggestion ? (
                       <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--ink-soft)]">
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                          {isEpFinished ? "👉 Tiếp theo:" : "✨ 10s cuối · Tập tiếp theo:"}
+                        <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                          {isEpFinished ? (
+                            <>
+                              <IconChevronRight className="w-3 h-3" /> Tiếp theo:
+                            </>
+                          ) : (
+                            <>
+                              <IconSparkle className="w-3 h-3" /> 10s cuối · Tập tiếp theo:
+                            </>
+                          )}
                         </span>
                         <span className="truncate font-medium text-[var(--ink)]">
                           #{nextEpIdx + 1} {nextEp.title}
@@ -1693,7 +1742,7 @@ export function ListenClient() {
                           onClick={() => playEpisode(nextEp)}
                           className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white shadow-xs hover:opacity-95 transition active:scale-95"
                         >
-                          <span>▶</span>
+                          <IconPlayFilled className="w-3 h-3" />
                           <span>{t("feed.suggestNext", { n: nextEpIdx + 1 })}</span>
                         </button>
                         <button
@@ -1701,7 +1750,7 @@ export function ListenClient() {
                           onClick={() => jumpToEpisode(nextEpIdx, epIdx)}
                           className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--rule)] bg-[var(--paper-raised)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--ink)] hover:text-[var(--accent)] transition shadow-2xs active:scale-95"
                         >
-                          <span>↓</span>
+                          <IconArrowDown className="w-3 h-3" />
                           <span>{t("feed.viewEp", { n: nextEpIdx + 1 })}</span>
                         </button>
                       </>
@@ -1717,7 +1766,11 @@ export function ListenClient() {
                         }}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white shadow-xs hover:opacity-95 transition active:scale-95"
                       >
-                        <span>{playing && (playing.id.includes(epId) || (playing.url && playing.url === ep.url)) ? "🎧" : "▶"}</span>
+                        {playing && (playing.id.includes(epId) || (playing.url && playing.url === ep.url)) ? (
+                          <IconHeadphones className="w-3 h-3" />
+                        ) : (
+                          <IconPlayFilled className="w-3 h-3" />
+                        )}
                         <span>{playing && (playing.id.includes(epId) || (playing.url && playing.url === ep.url)) ? t("player.nowPlaying") : t("nav.listenShort")}</span>
                       </button>
                     )}
@@ -1731,7 +1784,7 @@ export function ListenClient() {
                         className="inline-flex items-center gap-1 rounded-xl border border-[var(--rule)]/60 bg-[var(--surface)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--ink-soft)] hover:text-[var(--ink)] transition shadow-2xs active:scale-95"
                         title={t("feed.collapsePrior", { n: epIdx })}
                       >
-                        <span>📁</span>
+                        <IconFolder className="w-3 h-3" />
                         <span className="hidden sm:inline">{t("feed.startFromHere")}</span>
                       </button>
                     )}
@@ -1746,8 +1799,8 @@ export function ListenClient() {
             <div className="mb-3 overflow-hidden rounded-2xl border border-[var(--accent)]/30 bg-gradient-to-r from-[var(--surface)] via-[var(--paper-raised)] to-[var(--surface)] p-3 shadow-xs transition-all">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[15px] shrink-0 text-[var(--accent)]">
-                    📁
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent-soft)] shrink-0 text-[var(--accent)]">
+                    <IconFolder className="w-4 h-4" />
                   </span>
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-[var(--ink)] truncate">
@@ -1766,7 +1819,7 @@ export function ListenClient() {
                     onClick={() => setShowCollapsedPrior(!showCollapsedPrior)}
                     className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white border border-[var(--rule)] transition shadow-2xs active:scale-95"
                   >
-                    <span>{showCollapsedPrior ? "📁" : "👁️"}</span>
+                    {showCollapsedPrior ? <IconFolder className="w-3.5 h-3.5" /> : <IconEye className="w-3.5 h-3.5" />}
                     <span>
                       {showCollapsedPrior
                         ? t("feed.hidePriorAgain")
@@ -1779,11 +1832,11 @@ export function ListenClient() {
                       setCollapsedPriorCount(0);
                       setShowCollapsedPrior(false);
                     }}
-                    className="icon-btn text-[14px] text-[var(--ink-faint)] hover:text-[var(--ink)]"
+                    className="icon-btn text-[var(--ink-faint)] hover:text-[var(--ink)]"
                     title={t("common.close")}
                     aria-label={t("common.close")}
                   >
-                    ×
+                    <IconClose className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -1923,7 +1976,7 @@ export function ListenClient() {
                             className="opacity-0 group-hover/item:opacity-100 focus:opacity-100 transition inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--ink-faint)] hover:text-[var(--accent)] hover:bg-[var(--surface)] ml-auto"
                             title={t("feed.collapsePrior", { n: actualIndex })}
                           >
-                            <span>📁</span>
+                            <IconFolder className="w-3 h-3" />
                             <span className="hidden sm:inline">{t("feed.startFromHere")}</span>
                           </button>
                         ) : null}
@@ -1955,7 +2008,7 @@ export function ListenClient() {
                       });
                       refreshLibrary();
                     }}
-                    className={`icon-btn absolute right-2 top-3 h-8 w-8 text-[14px] transition ${
+                    className={`icon-btn absolute right-2 top-3 h-8 w-8 transition ${
                       isFav
                         ? "text-rose-500 opacity-100 scale-105"
                         : "text-[var(--ink-faint)] opacity-40 hover:opacity-100 hover:text-rose-500"
@@ -1963,15 +2016,15 @@ export function ListenClient() {
                     aria-label={isFav ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
                     title={isFav ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
                   >
-                    {isFav ? "❤️" : "🤍"}
+                    {isFav ? <IconHeartFilled className="w-3.5 h-3.5" /> : <IconHeart className="w-3.5 h-3.5" />}
                   </button>
 
                   {/* Next Episode Suggestion banner: ONLY show when completed 100% or in last 10s of playback */}
                   {(isFinished || (current && isNearEnd)) && actualIndex + 1 < episodes.length && (
                     <div className="mx-3 mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-[12px] shadow-2xs backdrop-blur-xs animate-fade-in">
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white shrink-0">
-                          {isFinished ? "✓" : "✨"}
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white shrink-0">
+                          {isFinished ? <IconCheck className="w-2.5 h-2.5" /> : <IconSparkle className="w-2.5 h-2.5" />}
                         </span>
                         <span className="text-[12px] font-medium text-[var(--ink)] truncate">
                           <span className="font-semibold text-emerald-700 dark:text-emerald-300">
@@ -1989,7 +2042,7 @@ export function ListenClient() {
                           }}
                           className="inline-flex items-center gap-1 rounded-lg bg-[var(--paper-raised)] px-2.5 py-1 text-[11.5px] font-semibold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition shadow-2xs border border-[var(--rule)]/60 active:scale-95"
                         >
-                          <span>👁️</span>
+                          <IconEye className="w-3 h-3" />
                           <span>{t("feed.viewEp", { n: actualIndex + 2 })}</span>
                         </button>
                         <button
@@ -2000,7 +2053,7 @@ export function ListenClient() {
                           }}
                           className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent)] px-2.5 py-1 text-[11.5px] font-semibold text-white hover:opacity-95 transition shadow-2xs active:scale-95"
                         >
-                          <span>▶</span>
+                          <IconPlayFilled className="w-3 h-3" />
                           <span>{t("nav.listenShort")}</span>
                         </button>
                       </div>
@@ -2090,8 +2143,8 @@ export function ListenClient() {
       {!feed && !results ? (
         <div className="mt-6 rounded-2xl border border-[var(--rule)]/80 bg-[var(--paper-raised)] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
           <div className="min-w-0 flex-1">
-            <p className="text-[14.5px] font-semibold text-[var(--ink)]">
-              📚 Danh sách 128 Kênh Podcast (A1–C2) & Bảng xếp hạng
+            <p className="flex items-center gap-1.5 text-[14.5px] font-semibold text-[var(--ink)]">
+              <IconBook className="w-3.5 h-3.5" /> Danh sách 128 Kênh Podcast (A1–C2) & Bảng xếp hạng
             </p>
             <p className="mt-0.5 text-[12.5px] text-[var(--ink-soft)]">
               Toàn bộ bảng xếp hạng Apple Podcasts và danh mục 128 kênh học theo cấp độ CEFR / chủ đề nằm trong tab <strong>{t("nav.library")}</strong>.
@@ -2102,7 +2155,9 @@ export function ListenClient() {
             onClick={() => router.push("/library")}
             className="btn btn-primary shrink-0 px-4 py-2 text-[13px] font-semibold"
           >
-            <span>📚 Mở {t("nav.library")} →</span>
+            <span className="flex items-center gap-1.5">
+              <IconBook className="w-3.5 h-3.5" /> Mở {t("nav.library")} →
+            </span>
           </button>
         </div>
       ) : null}
@@ -2166,7 +2221,7 @@ export function ListenClient() {
               title={t("player.nowPlaying")}
               aria-label={t("player.nowPlaying")}
             >
-              <span aria-hidden>🎧</span>
+              <IconHeadphones className="w-3.5 h-3.5" aria-hidden />
             </button>
           ) : null}
 
