@@ -8,8 +8,7 @@ import { useTransitionStage } from "@/lib/useTransitionStage";
 import { listVocabulary } from "@/lib/vocabulary";
 import { useZoom } from "@/lib/zoom";
 import { VocabularyModal } from "./caption/VocabularyModal";
-
-const THEME_GLYPH: Record<"light" | "dark", string> = { light: "☀", dark: "☾" };
+import { IconMoon, IconPalette, IconStar, IconSun } from "./icons";
 
 const THEME_OPTIONS: Array<{
   value: Theme;
@@ -97,7 +96,7 @@ export function SettingsMenu() {
         className="btn gap-1 px-2.5 py-1 text-[12px]"
         title="Sổ từ vựng đã lưu"
       >
-        <span>⭐</span>
+        <IconStar className="w-3.5 h-3.5" />
         <span className="hidden md:inline">Từ vựng</span>
         {vocabCount > 0 && (
           <span className="rounded-full bg-[var(--accent-soft)] px-1.5 text-[10.5px] font-bold text-[var(--accent)]">
@@ -114,9 +113,11 @@ export function SettingsMenu() {
         aria-expanded={open}
         aria-label={t("theme.settings")}
       >
-        <span aria-hidden className="text-[13px] leading-none text-[var(--ink-soft)]">
-          {THEME_GLYPH[resolved]}
-        </span>
+        {resolved === "light" ? (
+          <IconSun className="w-3.5 h-3.5 text-[var(--ink-soft)]" />
+        ) : (
+          <IconMoon className="w-3.5 h-3.5 text-[var(--ink-soft)]" />
+        )}
         <span className="hidden sm:inline">{lang.toUpperCase()}</span>
       </button>
 
@@ -129,12 +130,12 @@ export function SettingsMenu() {
             entered ? "is-open" : open ? "" : "is-closing"
           }`}
         >
-          <p className="px-1.5 pb-1.5 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
-            🎨 {t("theme.title")} (16+ Chủ đề màu)
+          <p className="flex items-center gap-1.5 px-1.5 pb-1.5 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
+            <IconPalette className="w-3 h-3" /> {t("theme.title")} (16+ Chủ đề màu)
           </p>
 
-          <p className="px-1.5 pb-1 pt-0.5 text-[10px] font-semibold text-[var(--ink-soft)]">
-            ☀️ Giao diện Sáng (Light)
+          <p className="flex items-center gap-1.5 px-1.5 pb-1 pt-0.5 text-[10px] font-semibold text-[var(--ink-soft)]">
+            <IconSun className="w-3 h-3" /> Giao diện Sáng (Light)
           </p>
           <div className="grid grid-cols-2 gap-1 mb-2">
             {THEME_OPTIONS.filter((o) => o.group === "light" || o.group === "auto").map((option) => {
@@ -168,8 +169,8 @@ export function SettingsMenu() {
             })}
           </div>
 
-          <p className="px-1.5 pb-1 pt-1 text-[10px] font-semibold text-[var(--ink-soft)]">
-            🌙 Giao diện Tối (Dark)
+          <p className="flex items-center gap-1.5 px-1.5 pb-1 pt-1 text-[10px] font-semibold text-[var(--ink-soft)]">
+            <IconMoon className="w-3 h-3" /> Giao diện Tối (Dark)
           </p>
           <div className="grid grid-cols-2 gap-1">
             {THEME_OPTIONS.filter((o) => o.group === "dark").map((option) => {

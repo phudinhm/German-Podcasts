@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IconMusicNote } from "../icons";
 
 /**
  * Six muted duotones for artwork that is missing or refuses to load.
@@ -45,16 +46,15 @@ export function Art({
     const [from, to] = tintFor(seed ?? alt ?? "");
     return (
       <span
-        className="art flex shrink-0 items-center justify-center font-semibold text-white/85"
+        className="art flex shrink-0 items-center justify-center text-white/85"
         style={{
           width: size,
           height: size,
-          fontSize: Math.max(11, size / 3.4),
           backgroundImage: `linear-gradient(140deg, ${from}, ${to})`,
         }}
         aria-hidden
       >
-        ♪
+        <IconMusicNote style={{ width: size / 2.6, height: size / 2.6 }} strokeWidth={1.8} />
       </span>
     );
   }

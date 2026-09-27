@@ -12,6 +12,18 @@ import { Art } from "../listen/Art";
 import { AudioVisualizer } from "../caption/AudioVisualizer";
 import { liveCaptionService, type CaptionSegment } from "@/lib/liveCaption";
 import { isEpisodeFavorited, toggleFavoriteEpisode } from "@/lib/library";
+import {
+  IconBook,
+  IconChevronDown,
+  IconChevronRight,
+  IconChevronUp,
+  IconExpand,
+  IconHeadphones,
+  IconHeart,
+  IconHeartFilled,
+  IconPin,
+  IconPopout,
+} from "../icons";
 
 const COLLAPSED_KEY = "hoerbar.dock.collapsed.v1";
 const SLOT_KEY = "hoerbar.dock.slot.v1";
@@ -224,7 +236,7 @@ export function MiniPlayer() {
             : "text-[var(--ink-faint)]"
         }`}
       >
-        <span className="text-[20px] leading-none">🎧</span>
+        <IconHeadphones className="w-5 h-5" />
         <span className="text-[10.5px] leading-tight">{t("nav.listenTab")}</span>
       </Link>
 
@@ -251,7 +263,7 @@ export function MiniPlayer() {
             : "text-[var(--ink-faint)]"
         }`}
       >
-        <span className="text-[20px] leading-none">📚</span>
+        <IconBook className="w-5 h-5" />
         <span className="text-[10.5px] leading-tight">{t("nav.libraryTab")}</span>
       </Link>
     </nav>
@@ -384,7 +396,7 @@ export function MiniPlayer() {
             <div className="max-h-24 space-y-1 overflow-y-auto rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-2 text-[11px]">
               {transcriptList.slice(-4).map((s) => (
                 <div key={s.id} className="flex gap-1.5">
-                  <span className="font-mono text-[10px] text-[var(--ink-faint)] shrink-0">▶</span>
+                  <IconChevronRight className="w-2.5 h-2.5 mt-0.5 text-[var(--ink-faint)] shrink-0" strokeWidth={2.5} />
                   <span className="text-[var(--ink)] line-clamp-1">{s.text}</span>
                 </div>
               ))}
@@ -405,9 +417,7 @@ export function MiniPlayer() {
             onClick={popout.close}
             className="card flex items-center gap-2 px-3.5 py-2 text-[12px] shadow-[var(--shadow-pop)] font-medium"
           >
-            <span aria-hidden className="text-[var(--accent)]">
-              ▣
-            </span>
+            <IconPopout className="w-3.5 h-3.5 text-[var(--accent)]" />
             {t("player.popoutClose")}
           </button>
         </div>
@@ -485,8 +495,8 @@ export function MiniPlayer() {
                 ) : null}
               </div>
               <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] border border-[var(--rule)]/80 px-2 py-0.5 text-[11px] font-semibold text-[var(--ink)] shadow-2xs shrink-0 group-hover:border-[var(--accent)]/50 transition">
-                <span>🎧</span>
-                <span className="text-[10px]">⤢</span>
+                <IconHeadphones className="w-3 h-3" />
+                <IconExpand className="w-2.5 h-2.5" />
               </span>
               <AudioVisualizer isPlaying={playing} barCount={5} />
               <button
@@ -518,19 +528,19 @@ export function MiniPlayer() {
                   type="button"
                   onClick={() => move(1)}
                   disabled={atTop}
-                  className="card h-7 w-7 rounded-full p-0 text-[11px] disabled:opacity-30"
+                  className="card grid h-7 w-7 place-items-center rounded-full p-0 disabled:opacity-30"
                   aria-label={t("player.moveUp")}
                 >
-                  ▲
+                  <IconChevronUp className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => move(-1)}
                   disabled={atBottom}
-                  className="card h-7 w-7 rounded-full p-0 text-[11px] disabled:opacity-30"
+                  className="card grid h-7 w-7 place-items-center rounded-full p-0 disabled:opacity-30"
                   aria-label={t("player.moveDown")}
                 >
-                  ▼
+                  <IconChevronDown className="w-3.5 h-3.5" />
                 </button>
               </div>
 
@@ -580,7 +590,7 @@ export function MiniPlayer() {
                     aria-label={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
                     title={favorited ? t("library.unfavoriteEpisode") : t("library.favoriteEpisode")}
                   >
-                    {favorited ? "❤️" : "🤍"}
+                    {favorited ? <IconHeartFilled className="w-3.5 h-3.5" /> : <IconHeart className="w-3.5 h-3.5" />}
                   </button>
                   <button
                     type="button"
@@ -592,16 +602,16 @@ export function MiniPlayer() {
                     aria-pressed={pinned}
                     title={pinned ? t("player.unpinExpanded") : t("player.pinExpanded")}
                   >
-                    📌
+                    <IconPin className="w-3.5 h-3.5" />
                   </button>
                   {popout.supported && (
                     <button
                       type="button"
                       onClick={() => void popout.open()}
-                      className="h-6 w-6 rounded-md flex items-center justify-center text-[11px] text-[var(--ink-faint)] hover:text-[var(--ink)] hover:bg-black/5 dark:hover:bg-white/5 transition"
+                      className="h-6 w-6 rounded-md flex items-center justify-center text-[var(--ink-faint)] hover:text-[var(--ink)] hover:bg-black/5 dark:hover:bg-white/5 transition"
                       title={t("player.popout")}
                     >
-                      ▣
+                      <IconPopout className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
@@ -660,9 +670,9 @@ export function MiniPlayer() {
                   title={t("player.openFullPlayer")}
                   aria-label={t("player.openFullPlayer")}
                 >
-                  <span>🎧</span>
+                  <IconHeadphones className="w-3.5 h-3.5" />
                   <span>Media Player</span>
-                  <span className="text-[11px]">⤢</span>
+                  <IconExpand className="w-3 h-3" />
                 </button>
               </div>
             </div>

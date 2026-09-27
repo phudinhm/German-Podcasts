@@ -20,6 +20,7 @@ import { transcribeAndSpliceRegion } from "@/lib/regionalTranscribe";
 import { getTranscriptOffset, setTranscriptOffset } from "@/lib/transcriptSync";
 import { markEpisodeFinished, notePosition } from "@/lib/library";
 import { PipSubtitleOverlay } from "./PipSubtitleOverlay";
+import { IconClapperboard } from "../icons";
 
 export interface Track {
   /** Stable id, used to tell "same episode" from "new episode". */
@@ -911,7 +912,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               }`}
               title="Hiện lại cửa sổ video Picture-in-Picture"
             >
-              <span>🎬</span>
+              <IconClapperboard className="w-3.5 h-3.5" />
               <span>Hiện PiP Video</span>
             </button>
           )}
@@ -982,10 +983,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
                     setVideoPipMode(false);
                     setFullscreenOpen(true);
                   }}
-                  className="truncate text-left text-[10.5px] font-semibold text-amber-300 hover:underline"
+                  className="flex items-center gap-1 truncate text-left text-[10.5px] font-semibold text-amber-300 hover:underline"
                   title="Mở lại trình phát toàn màn hình"
                 >
-                  🎬 {track.title}
+                  <IconClapperboard className="w-3 h-3 shrink-0" /> {track.title}
                 </button>
                 <div className="flex items-center gap-1 shrink-0">
                   {!stageRect && (

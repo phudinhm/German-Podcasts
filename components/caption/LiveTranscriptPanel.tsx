@@ -22,6 +22,17 @@ import {
   type SavedWord,
 } from "@/lib/vocabulary";
 import { VocabularyModal } from "./VocabularyModal";
+import {
+  IconCheck,
+  IconClose,
+  IconHourglass,
+  IconPlayFilled,
+  IconSettings,
+  IconSpeaker,
+  IconStar,
+  IconTarget,
+  IconZap,
+} from "../icons";
 
 // How long the collapsed floating bar stays fully visible after the last
 // caption update or interaction before fading, when auto-hide is on.
@@ -424,10 +435,10 @@ export function LiveTranscriptPanel({
           <button
             type="button"
             onClick={onClose}
-            className="icon-btn text-[14px]"
+            className="icon-btn"
             aria-label={t("common.close")}
           >
-            ×
+            <IconClose className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -473,18 +484,18 @@ export function LiveTranscriptPanel({
                 className="btn px-2.5 py-1 text-[11px] font-semibold text-[var(--accent)] border-[var(--accent)]/40 bg-[var(--accent-soft)]/50 hover:bg-[var(--accent-soft)] disabled:opacity-60"
                 title="Quét & Transcribe vùng âm thanh đang phát (tự động nhận diện quảng cáo chèn động & đồng bộ lại)"
               >
-                <span>{transcribingRegion ? "⏳" : "🎯"}</span>
+                {transcribingRegion ? <IconHourglass className="w-3.5 h-3.5" /> : <IconTarget className="w-3.5 h-3.5" />}
                 <span>{transcribingRegion ? "Đang quét vùng..." : "Quét vùng này"}</span>
               </button>
             ) : null}
             <button
               type="button"
               onClick={() => setShowSettings((v) => !v)}
-              className={`icon-btn text-[14px] ${showSettings ? "text-[var(--accent)]" : ""}`}
+              className={`icon-btn ${showSettings ? "text-[var(--accent)]" : ""}`}
               title={t("common.settings")}
               aria-label={t("common.settings")}
             >
-              ⚙
+              <IconSettings className="w-3.5 h-3.5" />
             </button>
             {onToggleCollapse && (
               <button
@@ -500,10 +511,10 @@ export function LiveTranscriptPanel({
             <button
               type="button"
               onClick={onClose}
-              className="icon-btn text-[16px]"
+              className="icon-btn"
               aria-label={t("common.close")}
             >
-              ×
+              <IconClose className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -537,7 +548,7 @@ export function LiveTranscriptPanel({
                 onClick={() => setSearchQuery("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ink-faint)] hover:text-[var(--ink)]"
               >
-                ×
+                <IconClose className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -546,10 +557,10 @@ export function LiveTranscriptPanel({
             <button
               type="button"
               onClick={() => setVocabModalOpen(true)}
-              className="btn px-2.5 py-1 text-[11.5px] font-semibold text-[var(--accent)]"
+              className="btn flex items-center gap-1.5 px-2.5 py-1 text-[11.5px] font-semibold text-[var(--accent)]"
               title="Mở sổ từ vựng đã lưu"
             >
-              ⭐ Từ vựng ({Object.keys(savedWords).length})
+              <IconStar className="w-3 h-3" /> Từ vựng ({Object.keys(savedWords).length})
             </button>
             <button
               type="button"
@@ -585,10 +596,10 @@ export function LiveTranscriptPanel({
           <button
             type="button"
             onClick={() => readAloud(selectedWord)}
-            className="font-bold text-[var(--accent)] hover:underline"
+            className="inline-flex items-center gap-1 font-bold text-[var(--accent)] hover:underline"
             title="Nghe phát âm"
           >
-            🔊 {selectedWord}:
+            <IconSpeaker className="w-3 h-3" /> {selectedWord}:
           </button>
           {loadingWord ? (
             <span className="animate-pulse">{t("caption.translating")}</span>
@@ -614,23 +625,29 @@ export function LiveTranscriptPanel({
                   });
                 }
               }}
-              className={`ml-auto rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
+              className={`ml-auto flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
                 savedWords[normalizeVocabWord(selectedWord)]
                   ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
                   : "bg-[var(--accent)] text-white hover:opacity-90"
               }`}
             >
-              {savedWords[normalizeVocabWord(selectedWord)]
-                ? "✓ Đã lưu (Bỏ lưu)"
-                : "⭐ Lưu từ vựng"}
+              {savedWords[normalizeVocabWord(selectedWord)] ? (
+                <>
+                  <IconCheck className="w-3 h-3" /> Đã lưu (Bỏ lưu)
+                </>
+              ) : (
+                <>
+                  <IconStar className="w-3 h-3" /> Lưu từ vựng
+                </>
+              )}
             </button>
           )}
           <button
             type="button"
             onClick={() => setSelectedWord(null)}
-            className="icon-btn h-6 w-6 text-[13px]"
+            className="icon-btn h-6 w-6"
           >
-            ×
+            <IconClose className="w-3 h-3" />
           </button>
         </div>
       )}
@@ -655,8 +672,8 @@ export function LiveTranscriptPanel({
                   {t("caption.generatingHint")}
                 </p>
                 {track?.url ? (
-                  <button type="button" onClick={onGenerateTranscript} className="btn btn-primary px-3.5 py-1.5 text-[12.5px]">
-                    ⚡ {t("caption.generateTranscript")}
+                  <button type="button" onClick={onGenerateTranscript} className="btn btn-primary flex items-center gap-1.5 px-3.5 py-1.5 text-[12.5px]">
+                    <IconZap className="w-3.5 h-3.5" /> {t("caption.generateTranscript")}
                   </button>
                 ) : null}
               </div>
@@ -689,18 +706,18 @@ export function LiveTranscriptPanel({
                       className="font-mono text-[11px] font-semibold text-[var(--ink-faint)] group-hover:text-[var(--accent)] rounded bg-[var(--surface)] px-1.5 py-0.5 transition active:scale-95 flex items-center gap-1"
                       title={`${t("caption.replaySegment")} (${formatTime(seg.start)})`}
                     >
-                      <span className="text-[9px]">▶</span>
+                      <IconPlayFilled className="w-2 h-2" />
                       <span>{formatTime(seg.start)}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => readAloud(seg.text)}
-                      className="text-[12px] opacity-40 hover:opacity-100 hover:text-[var(--accent)] transition px-0.5 py-0.5 rounded"
+                      className="opacity-40 hover:opacity-100 hover:text-[var(--accent)] transition px-0.5 py-0.5 rounded"
                       title={t("caption.readAloud")}
                       aria-label={t("caption.readAloud")}
                     >
-                      &#9835;
+                      <IconSpeaker className="w-3 h-3" />
                     </button>
                   </div>
 
@@ -727,7 +744,7 @@ export function LiveTranscriptPanel({
                                 ? "bg-amber-500/15 text-[var(--accent)] underline decoration-amber-400 decoration-2 underline-offset-4 font-semibold"
                                 : "hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
                             }`}
-                            title={saved ? `⭐ ${saved.word}: ${saved.meaning}` : "Click to translate & save this word"}
+                            title={saved ? `${saved.word}: ${saved.meaning}` : "Click to translate & save this word"}
                           >
                             {token}
                           </button>

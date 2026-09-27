@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlayerHandle } from "./types";
 import type { MediaElementState } from "./useMediaElement";
 import { useUi } from "@/lib/i18n";
+import { IconWarning } from "../icons";
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -249,7 +250,7 @@ export function Transport({
       {state.error ? (
         <div className="mb-2.5 flex flex-col gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-[12px] text-rose-800 dark:text-rose-200">
           <div className="flex items-start gap-2">
-            <span className="text-sm shrink-0 leading-none mt-0.5">⚠️</span>
+            <IconWarning className="w-4 h-4 shrink-0 mt-0.5" />
             <span className="min-w-0 flex-1 leading-snug">{state.error}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-0.5">

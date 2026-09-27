@@ -15,6 +15,7 @@ import { usePlayer } from "./PlayerProvider";
 import { Art } from "../listen/Art";
 
 import { FONT_FAMILIES, type FontFamily, type CaptionTheme, captionThemeStyle } from "../caption/CaptionSettings";
+import { IconCheck, IconClose, IconHourglass, IconMegaphone, IconSparkle, IconSpeaker, IconStar, IconZap } from "../icons";
 
 interface TranscriptReaderProps {
   currentTime: number;
@@ -285,9 +286,9 @@ export function TranscriptReader({
           <button
             type="button"
             onClick={onGenerateTranscript}
-            className={`rounded-full px-4 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${btnClasses}`}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[12.5px] font-medium transition active:scale-95 ${btnClasses}`}
           >
-            ⚡ {t("caption.generateTranscript")}
+            <IconZap className="w-3.5 h-3.5" /> {t("caption.generateTranscript")}
           </button>
         ) : null}
       </div>
@@ -331,7 +332,7 @@ export function TranscriptReader({
         {/* Subtle transient scanning toast when regional transcribe is running */}
         {adSyncNotice ? (
           <div className="sticky top-2 z-20 mx-auto max-w-sm flex items-center justify-center gap-2 rounded-full border border-emerald-500/40 bg-zinc-950/90 px-3.5 py-1 text-xs text-emerald-200 shadow-xl backdrop-blur-md">
-            <span>📢</span>
+            <IconMegaphone className="w-3.5 h-3.5" />
             <span>
               Đã tự động đồng bộ lại sau đoạn quảng cáo (
               {adSyncNotice.deltaSec > 0 ? "+" : ""}
@@ -340,7 +341,7 @@ export function TranscriptReader({
           </div>
         ) : transcribingRegion ? (
           <div className="sticky top-2 z-20 mx-auto max-w-sm flex items-center justify-center gap-2 rounded-full border border-amber-500/40 bg-zinc-950/90 px-3.5 py-1 text-xs text-amber-200 shadow-xl backdrop-blur-md animate-pulse">
-            <span>⏳</span>
+            <IconHourglass className="w-3.5 h-3.5" />
             <span>Đang quét & đồng bộ lại vùng âm thanh...</span>
           </div>
         ) : null}
@@ -429,7 +430,7 @@ export function TranscriptReader({
                         }}
                         title={
                           savedEntry
-                            ? `⭐ ${savedEntry.word}: ${savedEntry.meaning}`
+                            ? `${savedEntry.word}: ${savedEntry.meaning}`
                             : "Bấm để dịch & lưu từ này"
                         }
                         className={`inline-block rounded-md px-0.5 transition-all ${
@@ -463,7 +464,7 @@ export function TranscriptReader({
                         className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 font-bold text-amber-300 hover:bg-white/20"
                         title="Nghe phát âm"
                       >
-                        🔊 {selectedWord.cleanWord}
+                        <IconSpeaker className="w-3 h-3" /> {selectedWord.cleanWord}
                       </button>
                       <span className="text-white/40">→</span>
                       <span className="font-semibold text-emerald-300">
@@ -499,7 +500,15 @@ export function TranscriptReader({
                                 : "bg-amber-400 text-zinc-950 hover:bg-amber-300"
                             }`}
                           >
-                            {isSaved ? "✓ Đã lưu (Bỏ lưu)" : "⭐ Lưu từ vựng"}
+                            {isSaved ? (
+                              <>
+                                <IconCheck className="w-3 h-3" /> Đã lưu (Bỏ lưu)
+                              </>
+                            ) : (
+                              <>
+                                <IconStar className="w-3 h-3" /> Lưu từ vựng
+                              </>
+                            )}
                           </button>
                         );
                       })()}
@@ -509,7 +518,7 @@ export function TranscriptReader({
                         className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"
                         aria-label="Đóng"
                       >
-                        ✕
+                        <IconClose className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
@@ -546,7 +555,7 @@ export function TranscriptReader({
             >
               <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-inherit/20">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold tracking-wider uppercase text-[var(--accent)]">
-                  <span>✨</span>
+                  <IconSparkle className="w-3 h-3" />
                   <span>{currentTime >= totalDuration - 2 ? "Tập tiếp theo · Next Episode" : "10s cuối · Tập tiếp theo"}</span>
                 </span>
                 {nextTrack.durationSec ? (
